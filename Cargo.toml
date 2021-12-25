@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "core",
+]
+
+[profile.dev]
+opt-level = 1
+debug = false
+
+[profile.release]
+opt-level = 1
+debug = false
