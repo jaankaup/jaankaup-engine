@@ -12,4 +12,13 @@
 // pub mod render_pipelines;
 // pub mod noise3d;
 // pub mod compute;
-pub use wgpu;
+pub mod template;
+pub mod input;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}
