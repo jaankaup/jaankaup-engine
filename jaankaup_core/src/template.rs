@@ -203,8 +203,8 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     {
         SimpleLogger::new()
         .with_level(LevelFilter::Off)
-        .with_module_level("jaankaup", LevelFilter::Info)
-        .with_module_level("hello_project", LevelFilter::Info)
+        .with_module_level("jaankaup_core", LevelFilter::Info)
+        //.with_module_level("hello_project", LevelFilter::Info)
         //.with_module_level("wgpu", LevelFilter::Info)
         .with_utc_timestamps()
         .init()
@@ -230,7 +230,8 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
             .map(|x| x.parse().ok())
             .flatten()
             .unwrap_or(log::Level::Error);
-        console_log::init_with_level(level).expect("could not initialize logger");
+        // console_log::init_with_level(level).expect("could not initialize logger");
+        console_log::init_with_level(log::Level::Trace).expect("could not initialize logger");
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         // On wasm, append the canvas to the document body
         web_sys::window()

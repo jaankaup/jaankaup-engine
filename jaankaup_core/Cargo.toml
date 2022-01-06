@@ -4,15 +4,15 @@ version = "0.1.0"
 authors = ["jaankaup <janne.a.kauppinen@student.jyu.fi>"]
 edition = "2018"
 
-
 [lib]
 
 [features]
 input_debug = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c00e471274b6c21acda89b4b13d41742c0285d71", features = ["spirv"] }
-winit = { version = "0.26.0"}
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c00e471274b6c21acda89b4b13d41742c0285d71", features = ["spirv"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="043e36c59aeab52ddfe61517ce0ec5a676f91294", features = ["spirv"] }
+winit = { version = "0.26"}
 async-executor = "1.0"
 cgmath = "0.18"
 bytemuck = { version = "1.4", features = ["derive"] }
@@ -154,6 +154,7 @@ web-sys = { version = "0.3.53", features = [
     "HtmlCanvasElement",
     "OffscreenCanvas",
     "Window",
+    "Location",
 ]}
 js-sys = "0.3.50"
 wasm-bindgen-futures = "0.4.23"
