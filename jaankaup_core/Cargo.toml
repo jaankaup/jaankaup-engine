@@ -4,10 +4,13 @@ version = "0.1.0"
 authors = ["jaankaup <janne.a.kauppinen@student.jyu.fi>"]
 edition = "2018"
 
+
 [lib]
 
-[dependencies]
+[features]
+input_debug = []
 
+[dependencies]
 wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c00e471274b6c21acda89b4b13d41742c0285d71", features = ["spirv"] }
 winit = { version = "0.26.0"}
 async-executor = "1.0"

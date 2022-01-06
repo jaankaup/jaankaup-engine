@@ -143,6 +143,7 @@ impl Loop for BasicLoop {
                 // TODO: call clean up code. 
             }
 
+            // TODO: check if pre_update and update are conficting in some circumstances.
             Event::MainEventsCleared => {
                 //log::info!("MainEventsCleared....");
                 application.input(&queue, &input);

@@ -7,7 +7,7 @@ pub use ev::VirtualKeyCode as Key;
 use winit::dpi::PhysicalPosition;
 
 /// An enum for mouse and keyboard button states.
-#[derive(Clone,Debug)]
+#[derive(Clone,Copy,Debug)]
 pub enum InputState {
     Pressed(u128),
     Down(u128,u128),
@@ -16,31 +16,60 @@ pub enum InputState {
 
 impl InputState {
     /// Updates the state depending on given ElementState and the current state.
-    pub fn update(&mut self, state: &ev::ElementState, time_now: u128) {
+    pub fn update(&mut self, state: &ev::ElementState, time_now: u128) -> InputState {
         match state {
             ev::ElementState::Pressed => {
                 match std::mem::replace(self, InputState::Pressed(666)) {
                     InputState::Pressed(start_time) => {
-                        *self = InputState::Down(start_time,time_now)
+                        // #[cfg(feature = "input_debug")]
+                        // {
+                        //     log::info!("Key is already pressed. (start_time == {:?}, time_now == {:?}", start_time, time_now);
+                        // }
+                        let state = InputState::Down(start_time,time_now);
+                        *self = state; //InputState::Down(start_time,time_now)
+                        state                        
                     }
                     // This is updated in InputCache::pre_update function for mouse buttons.
                     // This won't never happen for mouse events.
                     InputState::Down(start_time, _) => {
-                        //log::info!("start_time == {}", start_time);
-                        *self = InputState::Down(start_time,time_now);
+                        // #[cfg(feature = "input_debug")]
+                        // {
+                        //     log::info!("Key is down. (start_time == {:?}, time_now == {:?})", start_time, time_now);
+                        // }
+                        let state = InputState::Down(start_time,time_now);
+                        *self = state; //InputState::Down(start_time,time_now);
+                        state
                     }
                     InputState::Released(_,_) => {
-                        *self = InputState::Pressed(time_now)
+                        // #[cfg(feature = "input_debug")]
+                        // {
+                        //     log::info!("Pressed => released {:?}", time_now);
+                        // }
+                        let state = InputState::Pressed(time_now);
+                        *self = state; // InputState::Pressed(time_now)
+                        state
                     }
                 }
             }
             ev::ElementState::Released => {
                 match std::mem::replace(self, InputState::Pressed(666)) {
                     InputState::Pressed(start_time) => {
-                        *self = InputState::Released(start_time,time_now)
+                        // #[cfg(feature = "input_debug")]
+                        // {
+                        //     log::info!("Key is released. (start_time == {:?}, time_now == {:?}", start_time, time_now);
+                        // }
+                        let state = InputState::Released(start_time,time_now);
+                        *self = state; //InputState::Released(start_time,time_now)
+                        state
                     }
                     InputState::Down(start_time, _) => {
-                        *self = InputState::Released(start_time,time_now)
+                        // #[cfg(feature = "input_debug")]
+                        // {
+                        //     log::info!("Key is released. (start_time == {:?}, time_now == {:?}", start_time, time_now);
+                        // }
+                        let state = InputState::Released(start_time,time_now);
+                        *self = state; //InputState::Released(start_time,time_now)
+                        state
                     }
                     InputState::Released(_,_) => {
                         panic!("Already released.")
@@ -156,7 +185,7 @@ impl CursorPosition {
 #[derive(Clone)]
 pub struct InputCache {
 
-    /// HashMap for keyboard keys/states.
+    /// HashMap for keyboard, keys/states.
     keyboard: HashMap<Key, InputState>,
 
     /// Left, middle and right mouse buttons.
@@ -218,7 +247,6 @@ impl InputCache {
 
     /// Get the difference between the current and previous mouse position.
     pub fn get_mouse_delta(&self) -> PhysicalPosition::<f64> {
-        // println!("get_mouse_delta :: self.mouse_moved == {:?}", self.mouse_moved);
         if self.mouse_moved { self.mouse_delta }
         else { PhysicalPosition::<f64>::new(0.0, 0.0) }
     }
@@ -304,10 +332,18 @@ impl InputCache {
             match self.keyboard.get_mut(&key) {
                 Some(state) => {
                     // Update the key time value.
-                    state.update(&evt.state, self.time_now) 
+                    let debug_state = state.update(&evt.state, self.time_now);
+                    #[cfg(feature = "input_debug")]
+                    {
+                        log::info!("Updating key {:?} :: {:?}", key, debug_state);
+                    }
                 }
                 None => {
                     // The key doesn't have any state. Add a new pressed state for this key.
+                    #[cfg(feature = "input_debug")]
+                    {
+                        log::info!("The key {:?} is pressed at time {:?}", key, self.time_now);
+                    }
                     let _ = self.keyboard.insert(key, InputState::Pressed(self.time_now));
                 }
             }
@@ -324,14 +360,11 @@ impl InputCache {
     /// Update the state of mouse movement.
     fn track_cursor_movement(&mut self, new_pos: PhysicalPosition<f64>) {
         self.mouse_moved = true;
-        //println!("mouse_moved = {:?}", self.mouse_moved);
         match self.mouse_position.pos {
             None => { self.mouse_position.pos = Some(new_pos);
                       //self.mouse_delta = PhysicalPosition::<f64>::new(0.0, 0.0);
                     }
             Some(old_position) => {
-                //let temp_delta = PhysicalPosition::<f64>::new(new_pos.x - old_position.x , new_pos.y - old_position.y);
-                //println!("temp_delta == {:?}", temp_delta);
                 self.mouse_delta = PhysicalPosition::<f64>::new(new_pos.x - old_position.x , new_pos.y - old_position.y);
                 self.mouse_position.pos = Some(new_pos);
             }
@@ -340,12 +373,18 @@ impl InputCache {
     /// Handle the cursor enter event. TODO: implement.
     fn track_cursor_enter(&mut self) {
         self.mouse_position.inside = true;
-        //log::info!("track_cursor_enter");
+        #[cfg(feature = "input_debug")]
+        {
+            log::info!("cursor enters");
+        }
     }
     /// Handle the cursor leave event. TODO: implement.
     fn track_cursor_leave(&mut self) {
         self.mouse_delta = PhysicalPosition::<f64>::new(0.0, 0.0);
         self.mouse_position.inside = false;
-        //log::info!("track_cursor_leave");
+        #[cfg(feature = "input_debug")]
+        {
+            log::info!("cursor leaves");
+        }
     }
 }
