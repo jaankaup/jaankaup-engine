@@ -1,5 +1,5 @@
 [package]
-name = "core"
+name = "jaankaup_core"
 version = "0.1.0"
 authors = ["jaankaup <janne.a.kauppinen@student.jyu.fi>"]
 edition = "2018"

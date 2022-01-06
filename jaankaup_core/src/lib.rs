@@ -14,6 +14,8 @@
 // pub mod compute;
 pub mod template;
 pub mod input;
+pub use wgpu;
+pub use winit;
 
 #[cfg(test)]
 mod tests {

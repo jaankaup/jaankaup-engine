@@ -2,7 +2,8 @@
 resolver = "2"
 
 members = [
-    "core",
+    "jaankaup_core",
+    "some_examples",
 ]
 
 [profile.dev]

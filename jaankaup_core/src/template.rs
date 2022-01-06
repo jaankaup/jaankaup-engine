@@ -166,7 +166,7 @@ impl Loop for BasicLoop {
                 // Update input cache.
                 input.update(&event);
 
-                match event {
+                match event { // Add ScaleFactorChanged.
                     WindowEvent::Resized(new_size) => {
                         size = new_size;
                         sc_desc.width = new_size.width;
@@ -205,6 +205,7 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
         .with_module_level("jaankaup", LevelFilter::Info)
         .with_module_level("hello_project", LevelFilter::Info)
         //.with_module_level("wgpu", LevelFilter::Info)
+        .with_utc_timestamps()
         .init()
         .unwrap();
     }
@@ -443,4 +444,23 @@ impl Spawner {
     pub fn spawn_local(&self, future: impl Future<Output = ()> + 'static) {
         wasm_bindgen_futures::spawn_local(future);
     }
+} 
+
+#[cfg(target_arch = "wasm32")]
+/// Parse the query string as returned by `web_sys::window()?.location().search()?` and get a
+/// specific key out of it.
+pub fn parse_url_query_string<'a>(query: &'a str, search_key: &str) -> Option<&'a str> {
+    let query_string = query.strip_prefix('?')?;
+
+    for pair in query_string.split('&') {
+        let mut pair = pair.split('=');
+        let key = pair.next()?;
+        let value = pair.next()?;
+
+        if key == search_key {
+            return Some(value);
+        }
+    }
+
+    None
 }

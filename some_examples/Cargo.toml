@@ -1,0 +1,12 @@
+[package]
+name = "some_examples"
+version = "0.1.0"
+authors = ["jaankaup <janne.a.kauppinen@student.jyu.fi>"]
+edition = "2018"
+
+[dependencies]
+jaankaup_core = { path = "../jaankaup_core" }
+
+[[example]]
+name = "basic"
+path = "src/basic.rs"
