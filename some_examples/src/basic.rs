@@ -4,9 +4,21 @@ use jaankaup_core::template::{
         Application,
         BasicLoop,
 };
+//use jaankaup_core::misc::Convert2Vec;
+//use jaankaup_core::impl_convert;
 use jaankaup_core::input::*;
 use jaankaup_core::wgpu;
 use jaankaup_core::winit;
+use bytemuck::{Pod,Zeroable};
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct TestData {
+    pub pos: [f32; 3],
+    pub something_else: u32,
+}
+//
+//impl_convert!{TestData}
 
 struct BasicFeatures {}
 impl WGPUFeatures for BasicFeatures { 

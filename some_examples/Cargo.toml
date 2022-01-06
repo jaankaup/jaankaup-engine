@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 jaankaup_core = { path = "../jaankaup_core" }
+bytemuck = { version = "1.4", features = ["derive"] }
 
 [[example]]
 name = "basic"

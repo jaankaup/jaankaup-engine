@@ -1278,6 +1278,7 @@ dependencies = [
 name = "some_examples"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "jaankaup_core",
 ]
 

@@ -14,8 +14,11 @@
 // pub mod compute;
 pub mod template;
 pub mod input;
+pub mod misc;
 pub use wgpu;
 pub use winit;
+//pub use bytemuck;
+//pub use bytemuck::{Pod, Zeroable};
 
 #[cfg(test)]
 mod tests {
