@@ -8,6 +8,7 @@ edition = "2018"
 
 [features]
 input_debug = []
+texture_debug = []
 
 [dependencies]
 #wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c00e471274b6c21acda89b4b13d41742c0285d71", features = ["spirv"] }

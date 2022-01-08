@@ -2,6 +2,7 @@
 *.output
 *.swp
 *.swo
+learning_diary.txt
 target/
 glslangValidator
 spirv-opt

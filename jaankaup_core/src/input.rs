@@ -332,13 +332,16 @@ impl InputCache {
             match self.keyboard.get_mut(&key) {
                 Some(state) => {
                     // Update the key time value.
-                    let debug_state = state.update(&evt.state, self.time_now);
+
+                    let _debug_state = state.update(&evt.state, self.time_now);
+
                     #[cfg(feature = "input_debug")]
                     {
-                        log::info!("Updating key {:?} :: {:?}", key, debug_state);
+                        log::info!("Updating key {:?} :: {:?}", key, _ebug_state);
                     }
                 }
                 None => {
+
                     // The key doesn't have any state. Add a new pressed state for this key.
                     #[cfg(feature = "input_debug")]
                     {
@@ -347,6 +350,7 @@ impl InputCache {
                     let _ = self.keyboard.insert(key, InputState::Pressed(self.time_now));
                 }
             }
+            // TODO: implement these with lambda functions.
         }
     }
     /// Update the state of mouse buttons.
