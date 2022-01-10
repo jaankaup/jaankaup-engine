@@ -51,15 +51,15 @@ pub trait Loop: Sized + 'static {
 
 /// A struct that holds the wgpu-rs application resources.
 pub struct WGPUConfiguration {
-    pub window: winit::window::Window,
-    pub event_loop: EventLoop<()>,
-    pub instance: wgpu::Instance,
-    pub size: winit::dpi::PhysicalSize<u32>,
-    pub surface: wgpu::Surface,
-    pub adapter: wgpu::Adapter,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
-    pub sc_desc: wgpu::SurfaceConfiguration,
+    window: winit::window::Window,
+    event_loop: EventLoop<()>,
+    instance: wgpu::Instance,
+    size: winit::dpi::PhysicalSize<u32>,
+    surface: wgpu::Surface,
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    sc_desc: wgpu::SurfaceConfiguration,
 }
 
 /// A trait to configure wgpu-rs engine.
