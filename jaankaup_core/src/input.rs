@@ -337,7 +337,7 @@ impl InputCache {
 
                     #[cfg(feature = "input_debug")]
                     {
-                        log::info!("Updating key {:?} :: {:?}", key, _ebug_state);
+                        log::info!("Updating key {:?} :: {:?}", key, _debug_state);
                     }
                 }
                 None => {
