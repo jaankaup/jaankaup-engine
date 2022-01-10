@@ -170,8 +170,8 @@ impl Loop for BasicLoop {
                 match event { // Add ScaleFactorChanged.
                     WindowEvent::Resized(new_size) => {
                         size = new_size;
-                        sc_desc.width = new_size.width;
-                        sc_desc.height = new_size.height;
+                        sc_desc.width = new_size.width.max(1);
+                        sc_desc.height = new_size.height.max(1);
                         surface.configure(&device, &sc_desc);
                         application.resize(&device, &sc_desc, size);
                     }
@@ -243,22 +243,6 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
             })
             .expect("couldn't append canvas to document body");
     }
-
-    //#[cfg(target_arch = "wasm32")]
-    //{
-    //    use winit::platform::web::WindowExtWebSys;
-    //    console_log::init_with_level(log::Level::Trace).expect("could not initialize logger");
-    //    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    //    // On wasm, append the canvas to the document body
-    //    web_sys::window()
-    //        .and_then(|win| win.document())
-    //        .and_then(|doc| doc.body())
-    //        .and_then(|body| {
-    //            body.append_child(&web_sys::Element::from(window.canvas()))
-    //                .ok()
-    //        })
-    //        .expect("couldn't append canvas to document body.");
-    //}
 
     log::info!("Initializing the surface...");
 
