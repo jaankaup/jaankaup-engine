@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::collections::HashMap;
 
 #[cfg(not(target_arch = "wasm32"))]
 use simple_logger::SimpleLogger;
@@ -103,8 +104,8 @@ impl Loop for BasicLoop {
         adapter,
         device,
         mut queue,
-        //mut swap_chain,
-        mut sc_desc
+        mut sc_desc 
+        //adapter_limits
         }: WGPUConfiguration,) {
 
     let spawner = Spawner::new();
@@ -204,7 +205,8 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
         SimpleLogger::new()
         .with_level(LevelFilter::Off)
         .with_module_level("jaankaup_core", LevelFilter::Info)
-        //.with_module_level("hello_project", LevelFilter::Info)
+        .with_module_level("basic", LevelFilter::Info)
+        //.with_target_levels(HashMap::from([("basic.rs".to_string(), LevelFilter::Info)]))
         //.with_module_level("wgpu", LevelFilter::Info)
         .with_utc_timestamps()
         .init()
@@ -278,9 +280,11 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     let optional_features = P::optional_features();
     let required_features = P::required_features();
     let adapter_features = adapter.features();
+    let adapter_limits = adapter.limits();
     log::info!("optional_features == {:?}", optional_features);
     log::info!("required_features == {:?}", required_features);
     log::info!("adapter_features == {:?}", adapter_features);
+    log::info!("adapter_limits == {:?}", adapter_limits);
     log::info!("(optional_features & adapter_features) | required_features == {:?}", (optional_features & adapter_features) | required_features);
     assert!(
         adapter_features.contains(required_features),

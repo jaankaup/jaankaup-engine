@@ -20,6 +20,8 @@ pub mod screen;
 pub mod render_object;
 pub use wgpu;
 pub use winit;
+pub use log;
+
 //pub use bytemuck;
 //pub use bytemuck::{Pod, Zeroable};
 
