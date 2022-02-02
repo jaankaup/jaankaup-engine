@@ -8,7 +8,7 @@ use jaankaup_core::template::{
 };
 //use jaankaup_core::misc::Convert2Vec;
 //use jaankaup_core::impl_convert;
-use jaankaup_core::render_object::{TestRenderObject,create_bind_groups,draw};
+use jaankaup_core::render_object::{RenderObject,create_bind_groups,draw};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::wgpu;
@@ -38,7 +38,7 @@ impl WGPUFeatures for BasicFeatures {
 // State for this application.
 struct BasicApp {
     pub screen: ScreenTexture, 
-    pub render_object: TestRenderObject, 
+    pub render_object: RenderObject, 
     pub bind_groups: Vec<wgpu::BindGroup>,
     pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
@@ -111,7 +111,7 @@ impl Application for BasicApp {
         buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
 
         let render_object =
-                TestRenderObject::init(&configuration.device,
+                RenderObject::init(&configuration.device,
                     &configuration.sc_desc,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_module"),

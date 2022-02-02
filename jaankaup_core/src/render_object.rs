@@ -1,13 +1,13 @@
 use core::ops::Range;
 use crate::texture::Texture;
 
-pub struct TestRenderObject {
+pub struct RenderObject {
     pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,
     pub pipeline: wgpu::RenderPipeline,
     pub bind_group_layout_entries: Vec<Vec<wgpu::BindGroupLayoutEntry>>
 }
 
-impl TestRenderObject {
+impl RenderObject {
     pub fn init(device: &wgpu::Device,
                 sc_desc: &wgpu::SurfaceConfiguration,
                 wgsl_module: &wgpu::ShaderModule,
@@ -117,7 +117,6 @@ impl TestRenderObject {
             bind_group_layout_entries: bind_group_layout_entries,
         }
     }
-
 }
 
 /// Takes wgpu::VertexFormats as input and returns (stride, Vec<wgpu::VertexBufferDescriptor>)
@@ -176,6 +175,7 @@ pub fn create_vb_descriptor(formats: &Vec<wgpu::VertexFormat>) -> (u64, Vec<wgpu
     (stride, attribute_descriptors)
 }
 
+/// Create BindGroups.
 pub fn create_bind_groups(device: &wgpu::Device,
                           entry_layouts: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
                           bing_group_layouts: &Vec<wgpu::BindGroupLayout>,
