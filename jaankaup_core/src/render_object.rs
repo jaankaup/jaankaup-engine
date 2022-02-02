@@ -178,6 +178,7 @@ pub fn create_vb_descriptor(formats: &Vec<wgpu::VertexFormat>) -> (u64, Vec<wgpu
 
 pub fn create_bind_groups(device: &wgpu::Device,
                           entry_layouts: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
+                          bing_group_layouts: &Vec<wgpu::BindGroupLayout>,
                           bindings: &Vec<Vec<&wgpu::BindingResource>>)
                         -> Vec<wgpu::BindGroup> {
 
@@ -189,9 +190,7 @@ pub fn create_bind_groups(device: &wgpu::Device,
 
         let mut inner_group: Vec<wgpu::BindGroupEntry> = Vec::new();
 
-        // Create the bind groups. TODO: this should be created only once (add to struct
-        // attribute).
-        let layouts = create_bind_group_layouts(&device, &entry_layouts);
+        // Create the bind groups.
 
         for j in 0..entry_layouts[i].len() {
 
@@ -208,7 +207,7 @@ pub fn create_bind_groups(device: &wgpu::Device,
                 result.push(device.create_bind_group(
                     &wgpu::BindGroupDescriptor {
                         label: None,
-                        layout: &layouts[i],
+                        layout: &bing_group_layouts[i],
                         entries: &inner_group,
                     })
                 );

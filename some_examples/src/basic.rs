@@ -6,8 +6,8 @@ use jaankaup_core::template::{
         Application,
         BasicLoop,
 };
-use jaankaup_core::misc::Convert2Vec;
-use jaankaup_core::impl_convert;
+//use jaankaup_core::misc::Convert2Vec;
+//use jaankaup_core::impl_convert;
 use jaankaup_core::render_object::{TestRenderObject,create_bind_groups,draw};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
@@ -17,16 +17,7 @@ use jaankaup_core::log;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_models::cube::create_cube;
-use bytemuck::{Pod,Zeroable};
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-pub struct TestData {
-    pub pos: [f32; 3],
-    pub something_else: u32,
-}
-
-impl_convert!{TestData}
+//use bytemuck::{Pod,Zeroable};
 
 struct BasicFeatures {}
 impl WGPUFeatures for BasicFeatures { 
@@ -49,7 +40,7 @@ struct BasicApp {
     pub screen: ScreenTexture, 
     pub render_object: TestRenderObject, 
     pub bind_groups: Vec<wgpu::BindGroup>,
-    pub textures: HashMap<String, Texture>,
+    pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
 }
@@ -118,21 +109,6 @@ impl Application for BasicApp {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
         buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
-        // let t_bindgroups = create_bind_groups(
-        //     &configuration.device,
-        //     &t.layout_entries,
-        //     &vec![
-        //         vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-        //                 buffer: &camera.get_camera_uniform(&configuration.device),
-        //                 offset: 0,
-        //                 size: None,
-        //         })],
-        //         vec![&wgpu::BindingResource::TextureView(&textures.get("grass").unwrap().view),
-        //              &wgpu::BindingResource::Sampler(&textures.get("grass").unwrap().sampler),
-        //              &wgpu::BindingResource::TextureView(&textures.get("rock").unwrap().view),
-        //              &wgpu::BindingResource::Sampler(&textures.get("rock").unwrap().sampler)]
-        //     ]
-        // );
 
         let render_object =
                 TestRenderObject::init(&configuration.device,
@@ -202,6 +178,7 @@ impl Application for BasicApp {
         let bind_groups = create_bind_groups(
                                 &configuration.device,
                                 &render_object.bind_group_layout_entries,
+                                &render_object.bind_group_layouts,
                                 &vec![
                                     vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                                             buffer: &camera.get_camera_uniform(&configuration.device),
@@ -219,7 +196,7 @@ impl Application for BasicApp {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
             bind_groups,
-            textures: textures,
+            _textures: textures,
             buffers: buffers,
             camera: camera,
         }
