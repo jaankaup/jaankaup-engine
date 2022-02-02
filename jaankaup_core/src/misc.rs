@@ -85,3 +85,10 @@ pub fn create_vb_descriptor(formats: &Vec<wgpu::VertexFormat>) -> (u64, Vec<wgpu
 
     (stride, attribute_descriptors)
 }
+
+/// Clamp function.
+pub fn clamp(val: f32, min: f32, max: f32) -> f32 {
+    let result  = if val >= max { max } else { val };
+    let result2 = if result <= min { min } else { val };
+    result2
+}

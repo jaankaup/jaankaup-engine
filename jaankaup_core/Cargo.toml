@@ -11,8 +11,7 @@ input_debug = []
 texture_debug = []
 
 [dependencies]
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c00e471274b6c21acda89b4b13d41742c0285d71", features = ["spirv"] }
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="043e36c59aeab52ddfe61517ce0ec5a676f91294", features = ["spirv"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="766c6cda1917c1265fa8a5f610ef7516d4314d1b", features = ["spirv"] }
 winit = { version = "0.26"}
 async-executor = "1.0"
 cgmath = "0.18"
@@ -31,7 +30,7 @@ simple_logger = "1.16.0"
 # version = "0.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2.76" # remember to change version in wiki as well
+wasm-bindgen = "0.2.79" # remember to change version in wiki as well
 web-sys = { version = "0.3.53", features = [
     "Document",
     "Navigator",

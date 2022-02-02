@@ -6,8 +6,13 @@ edition = "2018"
 
 [dependencies]
 jaankaup_core = { path = "../jaankaup_core" }
+jaankaup_models = { path = "../assets/models" }
 bytemuck = { version = "1.4", features = ["derive"] }
 
 [[example]]
 name = "basic"
 path = "src/basic.rs"
+
+[[example]]
+name = "common_functions"
+path = "src/misc_functions.rs"

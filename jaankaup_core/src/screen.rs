@@ -2,10 +2,11 @@ use std::mem;
 use crate::texture::Texture;
 
 /// A struct that owns the current wgpu::SurfaceTexture and the optional depth texture.
+/// TODO: getter_functions for attributes
 pub struct ScreenTexture {
-    surface_texture: Option<wgpu::SurfaceTexture>,
+    pub surface_texture: Option<wgpu::SurfaceTexture>,
     #[allow(dead_code)]
-    depth_texture: Option<Texture>,
+    pub depth_texture: Option<Texture>,
 }
 
 impl ScreenTexture {
@@ -17,6 +18,8 @@ impl ScreenTexture {
              sc_desc: &wgpu::SurfaceConfiguration,
              create_depth_texture: bool) -> Self {
 
+        log::info!("Screen::init.");
+
         let depth_texture = if create_depth_texture {
                 Some(Texture::create_depth_texture(
                     &device,
@@ -25,6 +28,8 @@ impl ScreenTexture {
                     )
                 )
             } else { None };
+
+        log::info!("Created depth_texture.");
 
         Self {
             surface_texture: None,
@@ -58,7 +63,7 @@ impl ScreenTexture {
     pub fn prepare_for_rendering(&mut self) {
 
         if self.surface_texture.is_none() {
-            panic!("ScreenTexture doesn't have a surface_testure. Consider calling the ScreenTexture::acquire_screen_texture before this method.");
+            panic!("ScreenTexture doesn't have a surface_texture. Consider calling the ScreenTexture::acquire_screen_texture before this method.");
         }
 
         mem::take(&mut self.surface_texture).unwrap().present();
