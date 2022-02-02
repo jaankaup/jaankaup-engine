@@ -28,6 +28,9 @@ impl ComputeObject {
             );
         }
 
+        // TODO: create labeling.
+        // let pipeline_layout_label = format!("{} {}", label.push_str(" pipeline_layout");
+
         // Create pipeline layout.
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: label,
@@ -48,6 +51,18 @@ impl ComputeObject {
             pipeline: pipeline,
             bind_group_layout_entries: bind_group_layout_entries,
         }
+    }
+
+    pub fn dispatch(&self, bind_groups: &Vec<wgpu::BindGroup>, encoder: &mut wgpu::CommandEncoder, x: u32, y: u32, z: u32, label: wgpu::Label) {
+
+        let mut pass = encoder.begin_compute_pass(
+            &wgpu::ComputePassDescriptor { label: label}
+        );
+        pass.set_pipeline(&self.pipeline);
+        for (e, bgs) in bind_groups.iter().enumerate() {
+            pass.set_bind_group(e as u32, &bgs, &[]);
+        }
+        pass.dispatch(x, y, z)
     }
 }
 
