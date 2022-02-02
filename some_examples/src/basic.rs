@@ -111,7 +111,8 @@ impl Application for BasicApp {
         buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
 
         let render_object =
-                RenderObject::init(&configuration.device,
+                RenderObject::init(
+                    &configuration.device,
                     &configuration.sc_desc,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_module"),
@@ -168,6 +169,7 @@ impl Application for BasicApp {
                             }
                         ] // Set 1
                     ],
+                    Some("Basic vvvvnnnn renderer with camera.")
         );
 
         // Camera.

@@ -1,6 +1,56 @@
 use core::ops::Range;
 use crate::texture::Texture;
 
+pub struct ComputeObject {
+    pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,
+    pub pipeline: wgpu::ComputePipeline,
+    pub bind_group_layout_entries: Vec<Vec<wgpu::BindGroupLayoutEntry>>
+}
+
+impl ComputeObject {
+    pub fn init(device: &wgpu::Device,
+                wgsl_module: &wgpu::ShaderModule,
+                bind_group_layout_entries: Vec<Vec<wgpu::BindGroupLayoutEntry>>,
+                label: wgpu::Label,
+            ) -> Self {
+
+        // Duplicate code...
+        let mut bind_group_layouts: Vec<wgpu::BindGroupLayout> = Vec::new();
+
+        for ve in bind_group_layout_entries.iter() {
+            bind_group_layouts.push(
+                device.create_bind_group_layout(
+                    &wgpu::BindGroupLayoutDescriptor {
+                        entries: &ve,
+                        label: None,
+                    }
+                )
+            );
+        }
+
+        // Create pipeline layout.
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: label,
+            bind_group_layouts: &bind_group_layouts.iter().collect::<Vec<_>>(),
+            push_constant_ranges: &[],
+        });
+
+        // Create the pipeline.
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("mc_pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &wgsl_module, // : wgpu::ProgrammableStageDescriptor {
+            entry_point: "main",
+        });
+
+        Self {
+            bind_group_layouts: bind_group_layouts,
+            pipeline: pipeline,
+            bind_group_layout_entries: bind_group_layout_entries,
+        }
+    }
+}
+
 pub struct RenderObject {
     pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,
     pub pipeline: wgpu::RenderPipeline,
@@ -13,12 +63,12 @@ impl RenderObject {
                 wgsl_module: &wgpu::ShaderModule,
                 vertex_attributes: &Vec<wgpu::VertexFormat>,
                 bind_group_layout_entries: Vec<Vec<wgpu::BindGroupLayoutEntry>>,
+                label: wgpu::Label,
                 ) -> Self {
 
+        // Duplicate code...
         let mut bind_group_layouts: Vec<wgpu::BindGroupLayout> = Vec::new();
 
-        // Create bind group layout descriptors. This is used to create bind group layout.
-        //for ve in layout_data.get_bind_group_layout_entries().iter() {
         for ve in bind_group_layout_entries.iter() {
             bind_group_layouts.push(
                 device.create_bind_group_layout(
@@ -36,7 +86,7 @@ impl RenderObject {
 
         // Create pipeline layout.
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
+            label: label,
             bind_group_layouts: &bind_group_layouts.iter().collect::<Vec<_>>(), // &[&bind_group_layout],
             push_constant_ranges: &[],
         });
