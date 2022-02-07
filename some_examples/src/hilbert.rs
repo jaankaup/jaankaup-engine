@@ -1,4 +1,4 @@
-use jaankaup_core::common_functions::{from_hilber_index, to_hilbert_index, g, gc, e, f, t, d, t_inv, from_compact_hilbert_index, compact_hilbert_index, mod3,mod3_64};
+use jaankaup_core::common_functions::{from_hilber_index, to_hilbert_index, g, gc, e, f, t, d, t_inv, from_compact_hilbert_index, compact_hilbert_index, mod3_32,mod3_64};
 
 fn main() {
 
@@ -6,22 +6,23 @@ fn main() {
     //     let point = from_hilber_index(i, 3);
     //     println!("from_hilbert_index({:?}) == {:?}", i, point); 
     // }
-    let mut map = Vec::<u32>::new();
-    for i in 0..4 {
-    for j in 0..4 {
-    for k in 0..4 {
-        
-        let index = to_hilbert_index([i,j,k], 3);
-        let point = from_hilber_index(index, 3);
-        print!("to_hilbert_index({:?}) == {:?}    ", [i,j,k], index); 
-        println!("from_hilbert_index({:?}) == {:?} :: {:?}", index, point, [i,j,k] == point); 
-        // println!("to_hilbert_index({},{},{}) == {:?}", i, j, k, index);
-        // map.push(index);
-    }}};
-    map.sort();
-    for i in map.iter() {
-        println!("{}", i);
-    }
+
+    //let mut map = Vec::<u32>::new();
+    //for i in 0..4 {
+    //for j in 0..4 {
+    //for k in 0..4 {
+    //    
+    //    let index = to_hilbert_index([i,j,k], 3);
+    //    let point = from_hilber_index(index, 3);
+    //    print!("to_hilbert_index({:?}) == {:?}    ", [i,j,k], index); 
+    //    println!("from_hilbert_index({:?}) == {:?} :: {:?}", index, point, [i,j,k] == point); 
+    //    // println!("to_hilbert_index({},{},{}) == {:?}", i, j, k, index);
+    //    // map.push(index);
+    //}}};
+    //map.sort();
+    //for i in map.iter() {
+    //    println!("{}", i);
+    //}
 
     //// const N: u32 = 3;
 
