@@ -29,9 +29,9 @@ impl ComputeObject {
 
         // Create the pipeline.
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("mc_pipeline"),
+            label: label,
             layout: Some(&pipeline_layout),
-            module: &wgsl_module, // : wgpu::ProgrammableStageDescriptor {
+            module: &wgsl_module,
             entry_point: "main",
         });
 

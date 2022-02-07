@@ -14,6 +14,10 @@ name = "basic"
 path = "src/basic.rs"
 
 [[example]]
+name = "debug_visualizator"
+path = "src/debug_visualizator.rs"
+
+[[example]]
 name = "common_functions"
 path = "src/misc_functions.rs"
 
