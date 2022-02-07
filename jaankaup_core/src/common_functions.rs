@@ -264,11 +264,13 @@ pub fn from_hilber_index(h: u32, m: u32) -> [u32; 3] {
 
 /* Rosenberg-Strong */ 
 
+/// Rosenberg-Strong tuple to index. 
 pub fn r2(x: i32, y: i32) -> i32 {
     let max2 = cmp::max(x,y);
     max2 * max2 + max2 + x - y 
 }
 
+/// Rosenberg-Strong triple to index. 
 pub fn r3(x: i32, y: i32, z: i32) -> i32 {
     let max2 = cmp::max(x,y);
     let max3  = cmp::max(z, max2);
@@ -282,6 +284,7 @@ fn floored_root(x: i32, n: i32) -> i32 {
     (x as f64).powf(1.0/(n as f64)).floor() as i32
 }
 
+/// Rosenberg-Strong index to tuple. 
 pub fn r2_reverse(z: i32) -> (i32, i32) {
     let m = floored_root(z, 2);
     let m_powf2 = m * m; 
@@ -292,6 +295,7 @@ pub fn r2_reverse(z: i32) -> (i32, i32) {
     }
 }
 
+/// Rosenberg-Strong index to triple. 
 pub fn r3_reverse(z: i32) -> (i32, i32, i32) {
     let m = (z as f64).cbrt().floor() as i32;
     let t = z - m*m*m - m*m;
