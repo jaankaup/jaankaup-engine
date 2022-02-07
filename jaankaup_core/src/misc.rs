@@ -29,6 +29,7 @@ macro_rules! impl_convert {
 }
 
 impl_convert!{OutputVertex}
+impl_convert!{u32}
 
 /// Takes wgpu::VertexFormats as input and returns (stride, Vec<wgpu::VertexBufferDescriptor>)
 pub fn create_vb_descriptor(formats: &Vec<wgpu::VertexFormat>) -> (u64, Vec<wgpu::VertexAttribute>) { 

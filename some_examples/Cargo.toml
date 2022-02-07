@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 jaankaup_core = { path = "../jaankaup_core" }
 jaankaup_models = { path = "../assets/models" }
+jaankaup_algorithms = { path = "../algorithms" }
 bytemuck = { version = "1.4", features = ["derive"] }
 
 [[example]]

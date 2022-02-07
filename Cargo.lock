@@ -726,6 +726,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 
 [[package]]
+name = "jaankaup_algorithms"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "jaankaup_core",
+]
+
+[[package]]
 name = "jaankaup_core"
 version = "0.1.0"
 dependencies = [
@@ -1294,6 +1302,7 @@ name = "some_examples"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "jaankaup_algorithms",
  "jaankaup_core",
  "jaankaup_models",
 ]

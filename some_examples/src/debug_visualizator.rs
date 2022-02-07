@@ -9,6 +9,7 @@ use jaankaup_core::template::{
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
+use jaankaup_core::buffer::{buffer_from_data, to_vec};
 use jaankaup_core::wgpu;
 use jaankaup_core::winit;
 use jaankaup_core::log;
@@ -16,6 +17,7 @@ use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
+use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 
 // 
@@ -67,10 +69,12 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
 struct DebugVisualizator {
     pub screen: ScreenTexture, 
     pub render_object: RenderObject, 
-    pub bind_groups: Vec<wgpu::BindGroup>,
+    pub render_bind_groups: Vec<wgpu::BindGroup>,
+    pub compute_bind_groups: Vec<wgpu::BindGroup>,
     // pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
+    pub histogram: Histogram,
 }
 
 impl DebugVisualizator {
@@ -95,6 +99,10 @@ impl Application for DebugVisualizator {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
         // buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
+
+        // Camera.
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
+        camera.set_rotation_sensitivity(0.2);
 
         let render_object =
                 RenderObject::init(
@@ -123,6 +131,20 @@ impl Application for DebugVisualizator {
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera.")
         );
+        let render_bind_groups = create_bind_groups(
+                                     &configuration.device,
+                                     &render_object.bind_group_layout_entries,
+                                     &render_object.bind_group_layouts,
+                                     &vec![
+                                         vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                                 buffer: &camera.get_camera_uniform(&configuration.device),
+                                                 offset: 0,
+                                                 size: None,
+                                         })],
+                                     ]
+        );
+
+        println!("Creating compute object.");
 
         let compute_object =
                 ComputeObject::init(
@@ -164,9 +186,22 @@ impl Application for DebugVisualizator {
                             },
                             // @group(0)
                             // @binding(2)
-                            // var<storage,read_write> output: array<VertexBuffer>;
+                            // var<storage, read> counter: array<DebugArray>;
                             wgpu::BindGroupLayoutEntry {
                                 binding: 2,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(3)
+                            // var<storage,read_write> output: array<VertexBuffer>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 3,
                                 visibility: wgpu::ShaderStages::COMPUTE,
                                 ty: wgpu::BindingType::Buffer {
                                     ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -179,31 +214,91 @@ impl Application for DebugVisualizator {
                     ]
         );
 
-        // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
-        camera.set_rotation_sensitivity(0.2);
+        let histogram = Histogram::init(&configuration.device, &vec![0]);
+
+        buffers.insert(
+            "visualization_params".to_string(),
+            buffer_from_data::<VisualizationParams>(
+            &configuration.device,
+            &vec![VisualizationParams { triangle_start: 0, triangle_end: 1024 }],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
+
+        buffers.insert(
+            "debug_arrays".to_string(),
+            buffer_from_data::<f32>(
+            &configuration.device,
+            &vec![0 as f32 ; 8*1024],
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
+
+        buffers.insert(
+            "output".to_string(),
+            buffer_from_data::<f32>(
+            &configuration.device,
+            &vec![0 as f32 ; 8*1024],
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
+
+        println!("Creating compute bind groups.");
+
+        let compute_bind_groups = create_bind_groups(
+                                      &configuration.device,
+                                      &compute_object.bind_group_layout_entries,
+                                      &compute_object.bind_group_layouts,
+                                      &vec![
+                                          vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                                  buffer: &buffers.get(&"visualization_params".to_string()).unwrap(),
+                                                  offset: 0,
+                                                  size: None,
+                                          }),
+                                          &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                                  buffer: &histogram.get_histogram_buffer(),
+                                                  offset: 0,
+                                                  size: None,
+                                          }),
+                                          &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                                  buffer: &buffers.get(&"debug_arrays".to_string()).unwrap(),
+                                                  offset: 0,
+                                                  size: None,
+                                          }),
+                                          &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                                  buffer: &buffers.get(&"output".to_string()).unwrap(),
+                                                  offset: 0,
+                                                  size: None,
+                                          }),
+                                          ]
+                                    ]
+        );
+
+        println!("Creating render bind groups.");
 
         // Create bind groups for basic render pipeline and grass/rock textures.
-        let bind_groups = create_bind_groups(
-                                &configuration.device,
-                                &render_object.bind_group_layout_entries,
-                                &render_object.bind_group_layouts,
-                                &vec![
-                                    vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                            buffer: &camera.get_camera_uniform(&configuration.device),
-                                            offset: 0,
-                                            size: None,
-                                    })],
-                                ]
+        let render_bind_groups = create_bind_groups(
+                                    &configuration.device,
+                                    &render_object.bind_group_layout_entries,
+                                    &render_object.bind_group_layouts,
+                                    &vec![
+                                        vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                                buffer: &camera.get_camera_uniform(&configuration.device),
+                                                offset: 0,
+                                                size: None,
+                                        })],
+                                    ]
         );
  
-        DebugVisualizator {
+        Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
-            bind_groups,
+            render_bind_groups: render_bind_groups,
+            compute_bind_groups: compute_bind_groups,
             // _textures: textures,
             buffers: buffers,
             camera: camera,
+            histogram: histogram,
         }
     }
 

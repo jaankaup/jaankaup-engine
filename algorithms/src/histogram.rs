@@ -1,3 +1,9 @@
+use jaankaup_core::wgpu;
+use jaankaup_core::cgmath;
+use jaankaup_core::buffer::{buffer_from_data, to_vec};
+use jaankaup_core::misc::Convert2Vec;
+use jaankaup_core::impl_convert;
+
 /// Histogram struct for GPU purposes. 
 pub struct Histogram {
     histogram: wgpu::Buffer,

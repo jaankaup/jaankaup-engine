@@ -24,6 +24,7 @@ pub mod buffer;
 pub use wgpu;
 pub use winit;
 pub use log;
+pub use cgmath;
 
 //pub use bytemuck;
 //pub use bytemuck::{Pod, Zeroable};
