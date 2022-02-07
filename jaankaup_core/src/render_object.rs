@@ -10,23 +10,12 @@ pub struct ComputeObject {
 impl ComputeObject {
     pub fn init(device: &wgpu::Device,
                 wgsl_module: &wgpu::ShaderModule,
-                bind_group_layout_entries: Vec<Vec<wgpu::BindGroupLayoutEntry>>,
+                bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
                 label: wgpu::Label,
             ) -> Self {
 
-        // Duplicate code...
-        let mut bind_group_layouts: Vec<wgpu::BindGroupLayout> = Vec::new();
 
-        for ve in bind_group_layout_entries.iter() {
-            bind_group_layouts.push(
-                device.create_bind_group_layout(
-                    &wgpu::BindGroupLayoutDescriptor {
-                        entries: &ve,
-                        label: None,
-                    }
-                )
-            );
-        }
+        let bind_group_layouts = create_bind_group_layouts(device, bind_group_layout_entries);
 
         // TODO: create labeling.
         // let pipeline_layout_label = format!("{} {}", label.push_str(" pipeline_layout");
@@ -49,7 +38,7 @@ impl ComputeObject {
         Self {
             bind_group_layouts: bind_group_layouts,
             pipeline: pipeline,
-            bind_group_layout_entries: bind_group_layout_entries,
+            bind_group_layout_entries: bind_group_layout_entries.to_vec(),
         }
     }
 
@@ -77,23 +66,11 @@ impl RenderObject {
                 sc_desc: &wgpu::SurfaceConfiguration,
                 wgsl_module: &wgpu::ShaderModule,
                 vertex_attributes: &Vec<wgpu::VertexFormat>,
-                bind_group_layout_entries: Vec<Vec<wgpu::BindGroupLayoutEntry>>,
+                bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
                 label: wgpu::Label,
                 ) -> Self {
 
-        // Duplicate code...
-        let mut bind_group_layouts: Vec<wgpu::BindGroupLayout> = Vec::new();
-
-        for ve in bind_group_layout_entries.iter() {
-            bind_group_layouts.push(
-                device.create_bind_group_layout(
-                    &wgpu::BindGroupLayoutDescriptor {
-                        entries: &ve,
-                        label: None,
-                    }
-                )
-            );
-        }
+        let bind_group_layouts = create_bind_group_layouts(device, bind_group_layout_entries);
 
         let (stride, attributes) =  create_vb_descriptor(
             vertex_attributes
@@ -179,7 +156,7 @@ impl RenderObject {
         Self {
             bind_group_layouts: bind_group_layouts,
             pipeline: pipeline,
-            bind_group_layout_entries: bind_group_layout_entries,
+            bind_group_layout_entries: bind_group_layout_entries.to_vec(),
         }
     }
 }
@@ -354,3 +331,22 @@ pub fn draw(encoder: &mut wgpu::CommandEncoder,
     
     render_pass.draw(range, 0..1);
 }
+
+// pub fn create_bind_group_layouts(device: &wgpu::Device,
+//                                  bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>)
+//                                  -> Vec<wgpu::BindGroupLayout> {
+// 
+//     let mut bind_group_layouts: Vec<wgpu::BindGroupLayout> = Vec::new();
+//     
+//     for ve in bind_group_layout_entries.iter() {
+//         bind_group_layouts.push(
+//             device.create_bind_group_layout(
+//                 &wgpu::BindGroupLayoutDescriptor {
+//                     entries: &ve,
+//                     label: None,
+//                 }
+//             )
+//         );
+//     }
+//     bind_group_layouts
+// }

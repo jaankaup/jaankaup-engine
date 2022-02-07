@@ -121,7 +121,7 @@ impl Application for BasicApp {
                     
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
-                    vec![
+                    &vec![
                         // Group 0
                         vec![wgpu::BindGroupLayoutEntry {
                                 binding: 0,
