@@ -10,8 +10,8 @@ pub struct ComputeObject {
 impl ComputeObject {
     pub fn init(device: &wgpu::Device,
                 wgsl_module: &wgpu::ShaderModule,
-                bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
                 label: wgpu::Label,
+                bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
             ) -> Self {
 
 

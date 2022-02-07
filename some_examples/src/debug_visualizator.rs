@@ -6,7 +6,7 @@ use jaankaup_core::template::{
         Application,
         BasicLoop,
 };
-use jaankaup_core::render_object::{RenderObject,create_bind_groups,draw};
+use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::wgpu;
@@ -14,10 +14,42 @@ use jaankaup_core::winit;
 use jaankaup_core::log;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
+use jaankaup_core::misc::Convert2Vec;
+use jaankaup_core::impl_convert;
+use bytemuck::{Pod, Zeroable};
+
+// 
+//  Arrow  
+//
+//  +----------------+
+//  | start: [3;f32] |
+//  | end: [3;f32]   |
+//  | color: u32     |
+//  | size: f32      |
+//  +----------------+
+//
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct VisualizationParams{
+    triangle_start: u32,
+    triangle_end: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct DebugArray {
+    start: [f32; 3],
+    end:   [f32; 3],
+    color: u32,
+    size: f32,
+}
+
+impl_convert!{DebugArray}
 
 struct DebugVisualizatorFeatures {}
 
-impl WGPUFeatures for DebugVisualizatorFeatures { 
+impl WGPUFeatures for DebugVisualizatorFeatures {
     fn optional_features() -> wgpu::Features {
         wgpu::Features::empty()
     }
@@ -69,7 +101,7 @@ impl Application for DebugVisualizator {
                     &configuration.device,
                     &configuration.sc_desc,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("renderer_v4n4_debug_visualizator"),
+                        label: Some("renderer_v4n4_debug_visualizator_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
                     
@@ -88,42 +120,63 @@ impl Application for DebugVisualizator {
                                 count: None,
                             },
                         ],
-                        // // Group 1
-                        // vec![wgpu::BindGroupLayoutEntry {
-                        //         binding: 0,
-                        //         visibility: wgpu::ShaderStages::FRAGMENT,
-                        //         ty: wgpu::BindingType::Texture {
-                        //             sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        //             view_dimension: wgpu::TextureViewDimension::D2,
-                        //             multisampled: false,
-                        //         },
-                        //         count: None,
-                        //     },
-                        //     wgpu::BindGroupLayoutEntry {
-                        //         binding: 1,
-                        //         visibility: wgpu::ShaderStages::FRAGMENT,
-                        //         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        //         count: None,
-                        //     },
-                        //     wgpu::BindGroupLayoutEntry {
-                        //         binding: 2,
-                        //         visibility: wgpu::ShaderStages::FRAGMENT,
-                        //         ty: wgpu::BindingType::Texture {
-                        //             sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        //             view_dimension: wgpu::TextureViewDimension::D2,
-                        //             multisampled: false,
-                        //         },
-                        //         count: None,
-                        //     },
-                        //     wgpu::BindGroupLayoutEntry {
-                        //         binding: 3,
-                        //         visibility: wgpu::ShaderStages::FRAGMENT,
-                        //         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        //         count: None,
-                        //     }
-                        // ] // Set 1
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera.")
+        );
+
+        let compute_object =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("compute_visuzlizer_wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
+                    
+                    }),
+                    Some("Visualizer Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0)
+                            // @binding(0)
+                            // var<uniform> visualization_params: VisualizationParams;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(1)
+                            // var<storage, read_write> counter: Counter;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(2)
+                            // var<storage,read_write> output: array<VertexBuffer>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 2,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                        ],
+                    ]
         );
 
         // Camera.
