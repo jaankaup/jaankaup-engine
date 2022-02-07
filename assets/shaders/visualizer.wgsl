@@ -74,8 +74,8 @@ fn create_aabb(aabb: AABB, r: u32, g: u32, b: u32) {
     //          +-----------------+p2
     //         /|                /|
     //        / |               / |
-    //       /  |           p7 /  |
-    //   p6 +-----------------+   |
+    //       /  |           p6 /  |
+    //   p7 +-----------------+   |
     //      |   |             |   |
     //      |   |p0           |   |p1
     //      |   +-------------|---+  
@@ -97,12 +97,12 @@ fn create_aabb(aabb: AABB, r: u32, g: u32, b: u32) {
 
     // FRONT.
 
-    output[index]   = Vertex(vec4<f32>(p4, 1.0), n_front);
+    output[index]    = Vertex(vec4<f32>(p4, 1.0), n_front);
     output[index+1u] = Vertex(vec4<f32>(p5, 1.0), n_front);
-    output[index+2u] = Vertex(vec4<f32>(p7, 1.0), n_front);
+    output[index+2u] = Vertex(vec4<f32>(p6, 1.0), n_front);
     output[index+3u] = Vertex(vec4<f32>(p4, 1.0), n_front);
-    output[index+4u] = Vertex(vec4<f32>(p7, 1.0), n_front);
-    output[index+5u] = Vertex(vec4<f32>(p6, 1.0), n_front);
+    output[index+4u] = Vertex(vec4<f32>(p6, 1.0), n_front);
+    output[index+5u] = Vertex(vec4<f32>(p7, 1.0), n_front);
 
     //// RIGHT.
 
@@ -111,43 +111,43 @@ fn create_aabb(aabb: AABB, r: u32, g: u32, b: u32) {
     output[index+8u]  = Vertex(vec4<f32>(p2, 1.0), n_right);
     output[index+9u]  = Vertex(vec4<f32>(p5, 1.0), n_right);
     output[index+10u] = Vertex(vec4<f32>(p2, 1.0), n_right);
-    output[index+11u] = Vertex(vec4<f32>(p7, 1.0), n_right);
+    output[index+11u] = Vertex(vec4<f32>(p6, 1.0), n_right);
 
-    //// BACK.
+    // //// BACK.
 
     output[index+12u] = Vertex(vec4<f32>(p1, 1.0), n_back);
-    output[index+13u] = Vertex(vec4<f32>(p2, 1.0), n_back);
+    output[index+13u] = Vertex(vec4<f32>(p0, 1.0), n_back);
     output[index+14u] = Vertex(vec4<f32>(p3, 1.0), n_back);
     output[index+15u] = Vertex(vec4<f32>(p1, 1.0), n_back);
     output[index+16u] = Vertex(vec4<f32>(p3, 1.0), n_back);
-    output[index+17u] = Vertex(vec4<f32>(p0, 1.0), n_back);
+    output[index+17u] = Vertex(vec4<f32>(p2, 1.0), n_back);
 
-    //// LEFT.
+    // //// LEFT.
 
-    output[index+18u] = Vertex(vec4<f32>(p4, 1.0), n_left);
-    output[index+19u] = Vertex(vec4<f32>(p0, 1.0), n_left);
-    output[index+20u] = Vertex(vec4<f32>(p3, 1.0), n_left);
-    output[index+21u] = Vertex(vec4<f32>(p4, 1.0), n_left);
-    output[index+22u] = Vertex(vec4<f32>(p3, 1.0), n_left);
-    output[index+23u] = Vertex(vec4<f32>(p6, 1.0), n_left);
+    output[index+18u] = Vertex(vec4<f32>(p0, 1.0), n_left);
+    output[index+19u] = Vertex(vec4<f32>(p4, 1.0), n_left);
+    output[index+20u] = Vertex(vec4<f32>(p7, 1.0), n_left);
+    output[index+21u] = Vertex(vec4<f32>(p0, 1.0), n_left);
+    output[index+22u] = Vertex(vec4<f32>(p7, 1.0), n_left);
+    output[index+23u] = Vertex(vec4<f32>(p3, 1.0), n_left);
 
-    //// TOP.
+    // //// TOP.
 
     output[index+24u] = Vertex(vec4<f32>(p6, 1.0), n_top);
-    output[index+25u] = Vertex(vec4<f32>(p7, 1.0), n_top);
-    output[index+26u] = Vertex(vec4<f32>(p2, 1.0), n_top);
+    output[index+25u] = Vertex(vec4<f32>(p3, 1.0), n_top);
+    output[index+26u] = Vertex(vec4<f32>(p7, 1.0), n_top);
     output[index+27u] = Vertex(vec4<f32>(p6, 1.0), n_top);
     output[index+28u] = Vertex(vec4<f32>(p2, 1.0), n_top);
     output[index+29u] = Vertex(vec4<f32>(p3, 1.0), n_top);
 
-    //// BOTTOM.
+    // //// BOTTOM.
 
     output[index+30u] = Vertex(vec4<f32>(p4, 1.0), n_bottom);
-    output[index+31u] = Vertex(vec4<f32>(p5, 1.0), n_bottom);
-    output[index+32u] = Vertex(vec4<f32>(p1, 1.0), n_bottom);
-    output[index+33u] = Vertex(vec4<f32>(p4, 1.0), n_bottom);
+    output[index+31u] = Vertex(vec4<f32>(p0, 1.0), n_bottom);
+    output[index+32u] = Vertex(vec4<f32>(p5, 1.0), n_bottom);
+    output[index+33u] = Vertex(vec4<f32>(p0, 1.0), n_bottom);
     output[index+34u] = Vertex(vec4<f32>(p1, 1.0), n_bottom);
-    output[index+35u] = Vertex(vec4<f32>(p0, 1.0), n_bottom);
+    output[index+35u] = Vertex(vec4<f32>(p5, 1.0), n_bottom);
 }
 
 fn create_array(index: u32) {
@@ -165,9 +165,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 			      2.0 * f32(global_id.y),
 			      2.0 * f32(global_id.z),
                               1.0),
-                    vec4<f32>(2.0 * f32(global_id.x) + 1.0, 
-			      2.0 * f32(global_id.y) + 1.0,
-			      2.0 * f32(global_id.z) + 1.0,
+                    vec4<f32>(2.0 * f32(global_id.x) + 0.3, 
+			      2.0 * f32(global_id.y) + 0.3,
+			      2.0 * f32(global_id.z) + 0.3,
                               1.0)
     );
     create_aabb(aabb, 0u, 255u, 0u);

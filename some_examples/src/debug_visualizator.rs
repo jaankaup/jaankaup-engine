@@ -70,11 +70,13 @@ struct DebugVisualizator {
     pub screen: ScreenTexture, 
     pub render_object: RenderObject, 
     pub render_bind_groups: Vec<wgpu::BindGroup>,
+    pub compute_object: ComputeObject, 
     pub compute_bind_groups: Vec<wgpu::BindGroup>,
     // pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
     pub histogram: Histogram,
+    pub draw_count: u32,
 }
 
 impl DebugVisualizator {
@@ -220,7 +222,7 @@ impl Application for DebugVisualizator {
             "visualization_params".to_string(),
             buffer_from_data::<VisualizationParams>(
             &configuration.device,
-            &vec![VisualizationParams { triangle_start: 0, triangle_end: 1024 }],
+            &vec![VisualizationParams { triangle_start: 0, triangle_end: 10240 }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -229,7 +231,7 @@ impl Application for DebugVisualizator {
             "debug_arrays".to_string(),
             buffer_from_data::<f32>(
             &configuration.device,
-            &vec![0 as f32 ; 8*1024],
+            &vec![0 as f32 ; 8*10240],
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -238,7 +240,7 @@ impl Application for DebugVisualizator {
             "output".to_string(),
             buffer_from_data::<f32>(
             &configuration.device,
-            &vec![0 as f32 ; 8*1024],
+            &vec![0 as f32 ; 8*10240],
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -294,11 +296,13 @@ impl Application for DebugVisualizator {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
             render_bind_groups: render_bind_groups,
+            compute_object: compute_object,
             compute_bind_groups: compute_bind_groups,
             // _textures: textures,
             buffers: buffers,
             camera: camera,
             histogram: histogram,
+            draw_count: 0,
         }
     }
 
@@ -308,34 +312,33 @@ impl Application for DebugVisualizator {
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration) {
 
-        // self.screen.acquire_screen_texture(
-        //     &device,
-        //     &sc_desc,
-        //     &surface
-        // );
+        self.screen.acquire_screen_texture(
+            &device,
+            &sc_desc,
+            &surface
+        );
 
-        // let mut encoder = device.create_command_encoder(
-        //     &wgpu::CommandEncoderDescriptor {
-        //         label: Some("Render Encoder"),
-        // });
+        let mut encoder = device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+        });
 
-        // // Ownership?
-        // let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // // Draw the cube.
-        // draw(&mut encoder,
-        //      &view,
-        //      self.screen.depth_texture.as_ref().unwrap(),
-        //      &self.bind_groups,
-        //      &self.render_object.pipeline,
-        //      &self.buffers.get("cube").unwrap(),
-        //      0..36, // TODO: Cube 
-        //      true
-        // );
+        // Draw the cube.
+        draw(&mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_bind_groups,
+             &self.render_object.pipeline,
+             &self.buffers.get("output").unwrap(),
+             0..self.draw_count, // TODO: Cube 
+             true
+        );
 
-        // queue.submit(Some(encoder.finish())); 
+        queue.submit(Some(encoder.finish())); 
 
-        // self.screen.prepare_for_rendering();
+        self.screen.prepare_for_rendering();
     }
 
     fn input(&mut self, queue: &wgpu::Queue, input_cache: &InputCache) {
@@ -348,6 +351,18 @@ impl Application for DebugVisualizator {
 
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
+
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
+        self.compute_object.dispatch(
+            &self.compute_bind_groups,
+            &mut encoder,
+            1, 1, 1, Some("aabb dispatch")
+        );
+        queue.submit(Some(encoder.finish()));
+        let counter = self.histogram.get_values(device, queue);
+        self.draw_count = counter[0];
+        // println!("{:?}", counter);
+        self.histogram.reset_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
     }
 }
 
