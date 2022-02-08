@@ -411,8 +411,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
     // let mapping = index_to_uvec3(global_id.x, 64u, 64u);
-    let mapping =  from_hilber_index(global_id.x, 5u);
-    let mapping2 = from_hilber_index(global_id.x + 1u, 5u);
+    var mapping =  from_hilber_index(global_id.x, 5u);
+    var mapping2 = from_hilber_index(global_id.x + 1u, 5u);
+
+    if ((global_id.x + 1u ) >= 32768u) { mapping2 = mapping; }
     
     let ma = max(mapping, mapping2);
     let mi = min(mapping, mapping2);
