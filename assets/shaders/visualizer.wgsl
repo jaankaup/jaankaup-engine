@@ -57,6 +57,17 @@ var<storage,read_write> output: array<Vertex>;
 //         vec2<i32>(0,4), vec2<i32>(1,5), vec2<i32>(2,6), vec2<i32>(3,7)
 // ); 
 
+// Map index to 3d coordinate.
+fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
+  var x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh; // check
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  return vec3<u32>(x, y, z);
+}
+
 fn create_aabb(aabb: AABB, r: u32, g: u32, b: u32) {
 
     let index = atomicAdd(&counter.counter, 36u);
@@ -155,19 +166,20 @@ fn create_array(index: u32) {
 }
 
 @stage(compute)
-@workgroup_size(4,4,4)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
+    let mapping = index_to_uvec3(global_id.x, 4u, 8u);
 
-    let aabb = AABB(vec4<f32>(2.0 * f32(global_id.x), 
-			      2.0 * f32(global_id.y),
-			      2.0 * f32(global_id.z),
+    let aabb = AABB(vec4<f32>(2.0 * f32(mapping.x), 
+			      2.0 * f32(mapping.y),
+			      2.0 * f32(mapping.z),
                               1.0),
-                    vec4<f32>(2.0 * f32(global_id.x) + 0.3, 
-			      2.0 * f32(global_id.y) + 0.3,
-			      2.0 * f32(global_id.z) + 0.3,
+                    vec4<f32>(2.0 * f32(mapping.x) + 0.3, 
+			      2.0 * f32(mapping.y) + 0.3,
+			      2.0 * f32(mapping.z) + 0.3,
                               1.0)
     );
     create_aabb(aabb, 0u, 255u, 0u);
