@@ -78,12 +78,6 @@ pub fn e(i: u32) -> u32 {
     if i == 0 { 0 } else { gc(2 * ((i-1) / 2)) }
 }
 
-/// Calculate the exit point of hypercube i.
-#[allow(dead_code)]
-pub fn f(i: u32) -> u32 {
-   e((1 << N) - 1 - i) ^ (1 << (N-1))
-}
-
 /// Extract the 3d position from a 3-bit integer.
 #[allow(dead_code)]
 fn i_to_p(i: u32) -> [u32; 3] {
@@ -99,7 +93,7 @@ fn inverse_gc(g: u32) -> u32 {
 /// Calculate the direction between i and the next one.
 #[allow(dead_code)]
 pub fn g(i: u32) -> u32 {
-    !i.trailing_zeros()
+    (!i).trailing_zeros()
 }
 
 /// Calculate the direction of the arrow whitin a subcube.
@@ -116,8 +110,8 @@ pub fn d(i: u32) -> u32 {
 
 /// Transform b.
 #[allow(dead_code)]
-pub fn t(e: u32, d: i32, b: u32) -> u32 {
-    rotate_right(b^e, (d+1) as u32)
+pub fn t(e: u32, d: u32, b: u32) -> u32 {
+    rotate_right(b^e, d+1)
 }
 
 /// Inverse transform.
@@ -132,15 +126,15 @@ pub fn t_inv(e: u32, d: u32, b: u32) -> u32 {
 pub fn to_hilbert_index(p: [u32; 3], m: u32) -> u32 {
 
     let mut h = 0;
-
     let mut ve: u32 = 0;
-    let mut vd: u32 = 2;
+    let mut vd: u32 = 0;
 
     for i in (0..m).rev() { // TODO: check
         let l = get_bit(p[0], i) | (get_bit(p[1], i) << 1) | (get_bit(p[2], i) << 2);
-        let w = inverse_gc(t(ve, vd as i32, l));
+        let w = inverse_gc(t(l, ve, vd));
         ve = ve ^ (rotate_left(e(w), vd+1));
         vd = mod3_32(vd + d(w) + 1); //% N;
+        //vd = mod3_32(vd + d(w) + 1); //% N;
         h = (h << N) | w;
     }
     h
@@ -150,7 +144,7 @@ pub fn to_hilbert_index(p: [u32; 3], m: u32) -> u32 {
 pub fn from_hilber_index(h: u32, m: u32) -> [u32; 3] {
     
     let mut ve: u32 = 0;
-    let mut vd: u32 = 2;
+    let mut vd: u32 = 0;
     let mut p: [u32; 3] = [0, 0, 0];
 
     for i in (0..m).rev() { // TODO: check
@@ -161,7 +155,7 @@ pub fn from_hilber_index(h: u32, m: u32) -> [u32; 3] {
         p[1] = (p[1] << 1) | ((l >> 1) & 1);
         p[2] = (p[2] << 1) | ((l >> 2) & 1);
         ve = ve ^ rotate_left(e(w), vd+1);
-        vd = mod3_32(vd + d(w) + 1); // % N;
+        vd = mod3_32(vd + d(w) + 1);
     }
     p
 }

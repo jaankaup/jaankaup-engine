@@ -241,7 +241,7 @@ impl Application for DebugVisualizator {
             "output".to_string(),
             buffer_from_data::<f32>(
             &configuration.device,
-            &vec![0 as f32 ; 8*36*64*64],
+            &vec![0 as f32 ; 8*36*32*32*32],
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -359,7 +359,7 @@ impl Application for DebugVisualizator {
             self.compute_object.dispatch(
                 &self.compute_bind_groups,
                 &mut encoder,
-                64, 1, 1, Some("aabb dispatch")
+                512, 1, 1, Some("aabb dispatch")
             );
             queue.submit(Some(encoder.finish()));
             let counter = self.histogram.get_values(device, queue);
