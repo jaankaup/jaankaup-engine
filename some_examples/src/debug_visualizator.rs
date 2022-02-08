@@ -77,6 +77,7 @@ struct DebugVisualizator {
     pub camera: Camera,
     pub histogram: Histogram,
     pub draw_count: u32,
+    pub update: bool,
 }
 
 impl DebugVisualizator {
@@ -240,7 +241,7 @@ impl Application for DebugVisualizator {
             "output".to_string(),
             buffer_from_data::<f32>(
             &configuration.device,
-            &vec![0 as f32 ; 8*10240],
+            &vec![0 as f32 ; 8*36*64*64],
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -303,6 +304,7 @@ impl Application for DebugVisualizator {
             camera: camera,
             histogram: histogram,
             draw_count: 0,
+            update: true,
         }
     }
 
@@ -352,17 +354,20 @@ impl Application for DebugVisualizator {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
-        self.compute_object.dispatch(
-            &self.compute_bind_groups,
-            &mut encoder,
-            1, 1, 1, Some("aabb dispatch")
-        );
-        queue.submit(Some(encoder.finish()));
-        let counter = self.histogram.get_values(device, queue);
-        self.draw_count = counter[0];
-        // println!("{:?}", counter);
-        self.histogram.reset_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
+        if self.update {
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
+            self.compute_object.dispatch(
+                &self.compute_bind_groups,
+                &mut encoder,
+                64, 1, 1, Some("aabb dispatch")
+            );
+            queue.submit(Some(encoder.finish()));
+            let counter = self.histogram.get_values(device, queue);
+            self.draw_count = counter[0];
+            println!("{:?}", counter);
+            self.histogram.reset_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
+            self.update = false;
+        }
     }
 }
 
