@@ -6,12 +6,13 @@ struct AABB {
 };
 
 struct VisualizationParams{
-    triangle_start: u32;
-    triangle_end: u32;
+    max_vertex_capacity: u32;
+    iterator_start_index: u32;
+    iterator_end_index: u32;
 };
 
 struct Counter {
-    counter: atomic<u32>;
+    counter: array<atomic<u32>, 2>;
 };
 
 struct Vertex {
@@ -24,11 +25,6 @@ struct DebugArray {
     end:   vec3<f32>;
     color: u32;
     size:  f32;
-};
-
-struct TempAABB {
-    aabb: AABB;
-    triangle_data: array<Vertex, 36>;
 };
 
 let STRIDE: u32 = 64u;
@@ -64,6 +60,7 @@ var<workgroup> temp_vertex_data: array<Vertex, 2304>; // 36 * 256
 @binding(0)
 var<uniform> visualization_params: VisualizationParams;
 
+// 0 :: total number of written vertices.
 @group(0)
 @binding(1)
 var<storage, read_write> counter: Counter;
@@ -246,7 +243,7 @@ fn decode_color(c: u32) -> vec4<f32> {
 fn create_aabb(aabb: AABB, offset: u32, r: u32, g: u32, b: u32, a: u32) {
 
     // Global start position.
-    let index = atomicAdd(&counter.counter, 36u);
+    let index = atomicAdd(&counter.counter[0], 36u);
 
     let delta: vec4<f32> = aabb.max - aabb.min;
 
@@ -312,15 +309,19 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
     // let mapping = index_to_uvec3(global_id.x, 64u, 64u);
-    var mapping =  from_hilber_index(global_id.x, 5u);
-    var mapping2 = from_hilber_index(global_id.x + 1u, 5u);
+    var mapping =  from_hilber_index(global_id.x + counter.counter[1], 6u);
+    var mapping2 = from_hilber_index(global_id.x + counter.counter[1] + 1u, 6u);
 
-    if ((global_id.x + 1u ) >= 32768u) { mapping2 = mapping; }
+    if (counter.counter[0] >= visualization_params.max_vertex_capacity) { return; }
+
+    // let index = atomicAdd(&counter.counter[0], 36u);
+
+    if ((global_id.x + counter.counter[1] + 1u ) >= 4096u * 64u) { mapping2 = mapping; }
     
     let ma = max(mapping, mapping2);
     let mi = min(mapping, mapping2);
     
-    let color_factor = mapRange(0.0, 64.0 * 512.0, 0.0, 255.0, f32(global_id.x));
+    let color_factor = mapRange(0.0, 64.0 * 4096.0, 0.0, 255.0, f32(global_id.x + counter.counter[1]));
 
     let v0 = vec4<f32>(f32(mapping.x),
         	       f32(mapping.y),

@@ -56,7 +56,7 @@ impl Histogram {
         );
     }
 
-    pub fn reset_cpu_version(&self, queue: &wgpu::Queue, value: u32) {
+    pub fn reset_all_cpu_version(&self, queue: &wgpu::Queue, value: u32) {
         queue.write_buffer(
             &self.histogram,
             0,

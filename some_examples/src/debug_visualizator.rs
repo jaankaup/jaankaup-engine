@@ -1,3 +1,4 @@
+use std::mem::size_of;
 use std::collections::HashMap;
 use std::borrow::Cow;
 use jaankaup_core::template::{
@@ -20,6 +21,12 @@ use jaankaup_core::impl_convert;
 use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 
+/// The maximum number of f32 in draw buffer;
+const MAX_VERTEX_CAPACITY: u32 = 128 * 64 * 36; // 128 * 64 * 36 = 262144 verticex. 
+
+/// Number of f32 in draw buffer.
+const VERTEX_BUFFER_SIZE: u32 = 8 * MAX_VERTEX_CAPACITY;
+
 // 
 //  Arrow  
 //
@@ -34,8 +41,10 @@ use bytemuck::{Pod, Zeroable};
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct VisualizationParams{
-    triangle_start: u32,
-    triangle_end: u32,
+    max_vertex_capacity: u32,
+    iterator_start_index: u32,
+    iterator_end_index: u32,
+    // current_iterator_index: u32,
 }
 
 #[repr(C)]
@@ -105,7 +114,8 @@ impl Application for DebugVisualizator {
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
-        camera.set_rotation_sensitivity(0.2);
+        camera.set_rotation_sensitivity(0.4);
+        camera.set_movement_sensitivity(0.01);
 
         let render_object =
                 RenderObject::init(
@@ -217,13 +227,20 @@ impl Application for DebugVisualizator {
                     ]
         );
 
-        let histogram = Histogram::init(&configuration.device, &vec![0]);
+        let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
 
         buffers.insert(
             "visualization_params".to_string(),
             buffer_from_data::<VisualizationParams>(
             &configuration.device,
-            &vec![VisualizationParams { triangle_start: 0, triangle_end: 10240 }],
+            &vec![
+                VisualizationParams {
+                    max_vertex_capacity: MAX_VERTEX_CAPACITY,
+                    iterator_start_index: 0,
+                    iterator_end_index: 512*64,
+                    // current_iterator_index: 0,
+                }
+            ],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -237,11 +254,14 @@ impl Application for DebugVisualizator {
             None)
         );
 
+        // println!("VERTEX_BUFFER_SIZE == {}", VERTEX_BUFFER_SIZE);
+
         buffers.insert(
             "output".to_string(),
             buffer_from_data::<f32>(
             &configuration.device,
-            &vec![0 as f32 ; 8*36*32*32*32],
+            &vec![0 as f32 ; VERTEX_BUFFER_SIZE as usize],
+            //&vec![0 as f32 ; 1024 * 32 * 8 * size_of::<f32>()],
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -320,27 +340,64 @@ impl Application for DebugVisualizator {
             &surface
         );
 
-        let mut encoder = device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-        });
-
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Draw the cube.
-        draw(&mut encoder,
-             &view,
-             self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_bind_groups,
-             &self.render_object.pipeline,
-             &self.buffers.get("output").unwrap(),
-             0..self.draw_count, // TODO: Cube 
-             true
-        );
+        let mut items_available: i32 = 4096 * 64; 
+        let mut dispatch_x = 128;
+        let mut clear = true;
+        let mut i = 128 * 64;
 
-        queue.submit(Some(encoder.finish())); 
+        while items_available > 0 {
+
+            let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
+
+            // Take 128 * 64 = 8192 items.
+            self.compute_object.dispatch(
+                &self.compute_bind_groups,
+                &mut encoder_command,
+                dispatch_x, 1, 1, Some("aabb dispatch")
+            );
+
+            // Submit compute.
+            queue.submit(Some(encoder_command.finish()));
+
+            let counter = self.histogram.get_values(device, queue);
+            self.draw_count = counter[0];
+
+            // set_values_cpu_version(&self, queue, !vec[0, counter[1]);
+
+            let mut encoder_render = device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+            });
+
+            items_available = items_available - 128 * 64; 
+            // println!("items_available == {}", items_available);
+
+            // Draw the cube.
+            draw(&mut encoder_render,
+                 &view,
+                 self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups,
+                 &self.render_object.pipeline,
+                 &self.buffers.get("output").unwrap(),
+                 0..self.draw_count, // TODO: Cube 
+                 clear
+                 //true
+            );
+            queue.submit(Some(encoder_render.finish()));
+            clear = false;
+            self.histogram.set_values_cpu_version(queue, &vec![0, i]);
+            i = i + 128*64;
+            // if (items_available <= 0) { break; } 
+
+
+        }
 
         self.screen.prepare_for_rendering();
+
+        // Reset counter.
+        self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
     }
 
     fn input(&mut self, queue: &wgpu::Queue, input_cache: &InputCache) {
@@ -355,18 +412,18 @@ impl Application for DebugVisualizator {
         self.camera.update_from_input(&queue, &input);
 
         if self.update {
-            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
-            self.compute_object.dispatch(
-                &self.compute_bind_groups,
-                &mut encoder,
-                512, 1, 1, Some("aabb dispatch")
-            );
-            queue.submit(Some(encoder.finish()));
-            let counter = self.histogram.get_values(device, queue);
-            self.draw_count = counter[0];
-            println!("{:?}", counter);
-            self.histogram.reset_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
-            self.update = false;
+            // let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
+            // self.compute_object.dispatch(
+            //     &self.compute_bind_groups,
+            //     &mut encoder,
+            //     512, 1, 1, Some("aabb dispatch")
+            // );
+            // queue.submit(Some(encoder.finish()));
+            // let counter = self.histogram.get_values(device, queue);
+            // self.draw_count = counter[0];
+            // println!("{:?}", counter);
+            // self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
+            // self.update = false;
         }
     }
 }
