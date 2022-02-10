@@ -301,32 +301,24 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let mi = min(mapping, mapping2);
     
     let v0 = vec4<f32>(f32(mapping.x),
-		       f32(mapping.y),
-		       f32(mapping.z),
+        	       f32(mapping.y),
+        	       f32(mapping.z),
                        1.0
     );
     let v1 = vec4<f32>(f32(mapping2.x), 
-		       f32(mapping2.y),
-		       f32(mapping2.z),
+        	       f32(mapping2.y),
+        	       f32(mapping2.z),
                        1.0
     );
-    // let aabb = AABB(vec4<f32>(min(v0.x, v1.x) - 0.01,
-    //     		      min(v0.y, v1.y) - 0.01,
-    //     		      min(v0.z, v1.z) - 0.01,
-    //                           1.0),
-    //                 vec4<f32>(max(v0.x, v1.x) + 0.01,
-    //     		      max(v0.y, v1.y) + 0.01,
-    //     		      max(v0.z, v1.z) + 0.01,
-    //                           1.0)
-    // );
-
-    let aabb = AABB(vec4<f32>(f32(mi.x) - 0.05,
-			      f32(mi.y) - 0.05,
-			      f32(mi.z) - 0.05,
+    let aabb = AABB(vec4<f32>(min(v0.x, v1.x) - 0.03,
+        		      min(v0.y, v1.y) - 0.03,
+        		      min(v0.z, v1.z) - 0.03,
                               1.0),
-                    vec4<f32>(f32(ma.x) + 0.05,
-			      f32(ma.y) + 0.05,
-			      f32(ma.z) + 0.05,
+                    vec4<f32>(max(v0.x, v1.x) + 0.03,
+        		      max(v0.y, v1.y) + 0.03,
+        		      max(v0.z, v1.z) + 0.03,
                               1.0)
     );
+
+    create_aabb(aabb, local_index, 0u, 255u, 0u);
 }
