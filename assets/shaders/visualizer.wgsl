@@ -48,6 +48,15 @@ var<private> vertex_positions: array<u32, 36> = array<u32, 36>(
     6u, 3u, 7u, 6u, 2u, 3u,
     4u, 0u, 5u, 0u, 1u, 5u
 );
+
+var<private> aabb_normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
+    vec4<f32>(0.0, 0.0, -1.0, 0.0),
+    vec4<f32>(0.0, 0.0, 1.0, 0.0),
+    vec4<f32>(1.0, 0.0, 0.0, 0.0),
+    vec4<f32>(-1.0, 0.0, 0.0, 0.0),
+    vec4<f32>(0.0, 1.0, 0.0, 0.0),
+    vec4<f32>(0.0, -1.0, 0.0, 0.0)
+);
     
 var<workgroup> temp_vertex_data: array<Vertex, 2304>; // 36 * 256 
 
@@ -208,29 +217,38 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   return vec3<u32>(x, y, z);
 }
 
-fn create_aabb(aabb: AABB, offset: u32, r: u32, g: u32, b: u32) {
+/**
+ * [a1] from range min
+ * [a2] from range max
+ * [b1] to range min
+ * [b2] to range max
+ * [s] value to scale
+ *
+ * a1 != a2
+ */
+fn mapRange(a1: f32, a2: f32, b1: f32, b2: f32, s: f32) -> f32 {
+    return b1 + (s - a1) * (b2 - b1) / (a2 - a1);
+}
+
+// Encode "rgba" to u32.
+fn encode_rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
+  return (r << 24u) | (g << 16u) | (b  << 8u) | a;
+}
+
+fn decode_color(c: u32) -> vec4<f32> {
+  let a: f32 = f32(c & 256u) / 255.0;
+  let b: f32 = f32((c & 65280u) >> 8u) / 255.0;
+  let g: f32 = f32((c & 16711680u) >> 16u) / 255.0;
+  let r: f32 = f32((c & 4278190080u) >> 24u) / 255.0;
+  return vec4<f32>(r,g,b,a);
+}
+
+fn create_aabb(aabb: AABB, offset: u32, r: u32, g: u32, b: u32, a: u32) {
 
     // Global start position.
     let index = atomicAdd(&counter.counter, 36u);
 
     let delta: vec4<f32> = aabb.max - aabb.min;
-
-    let n_front  = vec4<f32>(0.0, 0.0, -1.0, 0.0);
-    let n_back   = vec4<f32>(0.0, 0.0, 1.0, 0.0);
-    let n_right  = vec4<f32>(1.0, 0.0, 0.0, 0.0);
-    let n_left   = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
-    let n_top    = vec4<f32>(0.0, 1.0, 0.0, 0.0);
-    let n_bottom = vec4<f32>(0.0, -1.0, 0.0, 0.0);
-
-    var normals = array<vec4<f32>, 6>(
-    	vec4<f32>(0.0, 0.0, -1.0, 0.0),
-    	vec4<f32>(0.0, 0.0, 1.0, 0.0),
-    	vec4<f32>(1.0, 0.0, 0.0, 0.0),
-    	vec4<f32>(-1.0, 0.0, 0.0, 0.0),
-    	vec4<f32>(0.0, 1.0, 0.0, 0.0),
-    	vec4<f32>(0.0, -1.0, 0.0, 0.0)
-    );
-
 
     //          p3
     //          +-----------------+p2
@@ -250,22 +268,24 @@ fn create_aabb(aabb: AABB, offset: u32, r: u32, g: u32, b: u32) {
 
     // Decode color information to the fourth component.
 
+    let color = f32(encode_rgba_u32(r,g,b,a));
+
     var positions = array<vec4<f32>, 8>(
-    	aabb.min,
-    	aabb.min + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
-    	aabb.min + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
-    	aabb.min + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
-    	aabb.min + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
-    	aabb.min + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
-    	aabb.min + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
-    	aabb.min + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+    	vec4<f32>(aabb.min.xyz, color),
+    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
     );
     
     var i: u32 = 0u;
 
     loop {
         if (i == 36u) { break; }
-        temp_vertex_data[offset + STRIDE * i]  = Vertex(positions[vertex_positions[i]], normals[i/6u]);
+        temp_vertex_data[offset + STRIDE * i]  = Vertex(positions[vertex_positions[i]], aabb_normals[i/6u]);
         i = i + 1u;
     }
 
@@ -300,6 +320,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let ma = max(mapping, mapping2);
     let mi = min(mapping, mapping2);
     
+    let color_factor = mapRange(0.0, 64.0 * 512.0, 0.0, 255.0, f32(global_id.x));
+
     let v0 = vec4<f32>(f32(mapping.x),
         	       f32(mapping.y),
         	       f32(mapping.z),
@@ -319,6 +341,5 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         		      max(v0.z, v1.z) + 0.03,
                               1.0)
     );
-
-    create_aabb(aabb, local_index, 0u, 255u, 0u);
+    create_aabb(aabb, local_index, u32(255.0 - color_factor), 0u, u32(color_factor), 1u);
 }
