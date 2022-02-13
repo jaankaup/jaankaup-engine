@@ -18,14 +18,15 @@ use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
+use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 
-/// The maximum number of f32 in draw buffer;
-const MAX_VERTEX_CAPACITY: u32 = 128 * 64 * 36; // 128 * 64 * 36 = 262144 verticex. 
+/// The number of vertices per chunk.
+const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 36; // 128 * 64 * 36 = 262144 verticex. 
 
-/// Number of f32 in draw buffer.
-const VERTEX_BUFFER_SIZE: u32 = 8 * MAX_VERTEX_CAPACITY;
+/// The size of draw buffer;
+const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
 // 
 //  Arrow  
@@ -40,23 +41,25 @@ const VERTEX_BUFFER_SIZE: u32 = 8 * MAX_VERTEX_CAPACITY;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct VisualizationParams{
-    max_vertex_capacity: u32,
-    iterator_start_index: u32,
-    iterator_end_index: u32,
-    // current_iterator_index: u32,
+struct Arrow {
+    start_pos: [f32 ; 4],
+    end_pos: [f32 ; 4],
+    color: u32,
+    size: f32,
+    _padding: [u32; 2]
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct DebugArray {
-    start: [f32; 3],
-    end:   [f32; 3],
-    color: u32,
-    size: f32,
+struct VisualizationParams{
+    max_local_vertex_capacity: u32,
+    iterator_start_index: u32,
+    global_number_of_vertices: u32,
+    blaah: u32,
+    // current_iterator_index: u32,
 }
 
-impl_convert!{DebugArray}
+impl_convert!{Arrow}
 
 struct DebugVisualizatorFeatures {}
 
@@ -159,6 +162,51 @@ impl Application for DebugVisualizator {
 
         println!("Creating compute object.");
 
+        // let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
+        let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
+
+        buffers.insert(
+            "visualization_params".to_string(),
+            buffer_from_data::<VisualizationParams>(
+            &configuration.device,
+            &vec![
+                VisualizationParams {
+                    max_local_vertex_capacity: MAX_VERTEX_CAPACITY as u32,
+                    iterator_start_index: 0,
+                    global_number_of_vertices: 123,
+                    blaah: 123,
+                    // current_iterator_index: 0,
+                }
+            ],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
+
+        buffers.insert(
+            "debug_arrays".to_string(),
+            buffer_from_data::<Arrow>(
+                &configuration.device,
+                &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
+                              end_pos:   [4.0, 0.0, 0.0, 1.0],
+                              color: encode_rgba_u32(0, 0, 255, 255),
+                              size: 0.1,
+                              _padding: [0, 0]}],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                Some("Debug array buffer")
+            )
+        );
+
+        buffers.insert(
+            "output".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("draw buffer"),
+                size: VERTEX_BUFFER_SIZE as u64, 
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        );
+
+
         let compute_object =
                 ComputeObject::init(
                     &configuration.device,
@@ -199,7 +247,7 @@ impl Application for DebugVisualizator {
                             },
                             // @group(0)
                             // @binding(2)
-                            // var<storage, read> counter: array<DebugArray>;
+                            // var<storage, read> counter: array<Arrow>;
                             wgpu::BindGroupLayoutEntry {
                                 binding: 2,
                                 visibility: wgpu::ShaderStages::COMPUTE,
@@ -227,74 +275,43 @@ impl Application for DebugVisualizator {
                     ]
         );
 
-        let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
-
-        buffers.insert(
-            "visualization_params".to_string(),
-            buffer_from_data::<VisualizationParams>(
-            &configuration.device,
-            &vec![
-                VisualizationParams {
-                    max_vertex_capacity: MAX_VERTEX_CAPACITY,
-                    iterator_start_index: 0,
-                    iterator_end_index: 512*64,
-                    // current_iterator_index: 0,
-                }
-            ],
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            None)
-        );
-
-        buffers.insert(
-            "debug_arrays".to_string(),
-            buffer_from_data::<f32>(
-            &configuration.device,
-            &vec![0 as f32 ; 8*10240],
-            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            None)
-        );
-
-        // println!("VERTEX_BUFFER_SIZE == {}", VERTEX_BUFFER_SIZE);
-
-        buffers.insert(
-            "output".to_string(),
-            buffer_from_data::<f32>(
-            &configuration.device,
-            &vec![0 as f32 ; VERTEX_BUFFER_SIZE as usize],
-            //&vec![0 as f32 ; 1024 * 32 * 8 * size_of::<f32>()],
-            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            None)
-        );
-
         println!("Creating compute bind groups.");
+
+        println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
 
         let compute_bind_groups = create_bind_groups(
                                       &configuration.device,
                                       &compute_object.bind_group_layout_entries,
                                       &compute_object.bind_group_layouts,
                                       &vec![
-                                          vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                  buffer: &buffers.get(&"visualization_params".to_string()).unwrap(),
-                                                  offset: 0,
-                                                  size: None,
-                                          }),
-                                          &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                  buffer: &histogram.get_histogram_buffer(),
-                                                  offset: 0,
-                                                  size: None,
-                                          }),
-                                          &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                  buffer: &buffers.get(&"debug_arrays".to_string()).unwrap(),
-                                                  offset: 0,
-                                                  size: None,
-                                          }),
-                                          &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                  buffer: &buffers.get(&"output".to_string()).unwrap(),
-                                                  offset: 0,
-                                                  size: None,
-                                          }),
+                                          vec![
+                                               &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
+                                               &histogram.get_histogram_buffer().as_entire_binding(),
+                                               &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
+
+                                               // vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                               //         buffer: &buffers.get(&"visualization_params".to_string()).unwrap(),
+                                               //         offset: 0,
+                                               //         size: Some(core::num::NonZeroU64::new(40)),
+                                               // }),
+                                               // &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                               //         buffer: &histogram.get_histogram_buffer(),
+                                               //         offset: Some(core::num::NonZeroU64::new(8)),
+                                               //         size: None,
+                                               // }),
+                                               // &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                               //         buffer: &buffers.get(&"debug_arrays".to_string()).unwrap(),
+                                               //         offset: 0,
+                                               //         size: None,
+                                               // }),
+                                               // &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                                               //         buffer: &buffers.get(&"output".to_string()).unwrap(),
+                                               //         offset: 0,
+                                               //         size: None,
+                                               // }),
                                           ]
-                                    ]
+                                      ]
         );
 
         println!("Creating render bind groups.");
@@ -342,10 +359,10 @@ impl Application for DebugVisualizator {
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut items_available: i32 = 4096 * 64; 
-        let mut dispatch_x = 128;
+        let mut items_available: i32 = 1; 
+        let mut dispatch_x = 1;
         let mut clear = true;
-        let mut i = 128 * 64;
+        let mut i = dispatch_x * 64;
 
         while items_available > 0 {
 
@@ -390,8 +407,6 @@ impl Application for DebugVisualizator {
             self.histogram.set_values_cpu_version(queue, &vec![0, i]);
             i = i + 128*64;
             // if (items_available <= 0) { break; } 
-
-
         }
 
         self.screen.prepare_for_rendering();

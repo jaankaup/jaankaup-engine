@@ -1,5 +1,23 @@
 use std::cmp;
 
+// trait S {
+//     fn sizeOfMember();
+//     fn alignOfMember();
+//     fn alignOfMember();
+// }
+
+pub fn encode_rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
+  (r << 24) | (g << 16) | (b  << 8) | a
+}
+
+pub fn decode_color(c: u32) -> [f32; 4] {
+  let a: f32 = (c & 256) as f32 / 255.0;
+  let b: f32 = ((c & 65280) >> 8) as f32 / 255.0;
+  let g: f32 = ((c & 16711680) >> 16) as f32 / 255.0;
+  let r: f32 = ((c & 4278190080) >> 24) as f32 / 255.0;
+  [r,g,b,a]
+}
+
 pub fn udiv_up_32(x: u32, y: u32) -> u32 {
   (x + y - 1) / y
 }

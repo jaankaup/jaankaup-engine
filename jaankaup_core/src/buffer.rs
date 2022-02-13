@@ -17,11 +17,11 @@ pub fn buffer_from_data<T: Pod>(
     device: &wgpu::Device,
     t: &[T],
     usage: wgpu::BufferUsages,
-    _label: Option<String>)
+    label: wgpu::Label)
     -> wgpu::Buffer {
         device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
-                label: None, // TODO: label
+                label: label,
                 contents: bytemuck::cast_slice(&t),
                 usage: usage,
             }

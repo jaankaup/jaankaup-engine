@@ -5,35 +5,38 @@ struct AABB {
     max: vec4<f32>; 
 };
 
+struct Quaternion {
+    w: f32;
+    x: f32;
+    y: f32;
+    z: f32;
+};
+
 struct VisualizationParams{
     max_vertex_capacity: u32;
     iterator_start_index: u32;
     iterator_end_index: u32;
+    blaah: u32;
 };
 
-struct Counter {
-    counter: array<atomic<u32>, 2>;
-};
+// struct Counter {
+//     counter: array<atomic<u32>, 2>;
+// };
 
 struct Vertex {
     v: vec4<f32>;
     n: vec4<f32>;
 };
 
-struct DebugArray {
-    start: vec3<f32>;
-    end:   vec3<f32>;
+struct Arrow {
+    start_pos: vec4<f32>;
+    end_pos:   vec4<f32>;
     color: u32;
     size:  f32;
 };
 
 let STRIDE: u32 = 64u;
-
-// Lookup table for ctz. Maybe this should be a uniform.
-var<private> lookup: array<u32, 32> = array<u32, 32>(
-    0u, 1u, 28u, 2u, 29u, 14u, 24u, 3u, 30u, 22u, 20u, 15u, 25u, 17u, 4u, 8u,
-    31u, 27u, 13u, 23u, 21u, 19u, 16u, 7u, 26u, 12u, 18u, 6u, 11u, 5u, 10u, 9u
-);
+let PI: f32 = 3.14159265358979323846;
 
 // AABB triangulation.
 var<private> vertex_positions: array<u32, 36> = array<u32, 36>(
@@ -63,156 +66,92 @@ var<uniform> visualization_params: VisualizationParams;
 // 0 :: total number of written vertices.
 @group(0)
 @binding(1)
-var<storage, read_write> counter: Counter;
+var<storage, read_write> counter: array<atomic<u32>>;
 
 @group(0)
 @binding(2)
-var<storage, read> debug_arrays: array<DebugArray>;
+var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
 @binding(3)
 var<storage,read_write> output: array<Vertex>;
 
-// Get the bit value from postition i.
-fn get_bit(x: u32, i: u32) -> u32 {
-    return (x & (1u << i)) >> i;
+fn quaternion_id() -> Quaternion {
+    return Quaternion(1.0, 0.0, 0.0, 0.0);
 }
 
-// Modulo 3 for u32.
-fn mod3_32(x: u32) -> u32 {
-    var a = x;
-    a = (a >> 16u) + (a & 0xFFFFu);
-    a = (a >>  8u) + (a & 0xFFu);
-    a = (a >>  4u) + (a & 0xFu);
-    a = (a >>  2u) + (a & 0x3u);
-    a = (a >>  2u) + (a & 0x3u);
-    a = (a >>  2u) + (a & 0x3u);
-    if (a > 2u) { a = a - 3u; }
-    return a;
+fn quaternion_add(a: Quaternion, b: Quaternion) -> Quaternion {
+    return Quaternion(
+        a.w + b.w,
+        a.x + b.x,
+        a.y + b.y,
+        a.z + b.z
+    );
 }
 
-// Rotate first N bits in place to the right.
-fn rotate_right(x: u32, amount: u32) -> u32 {
-    let i = mod3_32(amount);
-    return (x >> i)^(x << (3u-i)) & !(0xFFFFFFFFu<<3u);
+fn quaternion_mul(a: Quaternion, b: Quaternion) -> Quaternion {
+    return Quaternion(
+        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
+    );
 }
 
-// Rotate first N bits in place to the left.
-fn rotate_left(x: u32, amount: u32) -> u32 {
-    let i = mod3_32(amount);
-    return (x << i) ^ (x >> (3u-i)) & !(0xFFFFFFFFu<<3u);
+fn quaternion_scale(q: Quaternion, s: f32) -> Quaternion {
+    return Quaternion(
+        q.w * s,
+        q.x * s, 
+        q.y * s, 
+        q.z * s 
+    );
 }
 
-// Calculate the gray code.
-fn gc(i: u32) -> u32 {
-    return i ^ (i >> 1u);
+fn quaternion_dot(a: Quaternion, b: Quaternion) -> f32 {
+    return a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z; 
 }
 
-// Calculate the entry point of hypercube i.
-fn e(i: u32) -> u32 {
-    if (i == 0u) { return 0u; } else { return gc(2u * ((i - 1u) / 2u)); }
+fn quaternion_conjugate(q: Quaternion) -> Quaternion {
+    return Quaternion(
+         q.w,
+        -q.x,
+        -q.y,
+        -q.z
+    );
 }
 
-// Calculate the exit point of hypercube i.
-fn f(i: u32) -> u32 {
-   return e((1u << 3u) - 1u - i) ^ (1u << 2u);
+// n == 0?
+fn quaternion_normalize(q: Quaternion) -> Quaternion {
+    let n = sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w); 
+    return Quaternion(
+        q.w / n,
+        q.x / n,
+        q.y / n,
+        q.z / n
+    );
+} 
+
+fn rotate_vector(q: Quaternion, v: vec3<f32>) -> vec3<f32> {
+    let t = cross(vec3<f32>(q.x, q.y, q.z), v) * 2.0; 
+    return v + q.w * t + cross(vec3<f32>(q.x, q.y, q.z), t);
 }
 
-// Calculate the inverse gray code.
-fn inverse_gc(g: u32) -> u32 {
-    return (g ^ (g >> 1u)) ^ (g >> 2u);
+fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
+    // let a_norm = normalize(a);    
+    // let b_norm = normalize(b);    
+
+    let v = cross(a,b);  
+    let a_len = length(a);
+    let b_len = length(b);
+    let w = sqrt(a_len * a_len * b_len * b_len) + dot(a,b);
+     
+    return quaternion_normalize(Quaternion(w, v.x, v.y, v.z));
 }
 
-// TODO: what happend when u32 is a really big number, larger than i32 can hold?
-fn countTrailingZeros(x: u32) -> u32 {
-    return lookup[
- 	u32((i32(x) & (-(i32(x))))) * 0x077CB531u >> 27u
-    ];
-}
-
-// Calculate the direction between i and the next one.
-fn g(i: u32) -> u32 {
-    return countTrailingZeros(!i);
-}
-
-// Calculate the direction of the arrow whitin a subcube.
-fn d(i: u32) -> u32 {
-    if (i == 0u) { return 0u; }
-    else if ((i & 1u) == 0u) {
-        return mod3_32(g(i - 1u));
-    }
-    else {
-        return mod3_32(g(i));
-    }
-}
-
-// Transform b.
-fn t(e: u32, d: u32, b: u32) -> u32 {
-    return rotate_right(b^e, d + 1u);
-}
-
-// Inverse transform.
-fn t_inv(e: u32, d: u32, b: u32) -> u32 {
-    return rotate_left(b, d + 1u) ^ e;
-}
-
-// Calculate the hilbert index from 3d point p.
-fn to_hilbert_index(p: vec3<u32>, m: u32) -> u32 {
-
-    var h = 0u;
-
-    var ve: u32 = 0u;
-    var vd: u32 = 0u;
-
-    var i: u32 = m - 1u;
-    loop {
-        if (i == 0u) { break; }
-
-        let l = get_bit(p.x, i) | (get_bit(p.y, i) << 1u) | (get_bit(p.z, i) << 2u);
-    	let w = inverse_gc(t(l, ve, vd));
-    	ve = ve ^ (rotate_left(e(w), vd + 1u));
-    	vd = mod3_32(vd + d(w) + 1u);
-        h = (h << 3u) | w;
-
-        i = i - 1u;
-    }
-    return h;
-}
-
-/// Calculate 3d point from hilbert index.
-fn from_hilber_index(h: u32, m: u32) -> vec3<u32> {
-    
-    var ve: u32 = 0u;
-    var vd: u32 = 0u;
-    var p = vec3<u32>(0u, 0u, 0u);
-
-    var i: u32 = m - 1u;
-    loop {
-        if (i == 0u) { break; }
-
-        let w = get_bit(h, i*3u) | (get_bit(h, i*3u + 1u) << 1u) | (get_bit(h, i*3u + 2u) << 2u);
-    	let l = t_inv(ve, vd, gc(w)); 
-    	p.x = (p.x << 1u) | ((l >> 0u) & 1u);
-    	p.y = (p.y << 1u) | ((l >> 1u) & 1u);
-    	p.z = (p.z << 1u) | ((l >> 2u) & 1u);
-    	ve = ve ^ rotate_left(e(w), vd + 1u);
-    	vd = mod3_32(vd + d(w) + 1u);
-
-        i = i - 1u;
-    }
-    return p;
-}
-
-// Map index to 3d coordinate.
-fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
-  var x  = index;
-  let wh = dim_x * dim_y;
-  let z  = x / wh;
-  x  = x - z * wh; // check
-  let y  = x / dim_x;
-  x  = x - y * dim_x;
-  return vec3<u32>(x, y, z);
-}
+// fn from_euler_angles(x: f32, y: f32, z: 32) -> Quaternion {
+// 
+// 
+// }
 
 /**
  * [a1] from range min
@@ -228,11 +167,11 @@ fn mapRange(a1: f32, a2: f32, b1: f32, b2: f32, s: f32) -> f32 {
 }
 
 // Encode "rgba" to u32.
-fn encode_rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
+fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
 
-fn decode_color(c: u32) -> vec4<f32> {
+fn u32_rgba(c: u32) -> vec4<f32> {
   let a: f32 = f32(c & 256u) / 255.0;
   let b: f32 = f32((c & 65280u) >> 8u) / 255.0;
   let g: f32 = f32((c & 16711680u) >> 16u) / 255.0;
@@ -240,12 +179,10 @@ fn decode_color(c: u32) -> vec4<f32> {
   return vec4<f32>(r,g,b,a);
 }
 
-fn create_aabb(aabb: AABB, offset: u32, r: u32, g: u32, b: u32, a: u32) {
+fn create_aabb(aabb: AABB, offset: u32, color: u32, q: Quaternion, original_pos: vec3<f32>) {
 
     // Global start position.
-    let index = atomicAdd(&counter.counter[0], 36u);
-
-    let delta: vec4<f32> = aabb.max - aabb.min;
+    let index = atomicAdd(&counter[0], 36u);
 
     //          p3
     //          +-----------------+p2
@@ -265,24 +202,40 @@ fn create_aabb(aabb: AABB, offset: u32, r: u32, g: u32, b: u32, a: u32) {
 
     // Decode color information to the fourth component.
 
-    let color = f32(encode_rgba_u32(r,g,b,a));
+    let c = f32(color);
+
+    let delta = aabb.max - aabb.min;
 
     var positions = array<vec4<f32>, 8>(
-    	vec4<f32>(aabb.min.xyz, color),
-    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
-    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
-    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
-    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
-    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
-    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
-    	vec4<f32>(aabb.min.xyz, color) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz), c),
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
+    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
     );
+
+    // var positions = array<vec4<f32>, 8>(
+    // 	vec4<f32>(aabb.min.xyz, c),
+    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
+    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
+    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
+    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
+    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
+    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
+    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+    // );
     
     var i: u32 = 0u;
 
     loop {
         if (i == 36u) { break; }
-        temp_vertex_data[offset + STRIDE * i]  = Vertex(positions[vertex_positions[i]], aabb_normals[i/6u]);
+        temp_vertex_data[offset + STRIDE * i]  = Vertex(
+                                                    positions[vertex_positions[i]],
+                                                    vec4<f32>(rotate_vector(q, aabb_normals[i/6u].xyz), 0.0)
+        );
         i = i + 1u;
     }
 
@@ -297,9 +250,44 @@ fn create_aabb(aabb: AABB, offset: u32, r: u32, g: u32, b: u32, a: u32) {
     }
 }
 
-// Create a renderable array.
-fn create_array(index: u32) {
-    
+fn create_arrow(arr: Arrow) {
+
+    var direction = arr.end_pos.xyz - arr.start_pos.xyz;
+    let array_length = length(direction);
+
+    //          array_length
+    //    +----------------------+
+    // s  |                      | ------> x
+    //    +-----------+----------+
+    //              x = 0
+
+    let from_origo_x = vec3<f32>(vec3<f32>(array_length * 1.1, arr.size, arr.size));
+
+    let aabb = AABB(
+                   vec4<f32>((-0.5) * from_origo_x, 0.0),
+                   vec4<f32>(0.5    * from_origo_x, 0.0)
+    );
+
+    direction = normalize(direction);
+    let q = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
+    create_aabb(aabb, 64u, arr.color, q, arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.1 );
+
+    let from_origo_x_top_arr = vec3<f32>(1.0 * vec3<f32>(1.1, arr.size, arr.size));
+
+    let q_top   = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), normalize(vec3<f32>(1.0, -1.0, 0.0)));
+    let q_top2  = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
+    let q_top3  = quaternion_mul(q_top2, q_top);
+
+    let aabb_top = AABB(
+        vec4<f32>((-0.5) * from_origo_x_top_arr, 0.0),
+        vec4<f32>(0.5    * from_origo_x_top_arr, 0.0)
+    );
+
+    create_aabb(aabb_top,
+                64u,
+                arr.color,
+                q_top3,
+                arr.end_pos.xyz - rotate_vector(q_top3, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * 1.1 );
 }
 
 @stage(compute)
@@ -308,39 +296,38 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    // let mapping = index_to_uvec3(global_id.x, 64u, 64u);
-    var mapping =  from_hilber_index(global_id.x + counter.counter[1], 6u);
-    var mapping2 = from_hilber_index(global_id.x + counter.counter[1] + 1u, 6u);
+    // struct VisualizationParams{
+    //     max_vertex_capacity: u32;
+    //     iterator_start_index: u32;
+    //     iterator_end_index: u32;
+    // };
 
-    if (counter.counter[0] >= visualization_params.max_vertex_capacity) { return; }
+    // if (global_id.x >= visualization_params.iterator_end_index) { return; }
+    if (global_id.x > 0u) { return; }
 
-    // let index = atomicAdd(&counter.counter[0], 36u);
+    // fn rotate_vector(q: Quaternion, v: vec3<f32>) -> vec3<f32> {
+    //     let t = cross(vec3<f32>(q.x, q.y, q.z), v) * 2.0; 
+    //     return (t + t * q.w) + cross(vec3<f32>(q.x, q.y, q.z), t);
+    // }
 
-    if ((global_id.x + counter.counter[1] + 1u ) >= 4096u * 64u) { mapping2 = mapping; }
-    
-    let ma = max(mapping, mapping2);
-    let mi = min(mapping, mapping2);
-    
-    let color_factor = mapRange(0.0, 64.0 * 4096.0, 0.0, 255.0, f32(global_id.x + counter.counter[1]));
+    // fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
 
-    let v0 = vec4<f32>(f32(mapping.x),
-        	       f32(mapping.y),
-        	       f32(mapping.z),
-                       1.0
-    );
-    let v1 = vec4<f32>(f32(mapping2.x), 
-        	       f32(mapping2.y),
-        	       f32(mapping2.z),
-                       1.0
-    );
-    let aabb = AABB(vec4<f32>(min(v0.x, v1.x) - 0.03,
-        		      min(v0.y, v1.y) - 0.03,
-        		      min(v0.z, v1.z) - 0.03,
-                              1.0),
-                    vec4<f32>(max(v0.x, v1.x) + 0.03,
-        		      max(v0.y, v1.y) + 0.03,
-        		      max(v0.z, v1.z) + 0.03,
-                              1.0)
-    );
-    create_aabb(aabb, local_index, u32(255.0 - color_factor), 0u, u32(color_factor), 1u);
+    let arr = arrows[global_id.x];
+
+    var direction = arr.end_pos - arr.start_pos;
+    let array_length = length(direction);
+    direction = normalize(direction);
+
+    create_arrow(arr);
+
+    // create_aabb(
+    //     AABB(
+    //         // vec4<f32>(arr.start_pos, 1.0),
+    //         // vec4<f32>(arr.end_pos,   1.0),
+    //         arr.start_pos,
+    //         arr.end_pos
+    //     ),
+    //     64u,
+    //     arr.color
+    // );
 }

@@ -42,7 +42,7 @@ struct VertexOutput {
 };
 
 // Ligth/material properties.
-let light_pos: vec3<f32> = vec3<f32>(3.0, 28.0, 3.0);
+let light_pos: vec3<f32> = vec3<f32>(3.0, 8.0, 3.0);
 let light_color: vec3<f32> = vec3<f32>(0.8, 0.3, 0.3);
 let material_spec_color: vec3<f32> = vec3<f32>(0.5, 0.1, 0.1);
 let material_shininess: f32 = 55.0;
