@@ -291,6 +291,16 @@ impl InputCache {
             self.mouse_buttons.right.state = Some(InputState::Down(start_time,self.time_now));
         }
 
+        // If key is pressed, change it to down. If it's down, update the value.
+        for (_, val) in self.keyboard.iter_mut() {
+            match *val {
+                InputState::Pressed(v) => { *val = InputState::Down(v, self.time_now) },
+                InputState::Down(s, e) => { *val = InputState::Down(s, e + self.time_now) },
+                _ => { }
+            }
+
+        }
+
         // Remove key from hashmap if its previous state was 'released'.
         self.keyboard.retain(|_, state| match state { InputState::Released(_,_) => false, _ => true }); 
     }

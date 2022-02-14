@@ -16,7 +16,7 @@ struct VisualizationParams{
     max_vertex_capacity: u32;
     iterator_start_index: u32;
     iterator_end_index: u32;
-    blaah: u32;
+    arrow_size: f32;
 };
 
 struct Vertex {
@@ -73,6 +73,18 @@ var<storage, read_write> arrows: array<Arrow>;
 @group(0)
 @binding(3)
 var<storage,read_write> output: array<Vertex>;
+
+// Map index to 3d coordinate (hexahedron). The x and y dimensions are chosen. The curve goes from left to right, row by row.
+// The z direction is "unlimited".
+fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
+  var x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh; // check
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  return vec3<u32>(x, y, z);
+}
 
 fn quaternion_id() -> Quaternion {
     return Quaternion(1.0, 0.0, 0.0, 0.0);
@@ -206,7 +218,7 @@ fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
         i = i + 1u;
     }
 
-    // workgroupBarrier();
+    workgroupBarrier();
 } 
 
 fn create_aabb(aabb: AABB, offset: u32, color: u32) {
@@ -278,13 +290,17 @@ fn create_aabb(aabb: AABB, offset: u32, color: u32) {
     	output[index+i] = temp_vertex_data[offset + STRIDE * i];
         i = i + 1u;
     }
+
+    workgroupBarrier();
 }
 
-fn create_arrow(arr: Arrow) {
+fn create_arrow(arr: Arrow, offset: u32) {
 
     var direction = arr.end_pos.xyz - arr.start_pos.xyz;
     let array_length = length(direction);
     direction = normalize(direction);
+
+    let head_size = min(array_length, 2.0 * arr.size);
 
     //          array_length
     //    +----------------------+
@@ -292,8 +308,7 @@ fn create_arrow(arr: Arrow) {
     //    +-----------+----------+
     //              x = 0
 
-    // let from_origo_x = vec3<f32>(vec3<f32>(array_length * 1.1, arr.size, arr.size));
-    let from_origo_x = vec3<f32>(vec3<f32>(array_length * 1.0, arr.size, arr.size)) - vec3<f32>(1.0, 0.0, 0.0);//  - direction;
+    let from_origo_x = vec3<f32>(vec3<f32>(array_length, arr.size, arr.size)) - vec3<f32>(head_size, 0.0, 0.0);
 
     let aabb = AABB(
                    vec4<f32>((-0.5) * from_origo_x, 0.0),
@@ -303,38 +318,55 @@ fn create_arrow(arr: Arrow) {
     let delta = aabb.max - aabb.min;
 
     let q = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
-    //let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.1;
     let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.0;
 
     let c = f32(arr.color);
 
-    var normals = array<vec4<f32>, 6> ( 
-    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 0.0, -1.0)), 0.0),
-    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 0.0, 1.0)),  0.0),
-    	vec4<f32>(rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)),  0.0),
-    	vec4<f32>(rotate_vector(q, vec3<f32>(-1.0, 0.0, 0.0)), 0.0),
-    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 1.0, 0.0)),  0.0),
-    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, -1.0, 0.0)), 0.0)
-    );
-
     var positions = array<vec4<f32>, 8>(
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz), c),
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
-        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz), c),
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
+        vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
     );
 
-    store_hexaedron(&positions, &normals, 64u);
+    var n0 = normalize(cross(positions[5u].xyz - positions[6u].xyz,
+                             positions[4u].xyz - positions[6u].xyz));
+    var n1 = normalize(cross(positions[1u].xyz - positions[2u].xyz,
+                             positions[5u].xyz - positions[2u].xyz));
+    var n2 = normalize(cross(positions[0u].xyz - positions[3u].xyz,
+                             positions[1u].xyz - positions[3u].xyz));
+    var n3 = normalize(cross(positions[4u].xyz - positions[7u].xyz,
+                             positions[0u].xyz - positions[7u].xyz));
+    var n4 = normalize(cross(positions[3u].xyz - positions[7u].xyz,
+                             positions[6u].xyz - positions[7u].xyz));
+    var n5 = normalize(cross(positions[0u].xyz - positions[5u].xyz,
+                             positions[4u].xyz - positions[5u].xyz));
+
+    var normals = array<vec4<f32>, 6> (
+        vec4<f32>(n0, 0.0),
+        vec4<f32>(n1, 0.0),
+        vec4<f32>(n2, 0.0),
+        vec4<f32>(n3, 0.0),
+        vec4<f32>(n4, 0.0),
+        vec4<f32>(n5, 0.0)
+    );
+
+    // var normals = array<vec4<f32>, 6> (
+    //     vec4<f32>(normalize(rotate_vector(q, vec3<f32>(0.0, 0.0, -1.0))), 0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, vec3<f32>(0.0, 0.0,  1.0))),  0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0))),  0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, vec3<f32>(-1.0, 0.0, 0.0))), 0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, vec3<f32>(0.0, 1.0, 0.0))),  0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, vec3<f32>(0.0, -1.0, 0.0))), 0.0)
+    // );
+
+    store_hexaedron(&positions, &normals, offset);
 
     let from_origo_x_top_arr = vec3<f32>(1.0, 3.0 * arr.size, 3.0 * arr.size);
-
-    // let q_top   = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), normalize(vec3<f32>(1.0, -1.0, 0.0)));
-    // let q_top2  = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
-    // let q_top3  = quaternion_mul(q_top2, q_top);
 
     let aabb_top = AABB(
         vec4<f32>((-0.5) * from_origo_x_top_arr, 0.0),
@@ -343,8 +375,6 @@ fn create_arrow(arr: Arrow) {
 
     let delta_head = aabb_top.max - aabb_top.min;
     
-    let center = vec3<f32>(0.5, 0.0, 0.0);
-
     //          p3
     //          +-----------------+p2
     //         /|                /|
@@ -361,8 +391,6 @@ fn create_arrow(arr: Arrow) {
     //      p4                p5
     //
 
-    // vec4 head = vec4<f32>(
-
     let hf = 0.45;
 
     let p0 = aabb_top.min.xyz;
@@ -374,7 +402,6 @@ fn create_arrow(arr: Arrow) {
     let p6 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * (1.0 - hf) , delta_head.z * (1.0 - hf));
     let p7 = aabb_top.min.xyz + vec3<f32>(0.0     , delta_head.y , delta_head.z);
 
-    //let the_pos_head = arr.end_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.0;
     let the_pos_head = arr.start_pos.xyz;
 
     var positions_head = array<vec4<f32>, 8>(
@@ -413,40 +440,49 @@ fn create_arrow(arr: Arrow) {
     // 7u, 3u, 6u,
     // 5u, 0u, 4u,
 
-    let n0 = normalize(cross(positions_head[5u].xyz - positions[4u].xyz,
-                             positions_head[6u].xyz - positions[4u].xyz));
-    let n1 = normalize(cross(positions_head[1u].xyz - positions[5u].xyz,
-                             positions_head[2u].xyz - positions[5u].xyz));
-    let n2 = normalize(cross(positions_head[0u].xyz - positions[1u].xyz,
-                             positions_head[3u].xyz - positions[1u].xyz));
-    let n3 = normalize(cross(positions_head[4u].xyz - positions[0u].xyz,
-                             positions_head[7u].xyz - positions[0u].xyz));
-    let n4 = normalize(cross(positions_head[3u].xyz - positions[6u].xyz,
-                             positions_head[7u].xyz - positions[6u].xyz));
-    let n5 = normalize(cross(positions_head[0u].xyz - positions[4u].xyz,
-    //                         positions_head[5u].xyz - positions[4u].xyz));
+    // let n0 = normalize(cross(positions_head[5u].xyz - positions_head[4u].xyz,
+    //                          positions_head[6u].xyz - positions_head[4u].xyz));
+    // let n1 = normalize(cross(positions_head[1u].xyz - positions_head[5u].xyz,
+    //                          positions_head[2u].xyz - positions_head[5u].xyz));
+    // let n2 = normalize(cross(positions_head[0u].xyz - positions_head[1u].xyz,
+    //                          positions_head[3u].xyz - positions_head[1u].xyz));
+    // let n3 = normalize(cross(positions_head[4u].xyz - positions_head[0u].xyz,
+    //                          positions_head[7u].xyz - positions_head[0u].xyz));
+    // let n4 = normalize(cross(positions_head[3u].xyz - positions_head[6u].xyz,
+    //                          positions_head[7u].xyz - positions_head[6u].xyz));
+    // let n5 = normalize(cross(positions_head[0u].xyz - positions_head[4u].xyz,
+    //                          positions_head[5u].xyz - positions_head[4u].xyz));
 
-    // let n0 = normalize(cross(positions_head[5u].xyz - positions[6u].xyz,
-    //                          positions_head[4u].xyz - positions[6u].xyz));
-    // let n1 = normalize(cross(positions_head[1u].xyz - positions[2u].xyz,
-    //                          positions_head[5u].xyz - positions[2u].xyz));
-    // let n2 = normalize(cross(positions_head[0u].xyz - positions[3u].xyz,
-    //                          positions_head[1u].xyz - positions[3u].xyz));
-    // let n3 = normalize(cross(positions_head[4u].xyz - positions[7u].xyz,
-    //                          positions_head[0u].xyz - positions[7u].xyz));
-    // let n4 = normalize(cross(positions_head[3u].xyz - positions[7u].xyz,
-    //                          positions_head[6u].xyz - positions[7u].xyz));
-    // let n5 = normalize(cross(positions_head[0u].xyz - positions[5u].xyz,
-                             positions_head[4u].xyz - positions[5u].xyz));
+    n0 = normalize(cross(positions_head[5u].xyz - positions_head[6u].xyz,
+                         positions_head[4u].xyz - positions_head[6u].xyz));
+    n1 = normalize(cross(positions_head[1u].xyz - positions_head[2u].xyz,
+                         positions_head[5u].xyz - positions_head[2u].xyz));
+    n2 = normalize(cross(positions_head[0u].xyz - positions_head[3u].xyz,
+                         positions_head[1u].xyz - positions_head[3u].xyz));
+    n3 = normalize(cross(positions_head[4u].xyz - positions_head[7u].xyz,
+                         positions_head[0u].xyz - positions_head[7u].xyz));
+    n4 = normalize(cross(positions_head[3u].xyz - positions_head[7u].xyz,
+                         positions_head[6u].xyz - positions_head[7u].xyz));
+    n5 = normalize(cross(positions_head[0u].xyz - positions_head[5u].xyz,
+                         positions_head[4u].xyz - positions_head[5u].xyz));
     // TODO: recalculate.
     var normals_head = array<vec4<f32>, 6> (
-    	vec4<f32>(normalize(rotate_vector(q, n0)), 0.0),
-    	vec4<f32>(normalize(rotate_vector(q, n1)),  0.0),
-    	vec4<f32>(normalize(rotate_vector(q, n2)),  0.0),
-    	vec4<f32>(normalize(rotate_vector(q, n3)), 0.0),
-    	vec4<f32>(normalize(rotate_vector(q, n4)),  0.0),
-    	vec4<f32>(normalize(rotate_vector(q, n5)), 0.0)
+    	vec4<f32>(n0, 0.0),
+    	vec4<f32>(n1,  0.0),
+    	vec4<f32>(n2,  0.0),
+    	vec4<f32>(n3, 0.0),
+    	vec4<f32>(n4,  0.0),
+    	vec4<f32>(n5, 0.0)
     );
+
+    // var normals_head = array<vec4<f32>, 6> (
+    // 	vec4<f32>(normalize(rotate_vector(q, n0)), 0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, n1)),  0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, n2)),  0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, n3)), 0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, n4)),  0.0),
+    // 	vec4<f32>(normalize(rotate_vector(q, n5)), 0.0)
+    // );
 
     // var normals_head = array<vec4<f32>, 6> (
     // 	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 0.0, -1.0)), 0.0),
@@ -458,7 +494,7 @@ fn create_arrow(arr: Arrow) {
     // );
 
 
-    store_hexaedron(&positions_head, &normals_head, 64u);
+    store_hexaedron(&positions_head, &normals_head, offset);
 
     // create_aabb(aabb_top,
     //             64u,
@@ -479,31 +515,55 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //     iterator_end_index: u32;
     // };
 
-    // if (global_id.x >= visualization_params.iterator_end_index) { return; }
-    if (global_id.x > 0u) { return; }
+    let actual_index = global_id.x + counter[1]; 
 
-    let arr = arrows[global_id.x];
+    if (actual_index >= visualization_params.iterator_end_index - 1u) { return; }
+    // if (global_id.x >= 5u) { return; }
 
-    var direction = arr.end_pos - arr.start_pos;
-    let array_length = length(direction);
-    direction = normalize(direction);
+    let curve_coord =   index_to_uvec3(actual_index,      32u, 32u);
+    let curve_coord_n = index_to_uvec3(actual_index + 1u, 32u, 32u);
 
-    create_arrow(arr);
-
-    create_aabb(
-        AABB(
-            arr.start_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),
-            arr.start_pos + vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0)
-        ),
-        64u,
-        rgba_u32(255u, 0u, 0u, 255u)
+    let c = mapRange(0.0, 
+                     f32(visualization_params.iterator_end_index),
+		     0.0,
+		     255.0, 
+		     f32(actual_index)
     );
-    create_aabb(
-        AABB(
-            arr.end_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),
-            arr.end_pos + vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0)
+
+    create_arrow(
+        Arrow (
+    	    3.0 * vec4<f32>(f32(curve_coord.x), f32(curve_coord.y), f32(curve_coord.z), 0.0),
+    	    3.0 * vec4<f32>(f32(curve_coord_n.x), f32(curve_coord_n.y), f32(curve_coord_n.z), 0.0),
+    	    rgba_u32(u32(c), 0u, 255u - u32(c), 255u),
+    	    visualization_params.arrow_size
         ),
-        64u,
-        rgba_u32(0u, 255u, 0u, 255u)
+        local_id.x,
     );
+    
+    // if (global_id.x > 0u) { return; }
+
+    // let arr = arrows[global_id.x];
+
+    // var direction = arr.end_pos - arr.start_pos;
+    // let array_length = length(direction);
+    // direction = normalize(direction);
+
+    // create_arrow(arr);
+
+    // create_aabb(
+    //     AABB(
+    //         arr.start_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),
+    //         arr.start_pos + vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0)
+    //     ),
+    //     64u,
+    //     rgba_u32(255u, 0u, 0u, 255u)
+    // );
+    // create_aabb(
+    //     AABB(
+    //         arr.end_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),
+    //         arr.end_pos + vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0)
+    //     ),
+    //     64u,
+    //     rgba_u32(0u, 255u, 0u, 255u)
+    // );
 }

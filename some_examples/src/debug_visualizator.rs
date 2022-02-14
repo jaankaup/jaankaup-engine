@@ -22,6 +22,9 @@ use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 
+use winit::event as ev;
+pub use ev::VirtualKeyCode as Key;
+
 /// The number of vertices per chunk.
 const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 36; // 128 * 64 * 36 = 262144 verticex. 
 
@@ -54,8 +57,8 @@ struct Arrow {
 struct VisualizationParams{
     max_local_vertex_capacity: u32,
     iterator_start_index: u32,
-    global_number_of_vertices: u32,
-    blaah: u32,
+    iterator_end_index: u32,
+    arrow_size: f32,
     // current_iterator_index: u32,
 }
 
@@ -77,6 +80,47 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
     }
 }
 
+struct KeyboardManager {
+    keys: HashMap<Key, (f64, f64)>,
+}
+
+impl KeyboardManager {
+    pub fn init() -> Self {
+        Self {
+            keys: HashMap::<Key, (f64, f64)>::new(),
+        }
+    }
+
+    pub fn register_key(&mut self, key: Key, threshold: f64) {
+        self.keys.insert(key, (0.0, threshold)); 
+    }
+
+    pub fn test_key(&mut self, key: &Key, input: &InputCache) -> bool {
+        
+        let state_key = input.key_state(key);
+        let mut result = false;
+
+        match state_key {
+            Some(InputState::Down(s, e)) => {
+                let delta = (e - s) as f64 / 1000000.0;
+                if let Some(v) = self.keys.get_mut(key) {
+                    // println!("size ....{:}", *v );
+                    v.0 = v.0 + delta; 
+                    if v.0 > v.1 {
+                        println!("updating ....{:}", delta);
+                        //self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+                        v.0 = 0.0;
+                        result = true;
+                    }
+                }
+            },
+            _ => { }
+        }
+
+        return result;
+    }
+}
+
 // State for this application.
 struct DebugVisualizator {
     pub screen: ScreenTexture, 
@@ -90,6 +134,8 @@ struct DebugVisualizator {
     pub histogram: Histogram,
     pub draw_count: u32,
     pub update: bool,
+    pub visualization_params: VisualizationParams,
+    pub keys: KeyboardManager,
 }
 
 impl DebugVisualizator {
@@ -114,6 +160,10 @@ impl Application for DebugVisualizator {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
         // buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
+
+        let mut keys = KeyboardManager::init();
+        keys.register_key(Key::L, 1000.0);
+        keys.register_key(Key::K, 1000.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
@@ -165,19 +215,18 @@ impl Application for DebugVisualizator {
         // let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
         let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
 
+        let params = VisualizationParams {
+            max_local_vertex_capacity: MAX_VERTEX_CAPACITY as u32,
+            iterator_start_index: 0,
+            iterator_end_index: 32768,
+            arrow_size: 0.3,
+        };
+
         buffers.insert(
             "visualization_params".to_string(),
             buffer_from_data::<VisualizationParams>(
             &configuration.device,
-            &vec![
-                VisualizationParams {
-                    max_local_vertex_capacity: MAX_VERTEX_CAPACITY as u32,
-                    iterator_start_index: 0,
-                    global_number_of_vertices: 123,
-                    blaah: 123,
-                    // current_iterator_index: 0,
-                }
-            ],
+            &vec![params],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -342,6 +391,8 @@ impl Application for DebugVisualizator {
             histogram: histogram,
             draw_count: 0,
             update: true,
+            visualization_params: params,
+            keys: keys,
         }
     }
 
@@ -359,8 +410,8 @@ impl Application for DebugVisualizator {
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut items_available: i32 = 1; 
-        let mut dispatch_x = 1;
+        let mut items_available: i32 = 32768; 
+        let mut dispatch_x = 64;
         let mut clear = true;
         let mut i = dispatch_x * 64;
 
@@ -380,6 +431,8 @@ impl Application for DebugVisualizator {
 
             let counter = self.histogram.get_values(device, queue);
             self.draw_count = counter[0];
+            // println!("draw_count == {}", self.draw_count);
+            // println!("items_available == {}", items_available);
 
             // set_values_cpu_version(&self, queue, !vec[0, counter[1]);
 
@@ -388,7 +441,7 @@ impl Application for DebugVisualizator {
                     label: Some("Render Encoder"),
             });
 
-            items_available = items_available - 128 * 64; 
+            items_available = items_available - dispatch_x as i32 * 64; 
             // println!("items_available == {}", items_available);
 
             // Draw the cube.
@@ -403,9 +456,9 @@ impl Application for DebugVisualizator {
                  //true
             );
             queue.submit(Some(encoder_render.finish()));
-            clear = false;
+            clear = items_available <= 0;
             self.histogram.set_values_cpu_version(queue, &vec![0, i]);
-            i = i + 128*64;
+            i = i + dispatch_x*64;
             // if (items_available <= 0) { break; } 
         }
 
@@ -440,6 +493,38 @@ impl Application for DebugVisualizator {
             // self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
             // self.update = false;
         }
+
+        if self.keys.test_key(&Key::L, input) { 
+            self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+        }
+        if self.keys.test_key(&Key::K, input) { 
+            self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
+        }
+        // let state_k = input.key_state(&Key::K);
+        // let mut change = false;
+        // 
+        // match state_l {
+        //     Some(InputState::Down(s, e)) => {
+        //         let delta = (e - s) as f64 / 1000000.0;
+        //         if let Some(v) = self.keys.get_mut(&Key::L) {
+        //             println!("size ....{:}", *v );
+        //             *v = *v + delta; 
+        //             if *v > 1000.0 {
+        //                 println!("updating ....{:}", delta);
+        //                 self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+        //                 *v = 0.0;
+        //             }
+        //         }
+        //     },
+        //     _ => { }
+        // }
+
+        // println!("{:?}", state_l);
+        queue.write_buffer(
+            &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.visualization_params])
+        );
     }
 }
 
