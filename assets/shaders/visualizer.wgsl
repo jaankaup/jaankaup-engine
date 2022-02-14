@@ -19,14 +19,12 @@ struct VisualizationParams{
     blaah: u32;
 };
 
-// struct Counter {
-//     counter: array<atomic<u32>, 2>;
-// };
-
 struct Vertex {
     v: vec4<f32>;
     n: vec4<f32>;
 };
+
+type Hexaedra = array<Vertex , 8>;
 
 struct Arrow {
     start_pos: vec4<f32>;
@@ -179,7 +177,39 @@ fn u32_rgba(c: u32) -> vec4<f32> {
   return vec4<f32>(r,g,b,a);
 }
 
-fn create_aabb(aabb: AABB, offset: u32, color: u32, q: Quaternion, original_pos: vec3<f32>) {
+fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
+                   normals:   ptr<function, array<vec4<f32>, 6>>,
+                   offset: u32) {
+
+    let index = atomicAdd(&counter[0], 36u);
+
+    var i: u32 = 0u;
+
+    loop {
+        if (i == 36u) { break; }
+        temp_vertex_data[offset + STRIDE * i]  =
+            Vertex(
+                (*positions)[vertex_positions[i]],
+                (*normals)[i/6u]
+            );
+
+        i = i + 1u;
+    }
+
+    workgroupBarrier();
+
+    var i: u32 = 0u;
+
+    loop {
+        if (i == 36u) { break; }
+    	output[index+i] = temp_vertex_data[offset + STRIDE * i];
+        i = i + 1u;
+    }
+
+    // workgroupBarrier();
+} 
+
+fn create_aabb(aabb: AABB, offset: u32, color: u32) {
 
     // Global start position.
     let index = atomicAdd(&counter[0], 36u);
@@ -206,27 +236,27 @@ fn create_aabb(aabb: AABB, offset: u32, color: u32, q: Quaternion, original_pos:
 
     let delta = aabb.max - aabb.min;
 
-    var positions = array<vec4<f32>, 8>(
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz), c),
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
-    	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
-    );
-
     // var positions = array<vec4<f32>, 8>(
-    // 	vec4<f32>(aabb.min.xyz, c),
-    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
-    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
-    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
-    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
-    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
-    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
-    // 	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz), c),
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
+    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
     // );
+
+    var positions = array<vec4<f32>, 8>(
+    	vec4<f32>(aabb.min.xyz, c),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+    );
     
     var i: u32 = 0u;
 
@@ -234,7 +264,7 @@ fn create_aabb(aabb: AABB, offset: u32, color: u32, q: Quaternion, original_pos:
         if (i == 36u) { break; }
         temp_vertex_data[offset + STRIDE * i]  = Vertex(
                                                     positions[vertex_positions[i]],
-                                                    vec4<f32>(rotate_vector(q, aabb_normals[i/6u].xyz), 0.0)
+                                                    vec4<f32>(aabb_normals[i/6u])
         );
         i = i + 1u;
     }
@@ -254,6 +284,7 @@ fn create_arrow(arr: Arrow) {
 
     var direction = arr.end_pos.xyz - arr.start_pos.xyz;
     let array_length = length(direction);
+    direction = normalize(direction);
 
     //          array_length
     //    +----------------------+
@@ -261,33 +292,179 @@ fn create_arrow(arr: Arrow) {
     //    +-----------+----------+
     //              x = 0
 
-    let from_origo_x = vec3<f32>(vec3<f32>(array_length * 1.1, arr.size, arr.size));
+    // let from_origo_x = vec3<f32>(vec3<f32>(array_length * 1.1, arr.size, arr.size));
+    let from_origo_x = vec3<f32>(vec3<f32>(array_length * 1.0, arr.size, arr.size)) - vec3<f32>(1.0, 0.0, 0.0);//  - direction;
 
     let aabb = AABB(
                    vec4<f32>((-0.5) * from_origo_x, 0.0),
                    vec4<f32>(0.5    * from_origo_x, 0.0)
     );
 
-    direction = normalize(direction);
+    let delta = aabb.max - aabb.min;
+
     let q = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
-    create_aabb(aabb, 64u, arr.color, q, arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.1 );
+    //let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.1;
+    let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.0;
 
-    let from_origo_x_top_arr = vec3<f32>(1.0 * vec3<f32>(1.1, arr.size, arr.size));
+    let c = f32(arr.color);
 
-    let q_top   = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), normalize(vec3<f32>(1.0, -1.0, 0.0)));
-    let q_top2  = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
-    let q_top3  = quaternion_mul(q_top2, q_top);
+    var normals = array<vec4<f32>, 6> ( 
+    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 0.0, -1.0)), 0.0),
+    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 0.0, 1.0)),  0.0),
+    	vec4<f32>(rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)),  0.0),
+    	vec4<f32>(rotate_vector(q, vec3<f32>(-1.0, 0.0, 0.0)), 0.0),
+    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 1.0, 0.0)),  0.0),
+    	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, -1.0, 0.0)), 0.0)
+    );
+
+    var positions = array<vec4<f32>, 8>(
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz), c),
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
+        vec4<f32>(the_pos - 0.5 * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
+    );
+
+    store_hexaedron(&positions, &normals, 64u);
+
+    let from_origo_x_top_arr = vec3<f32>(1.0, 3.0 * arr.size, 3.0 * arr.size);
+
+    // let q_top   = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), normalize(vec3<f32>(1.0, -1.0, 0.0)));
+    // let q_top2  = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
+    // let q_top3  = quaternion_mul(q_top2, q_top);
 
     let aabb_top = AABB(
         vec4<f32>((-0.5) * from_origo_x_top_arr, 0.0),
         vec4<f32>(0.5    * from_origo_x_top_arr, 0.0)
     );
 
-    create_aabb(aabb_top,
-                64u,
-                arr.color,
-                q_top3,
-                arr.end_pos.xyz - rotate_vector(q_top3, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * 1.1 );
+    let delta_head = aabb_top.max - aabb_top.min;
+    
+    let center = vec3<f32>(0.5, 0.0, 0.0);
+
+    //          p3
+    //          +-----------------+p2
+    //         /|                /|
+    //        / |               / |
+    //       /  |           p6 /  |
+    //   p7 +-----------------+   |
+    //      |   |             |   |
+    //      |   |p0           |   |p1
+    //      |   +-------------|---+  
+    //      |  /              |  /
+    //      | /               | /
+    //      |/                |/
+    //      +-----------------+
+    //      p4                p5
+    //
+
+    // vec4 head = vec4<f32>(
+
+    let hf = 0.45;
+
+    let p0 = aabb_top.min.xyz;
+    let p1 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * hf , delta_head.z * hf);
+    let p2 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * (1.0 - hf) , delta_head.z * hf);
+    let p3 = aabb_top.min.xyz + vec3<f32>(0.0     , delta_head.y , 0.0);
+    let p4 = aabb_top.min.xyz + vec3<f32>(0.0     , 0.0     , delta_head.z);
+    let p5 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * hf , delta_head.z * (1.0 - hf));
+    let p6 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * (1.0 - hf) , delta_head.z * (1.0 - hf));
+    let p7 = aabb_top.min.xyz + vec3<f32>(0.0     , delta_head.y , delta_head.z);
+
+    //let the_pos_head = arr.end_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.0;
+    let the_pos_head = arr.start_pos.xyz;
+
+    var positions_head = array<vec4<f32>, 8>(
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p0) - direction * 0.5, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p1) - direction * 0.5, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p2) - direction * 0.5, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p3) - direction * 0.5, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p4) - direction * 0.5, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p5) - direction * 0.5, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p6) - direction * 0.5, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p7) - direction * 0.5, c)
+    );
+
+    // var positions_head = array<vec4<f32>, 8>(
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p0), c),
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p1), c),
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p2), c),
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p3), c),
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p4), c),
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p5), c),
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p6), c),
+    //     vec4<f32>(arr.end_pos.xyz - direction + rotate_vector(q, p7), c)
+    // );
+
+    // 4u, 5u, 6u,
+    // 5u, 1u, 2u,
+    // 1u, 0u, 3u,
+    // 0u, 4u, 7u,
+    // 6u, 3u, 7u,
+    // 4u, 0u, 5u,
+
+    // 6u, 5u, 4u,
+    // 2u, 1u, 5u,
+    // 3u, 0u, 1u,
+    // 7u, 4u, 0u,
+    // 7u, 3u, 6u,
+    // 5u, 0u, 4u,
+
+    let n0 = normalize(cross(positions_head[5u].xyz - positions[4u].xyz,
+                             positions_head[6u].xyz - positions[4u].xyz));
+    let n1 = normalize(cross(positions_head[1u].xyz - positions[5u].xyz,
+                             positions_head[2u].xyz - positions[5u].xyz));
+    let n2 = normalize(cross(positions_head[0u].xyz - positions[1u].xyz,
+                             positions_head[3u].xyz - positions[1u].xyz));
+    let n3 = normalize(cross(positions_head[4u].xyz - positions[0u].xyz,
+                             positions_head[7u].xyz - positions[0u].xyz));
+    let n4 = normalize(cross(positions_head[3u].xyz - positions[6u].xyz,
+                             positions_head[7u].xyz - positions[6u].xyz));
+    let n5 = normalize(cross(positions_head[0u].xyz - positions[4u].xyz,
+    //                         positions_head[5u].xyz - positions[4u].xyz));
+
+    // let n0 = normalize(cross(positions_head[5u].xyz - positions[6u].xyz,
+    //                          positions_head[4u].xyz - positions[6u].xyz));
+    // let n1 = normalize(cross(positions_head[1u].xyz - positions[2u].xyz,
+    //                          positions_head[5u].xyz - positions[2u].xyz));
+    // let n2 = normalize(cross(positions_head[0u].xyz - positions[3u].xyz,
+    //                          positions_head[1u].xyz - positions[3u].xyz));
+    // let n3 = normalize(cross(positions_head[4u].xyz - positions[7u].xyz,
+    //                          positions_head[0u].xyz - positions[7u].xyz));
+    // let n4 = normalize(cross(positions_head[3u].xyz - positions[7u].xyz,
+    //                          positions_head[6u].xyz - positions[7u].xyz));
+    // let n5 = normalize(cross(positions_head[0u].xyz - positions[5u].xyz,
+                             positions_head[4u].xyz - positions[5u].xyz));
+    // TODO: recalculate.
+    var normals_head = array<vec4<f32>, 6> (
+    	vec4<f32>(normalize(rotate_vector(q, n0)), 0.0),
+    	vec4<f32>(normalize(rotate_vector(q, n1)),  0.0),
+    	vec4<f32>(normalize(rotate_vector(q, n2)),  0.0),
+    	vec4<f32>(normalize(rotate_vector(q, n3)), 0.0),
+    	vec4<f32>(normalize(rotate_vector(q, n4)),  0.0),
+    	vec4<f32>(normalize(rotate_vector(q, n5)), 0.0)
+    );
+
+    // var normals_head = array<vec4<f32>, 6> (
+    // 	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 0.0, -1.0)), 0.0),
+    // 	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 0.0, 1.0)),  0.0),
+    // 	vec4<f32>(rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)),  0.0),
+    // 	vec4<f32>(rotate_vector(q, vec3<f32>(-1.0, 0.0, 0.0)), 0.0),
+    // 	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, 1.0, 0.0)),  0.0),
+    // 	vec4<f32>(rotate_vector(q, vec3<f32>(0.0, -1.0, 0.0)), 0.0)
+    // );
+
+
+    store_hexaedron(&positions_head, &normals_head, 64u);
+
+    // create_aabb(aabb_top,
+    //             64u,
+    //             arr.color,
+    //             q_top3,
+    //             arr.end_pos.xyz - rotate_vector(q_top3, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * 1.1 );
 }
 
 @stage(compute)
@@ -305,13 +482,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // if (global_id.x >= visualization_params.iterator_end_index) { return; }
     if (global_id.x > 0u) { return; }
 
-    // fn rotate_vector(q: Quaternion, v: vec3<f32>) -> vec3<f32> {
-    //     let t = cross(vec3<f32>(q.x, q.y, q.z), v) * 2.0; 
-    //     return (t + t * q.w) + cross(vec3<f32>(q.x, q.y, q.z), t);
-    // }
-
-    // fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
-
     let arr = arrows[global_id.x];
 
     var direction = arr.end_pos - arr.start_pos;
@@ -320,14 +490,20 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     create_arrow(arr);
 
-    // create_aabb(
-    //     AABB(
-    //         // vec4<f32>(arr.start_pos, 1.0),
-    //         // vec4<f32>(arr.end_pos,   1.0),
-    //         arr.start_pos,
-    //         arr.end_pos
-    //     ),
-    //     64u,
-    //     arr.color
-    // );
+    create_aabb(
+        AABB(
+            arr.start_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),
+            arr.start_pos + vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0)
+        ),
+        64u,
+        rgba_u32(255u, 0u, 0u, 255u)
+    );
+    create_aabb(
+        AABB(
+            arr.end_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),
+            arr.end_pos + vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0)
+        ),
+        64u,
+        rgba_u32(0u, 255u, 0u, 255u)
+    );
 }

@@ -187,9 +187,9 @@ impl Application for DebugVisualizator {
             buffer_from_data::<Arrow>(
                 &configuration.device,
                 &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
-                              end_pos:   [4.0, 0.0, 0.0, 1.0],
+                              end_pos:   [4.0, 3.0, 0.0, 1.0],
                               color: encode_rgba_u32(0, 0, 255, 255),
-                              size: 0.1,
+                              size: 0.2,
                               _padding: [0, 0]}],
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 Some("Debug array buffer")
