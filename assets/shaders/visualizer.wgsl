@@ -86,6 +86,226 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   return vec3<u32>(x, y, z);
 }
 
+// ROSENBERG-STRONG
+
+fn r2(x: i32, y: i32) -> i32 {
+    let max2 = max(x,y);
+    return max2 * max2 + max2 + x - y;
+}
+
+fn r3(x: i32, y: i32, z: i32) -> i32 {
+    let max2 = max(x,y);
+    let max3  = max(z, max2);
+    let max3_2 = max3 * max3;
+    let max3_3 = max3 * max3_2;
+    return max2 * max2 + max2 + x - y + max3_3 + (max3 - z) * (2 * max3 + 1);
+}
+
+// fn mm_square(d: f64, z: f64) -> f64 {
+//     (z as f64).powf(1.0/d).ceil() 
+// }
+// 
+// fn xd(d: i32, z: i32) -> i32 {
+//     let m = mm_square(d as f64, z as f64);  
+//     let a = z as f64 - m.powf(d as f64) - m.powf((d - 1) as f64);
+//     let b = (m + 1.0).powf(d as f64) - m.powf((d-1) as f64); 
+//     let c = if m < 0.0 { 0.0 } else { m };
+//     (m - (c / b).ceil()) as i32
+// }
+
+fn r2_reverse(z: f32) -> vec2<i32> {
+    let m = floor(sqrt(z));
+    let t = z - m * m;
+    if (t < m) { return vec2<i32>(i32(t), i32(m)); }
+    else {
+        return vec2<i32>(i32(m), i32( m * m + 2.0 * m - z));
+    }
+}
+
+// fn cbrt2(x: i32) -> i32 {
+// 
+//     let one = 1;
+//     let three = 3;
+//     var result = 0;
+//     let num_bits = 0xffffffff - log2(f32(x));
+//     
+//     
+// }
+
+
+fn cbrt(x: f32) -> f32 {
+
+    // CHEATING! The precision of f32 and log2 are not enought.
+    let lg2 = log2(x) + 0.00001;
+
+    if (x > 0.0) { return exp2(lg2 / 3.0); }
+    //if (x > 0.0) { return exp2(log2(x) / 3.0); }
+    //if (x < 0.0) { return (-1.0)*exp2(log2(-x) / 3.0); }
+    return 0.0;
+}
+
+fn r3_reverse(z: f32) -> vec3<i32> {
+    let m = floor(cbrt(z));
+    let t = z - m*m*m - m*m;
+    let v = max(0.0, t);
+    let x3 = m - floor(
+                     v / ((m + 1.0) * (m + 1.0) - m*m)
+                 );
+    let xy = r2_reverse(z - m*m*m - (m - x3) * ((m + 1.0) * (m + 1.0) - m*m));
+    return vec3<i32>(xy.x, xy.y, i32(x3));
+}
+
+// THE HILBERT STUFF.
+
+// Lookup table for ctz. Maybe this should be a uniform.
+var<private> lookup: array<u32, 32> = array<u32, 32>(
+    0u, 1u, 28u, 2u, 29u, 14u, 24u, 3u, 30u, 22u, 20u, 15u, 25u, 17u, 4u, 8u,
+    31u, 27u, 13u, 23u, 21u, 19u, 16u, 7u, 26u, 12u, 18u, 6u, 11u, 5u, 10u, 9u
+);
+
+// Get the bit value from postition i.
+fn get_bit(x: u32, i: u32) -> u32 {
+    return (x & (1u << i)) >> i;
+}
+
+// Modulo 3 for u32.
+fn mod3_32(x: u32) -> u32 {
+    var a = x;
+    a = (a >> 16u) + (a & 0xFFFFu);
+    a = (a >>  8u) + (a & 0xFFu);
+    a = (a >>  4u) + (a & 0xFu);
+    a = (a >>  2u) + (a & 0x3u);
+    a = (a >>  2u) + (a & 0x3u);
+    a = (a >>  2u) + (a & 0x3u);
+    if (a > 2u) { a = a - 3u; }
+    return a;
+}
+
+// Rotate first N bits in place to the right. This is now tuned for 3-bits.
+// For more general function, implement function that has number of bits as parameter.
+fn rotate_right(x: u32, amount: u32) -> u32 {
+    let i = mod3_32(amount);
+    return (x >> i)^(x << (3u-i)) & !(0xFFFFFFFFu<<3u);
+}
+
+// Rotate first N bits in place to the left. This is now tuned for 3-bits.
+// For more general function, implement function that has number of bits as parameter.
+fn rotate_left(x: u32, amount: u32) -> u32 {
+    let i = mod3_32(amount);
+    return (x << i) ^ (x >> (3u-i)) & !(0xFFFFFFFFu<<3u);
+}
+
+// Calculate the gray code.
+fn gc(i: u32) -> u32 {
+    return i ^ (i >> 1u);
+}
+
+// Calculate the inverse gray code.
+fn inverse_gc(g: u32) -> u32 {
+    return (g ^ (g >> 1u)) ^ (g >> 2u);
+}
+
+// TODO: what happend when u32 is a really big number, larger than i32 can hold?
+fn countTrailingZeros(x: u32) -> u32 {
+    return lookup[
+ 	u32((i32(x) & (-(i32(x))))) * 0x077CB531u >> 27u
+    ];
+}
+
+///////////////////////////
+////// HILBERT INDEX //////
+///////////////////////////
+
+// Calculate the entry point of hypercube i.
+fn e(i: u32) -> u32 {
+    if (i == 0u) { return 0u; } else { return gc(2u * ((i - 1u) / 2u)); }
+}
+
+// Calculate the exit point of hypercube i.
+fn f(i: u32) -> u32 {
+   return e((1u << 3u) - 1u - i) ^ (1u << 2u);
+}
+
+// Calculate the direction between i and the next one.
+fn g(i: u32) -> u32 {
+    return countTrailingZeros(!i);
+}
+
+// Calculate the direction of the arrow whitin a subcube.
+fn d(i: u32) -> u32 {
+    if (i == 0u) { return 0u; }
+    else if ((i & 1u) == 0u) {
+        return mod3_32(g(i - 1u));
+    }
+    else {
+        return mod3_32(g(i));
+    }
+}
+
+// Transform b.
+fn t(e: u32, d: u32, b: u32) -> u32 {
+    return rotate_right(b^e, d + 1u);
+}
+
+// Inverse transform.
+fn t_inv(e: u32, d: u32, b: u32) -> u32 {
+    return rotate_left(b, d + 1u) ^ e;
+}
+
+// Calculate the hilbert index from 3d point p.
+// m is the number of bits that represent the value of single coordinate.
+// If m is 2, then the compute domain is: m X m X m => 2x2x2
+fn to_hilbert_index(p: vec3<u32>, m: u32) -> u32 {
+
+    var h = 0u;
+
+    var ve: u32 = 0u;
+    var vd: u32 = 0u;
+
+    var i: u32 = m - 1u;
+    loop {
+        if (i == 0u) { break; }
+
+        let l = get_bit(p.x, i) | (get_bit(p.y, i) << 1u) | (get_bit(p.z, i) << 2u);
+    	let w = inverse_gc(t(l, ve, vd));
+    	ve = ve ^ (rotate_left(e(w), vd + 1u));
+    	vd = mod3_32(vd + d(w) + 1u);
+        h = (h << 3u) | w;
+
+        i = i - 1u;
+    }
+    return h;
+}
+
+// Calculate 3d point from hilbert index.
+// m is the number of bits that represent the value of single coordinate.
+// If m is 2, then the compute domain is: m X m X m => 2x2x2
+fn from_hilbert_index(h: u32, m: u32) -> vec3<u32> {
+    
+    var ve: u32 = 0u;
+    var vd: u32 = 0u;
+    var p = vec3<u32>(0u, 0u, 0u);
+
+    var i: u32 = m - 1u;
+    loop {
+
+        let w = get_bit(h, i*3u) | (get_bit(h, i*3u + 1u) << 1u) | (get_bit(h, i*3u + 2u) << 2u);
+    	let l = t_inv(ve, vd, gc(w)); 
+    	p.x = (p.x << 1u) | ((l >> 0u) & 1u);
+    	p.y = (p.y << 1u) | ((l >> 1u) & 1u);
+    	p.z = (p.z << 1u) | ((l >> 2u) & 1u);
+    	ve = ve ^ rotate_left(e(w), vd + 1u);
+    	vd = mod3_32(vd + d(w) + 1u);
+
+        if (i == 0u) { break; }
+
+        i = i - 1u;
+    }
+    return p;
+}
+
+
+
 fn quaternion_id() -> Quaternion {
     return Quaternion(1.0, 0.0, 0.0, 0.0);
 }
@@ -146,16 +366,65 @@ fn rotate_vector(q: Quaternion, v: vec3<f32>) -> vec3<f32> {
     return v + q.w * t + cross(vec3<f32>(q.x, q.y, q.z), t);
 }
 
+fn axis_angle(axis: vec3<f32>, angle: f32) -> Quaternion {
+    let half_angle = angle * 0.5;
+    let bl = axis * sin(half_angle);
+    return Quaternion(cos(half_angle), bl.x, bl.y, bl.z); 
+}
+
+fn vec3_cross(a: vec3<f32>, b: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+   );
+}
+
 fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
+
+    let v = cross(a,b);  
+
+
+    let a_len = length(a);
+    let b_len = length(b);
+
+    let w = sqrt(a_len * a_len * b_len * b_len) + dot(a,b);
+
+    if ( a.x == 1.0 && b.x == -1.0 && a.y == 0.0 && b.y == 0.0 && a.z == 0.0 && b.z == 0.0) { 
+        
+        var axis = cross(vec3<f32>(1.0, 0.0, 0.0), a);
+        if (length(axis) == 0.0) {
+            axis = cross(vec3<f32>(0.0, 1.0, 0.0), a);
+        }
+        axis = normalize(axis);
+        return axis_angle(axis, PI);
+    }
+     
+    return quaternion_normalize(Quaternion(w, v.x, v.y, v.z));
+
     // let a_norm = normalize(a);    
     // let b_norm = normalize(b);    
 
-    let v = cross(a,b);  
-    let a_len = length(a);
-    let b_len = length(b);
-    let w = sqrt(a_len * a_len * b_len * b_len) + dot(a,b);
-     
-    return quaternion_normalize(Quaternion(w, v.x, v.y, v.z));
+    //++ let d = dot(a,b);
+
+    //++ if (d >=1.0 ) {
+    //++     return quaternion_id(); 
+    //++ }
+
+    //++ if (d < -0.999999) {
+    //++     var axis = vec3_cross(vec3<f32>(1.0, 0.0, 0.0), a);
+    //++     if (length(axis) == 0.0) {
+    //++         axis = vec3_cross(vec3<f32>(0.0, 1.0, 0.0), a);
+    //++     }
+    //++     axis = normalize(axis);
+    //++     return axis_angle(axis, PI);
+    //++ }
+    //++ else {
+    //++     let cr = vec3_cross(a, b);
+    //++     let q = Quaternion(1.0 + d, cr.x, cr.y, cr.z);  
+    //++     return quaternion_scale(q, 1.0 / sqrt(length(q.w)));
+    //++ }
+
 }
 
 // fn from_euler_angles(x: f32, y: f32, z: 32) -> Quaternion {
@@ -248,17 +517,6 @@ fn create_aabb(aabb: AABB, offset: u32, color: u32) {
 
     let delta = aabb.max - aabb.min;
 
-    // var positions = array<vec4<f32>, 8>(
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz), c),
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
-    // 	vec4<f32>(original_pos + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
-    // );
-
     var positions = array<vec4<f32>, 8>(
     	vec4<f32>(aabb.min.xyz, c),
     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
@@ -300,7 +558,7 @@ fn create_arrow(arr: Arrow, offset: u32) {
     let array_length = length(direction);
     direction = normalize(direction);
 
-    let head_size = min(array_length, 2.0 * arr.size);
+    let head_size = min(0.5 * array_length, 2.0 * arr.size);
 
     //          array_length
     //    +----------------------+
@@ -315,10 +573,10 @@ fn create_arrow(arr: Arrow, offset: u32) {
                    vec4<f32>(0.5    * from_origo_x, 0.0)
     );
 
-    let delta = aabb.max - aabb.min;
+    var delta = aabb.max - aabb.min;
 
     let q = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
-    let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length * 1.0;
+    let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length;
 
     let c = f32(arr.color);
 
@@ -494,6 +752,7 @@ fn create_arrow(arr: Arrow, offset: u32) {
     // );
 
 
+    workgroupBarrier();
     store_hexaedron(&positions_head, &normals_head, offset);
 
     // create_aabb(aabb_top,
@@ -520,25 +779,43 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if (actual_index >= visualization_params.iterator_end_index - 1u) { return; }
     // if (global_id.x >= 5u) { return; }
 
-    let curve_coord =   index_to_uvec3(actual_index,      32u, 32u);
-    let curve_coord_n = index_to_uvec3(actual_index + 1u, 32u, 32u);
+    //let curve_coord =   index_to_uvec3(actual_index,      16u, 16u);
+    //let curve_coord_n = index_to_uvec3(actual_index + 1u, 16u, 16u);
+
+    //let curve_coord_n = vec3<i32>(i32(curve_coord.x), i32(curve_coord.y), i32(curve_coord.z) + 1);
+
+    // let curve_coord =   r3_reverse(f32(actual_index));
+    // let curve_coord_n = r3_reverse(f32(actual_index + 1u));
+
+    let curve_coord =   from_hilbert_index(actual_index, 4u);
+    let curve_coord_n = from_hilbert_index(actual_index + 1u, 4u);
 
     let c = mapRange(0.0, 
                      f32(visualization_params.iterator_end_index),
-		     0.0,
-		     255.0, 
-		     f32(actual_index)
+        	     0.0,
+        	     255.0, 
+        	     f32(actual_index)
     );
 
     create_arrow(
         Arrow (
-    	    3.0 * vec4<f32>(f32(curve_coord.x), f32(curve_coord.y), f32(curve_coord.z), 0.0),
-    	    3.0 * vec4<f32>(f32(curve_coord_n.x), f32(curve_coord_n.y), f32(curve_coord_n.z), 0.0),
+    	    5.0 * vec4<f32>(f32(curve_coord.x), f32(curve_coord.y), f32(curve_coord.z), 0.0),
+    	    5.0 * vec4<f32>(f32(curve_coord_n.x), f32(curve_coord_n.y), f32(curve_coord_n.z), 0.0),
     	    rgba_u32(u32(c), 0u, 255u - u32(c), 255u),
     	    visualization_params.arrow_size
         ),
         local_id.x,
     );
+
+    // create_arrow(
+    //     Arrow (
+    // 	    5.0 * vec4<f32>(f32(actual_index), f32(1.0), f32(1.0), 0.0),
+    // 	    5.0 * vec4<f32>(f32(actual_index), f32(1.0), f32(2.0), 0.0),
+    // 	    rgba_u32(u32(c), 0u, 255u - u32(c), 255u),
+    // 	    visualization_params.arrow_size
+    //     ),
+    //     local_id.x,
+    // );
     
     // if (global_id.x > 0u) { return; }
 
@@ -550,14 +827,17 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // create_arrow(arr);
 
-    // create_aabb(
-    //     AABB(
-    //         arr.start_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),
-    //         arr.start_pos + vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0)
-    //     ),
-    //     64u,
-    //     rgba_u32(255u, 0u, 0u, 255u)
-    // );
+    ////let st = 5.0 * vec4<f32>(f32(curve_coord.x), f32(curve_coord.y), f32(curve_coord.z), 1.0); 
+
+    //// create_aabb(
+    ////     AABB(
+    ////         st - vec4<f32>(0.5, 0.5, 0.5, 0.0),
+    ////         st + vec4<f32>(0.5, 0.5, 0.5, 0.0)
+    ////     ),
+    ////     local_index,
+    ////     rgba_u32(u32(c), 0u, 255u - u32(c), 255u)
+    //// );
+
     // create_aabb(
     //     AABB(
     //         arr.end_pos - vec4<f32>(arr.size * 1.1, arr.size * 1.1, arr.size * 1.1, 0.0),

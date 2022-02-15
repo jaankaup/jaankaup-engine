@@ -26,7 +26,7 @@ use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
 /// The number of vertices per chunk.
-const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 36; // 128 * 64 * 36 = 262144 verticex. 
+const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
 
 /// The size of draw buffer;
 const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
@@ -164,6 +164,9 @@ impl Application for DebugVisualizator {
         let mut keys = KeyboardManager::init();
         keys.register_key(Key::L, 1000.0);
         keys.register_key(Key::K, 1000.0);
+        keys.register_key(Key::Key1, 1000.0);
+        keys.register_key(Key::Key2, 1000.0);
+        keys.register_key(Key::Key3, 1000.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
@@ -218,7 +221,8 @@ impl Application for DebugVisualizator {
         let params = VisualizationParams {
             max_local_vertex_capacity: MAX_VERTEX_CAPACITY as u32,
             iterator_start_index: 0,
-            iterator_end_index: 32768,
+            iterator_end_index: 4096,
+            //iterator_end_index: 32768,
             arrow_size: 0.3,
         };
 
@@ -410,7 +414,8 @@ impl Application for DebugVisualizator {
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut items_available: i32 = 32768; 
+        // let mut items_available: i32 = 32768; 
+        let mut items_available: i32 = 4096; 
         let mut dispatch_x = 64;
         let mut clear = true;
         let mut i = dispatch_x * 64;

@@ -129,7 +129,6 @@ fn from_hilber_index(h: u32, m: u32) -> vec3<u32> {
 
     var i: u32 = m - 1u;
     loop {
-        if (i == 0u) { break; }
 
         let w = get_bit(h, i*3u) | (get_bit(h, i*3u + 1u) << 1u) | (get_bit(h, i*3u + 2u) << 2u);
     	let l = t_inv(ve, vd, gc(w)); 
@@ -138,6 +137,8 @@ fn from_hilber_index(h: u32, m: u32) -> vec3<u32> {
     	p.z = (p.z << 1u) | ((l >> 2u) & 1u);
     	ve = ve ^ rotate_left(e(w), vd + 1u);
     	vd = mod3_32(vd + d(w) + 1u);
+
+        if (i == 0u) { break; }
 
         i = i - 1u;
     }
