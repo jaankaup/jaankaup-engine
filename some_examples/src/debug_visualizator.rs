@@ -219,7 +219,7 @@ impl Application for DebugVisualizator {
         let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
 
         let params = VisualizationParams {
-            max_local_vertex_capacity: MAX_VERTEX_CAPACITY as u32,
+            max_local_vertex_capacity: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
             iterator_start_index: 0,
             iterator_end_index: 4096,
             //iterator_end_index: 32768,
@@ -504,6 +504,15 @@ impl Application for DebugVisualizator {
         }
         if self.keys.test_key(&Key::K, input) { 
             self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
+        }
+        if self.keys.test_key(&Key::Key1, input) { 
+            self.visualization_params.max_local_vertex_capacity = 1;  
+        }
+        if self.keys.test_key(&Key::Key2, input) { 
+            self.visualization_params.max_local_vertex_capacity = 2;
+        }
+        if self.keys.test_key(&Key::Key3, input) { 
+            self.visualization_params.max_local_vertex_capacity = 3;  
         }
         // let state_k = input.key_state(&Key::K);
         // let mut change = false;

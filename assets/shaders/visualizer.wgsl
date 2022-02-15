@@ -787,8 +787,38 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // let curve_coord =   r3_reverse(f32(actual_index));
     // let curve_coord_n = r3_reverse(f32(actual_index + 1u));
 
-    let curve_coord =   from_hilbert_index(actual_index, 4u);
-    let curve_coord_n = from_hilbert_index(actual_index + 1u, 4u);
+    // let curve_coord =   from_hilbert_index(actual_index, 4u);
+    // let curve_coord_n = from_hilbert_index(actual_index + 1u, 4u);
+
+    var curve_coord   = vec3<f32>(0.0);
+    var curve_coord_n = vec3<f32>(0.0);
+
+    if (visualization_params.max_vertex_capacity == 1u) {
+
+        let h1 =   from_hilbert_index(actual_index, 4u);
+        let h2 = from_hilbert_index(actual_index + 1u, 4u);
+
+        curve_coord   = vec3<f32>(f32(h1.x), f32(h1.y), f32(h1.z));
+        curve_coord_n = vec3<f32>(f32(h2.x), f32(h2.y), f32(h2.z));
+    }
+
+    if (visualization_params.max_vertex_capacity == 2u) {
+
+        let r1 = r3_reverse(f32(actual_index));
+        let r2 = r3_reverse(f32(actual_index + 1u));
+
+        curve_coord   = vec3<f32>(f32(r1.x), f32(r1.y), f32(r1.z));
+        curve_coord_n = vec3<f32>(f32(r2.x), f32(r2.y), f32(r2.z));
+    }
+
+    if (visualization_params.max_vertex_capacity == 3u) {
+
+        let i1 = index_to_uvec3(actual_index,      16u, 16u);
+        let i2 = index_to_uvec3(actual_index + 1u, 16u, 16u);
+
+        curve_coord   = vec3<f32>(f32(i1.x), f32(i1.y), f32(i1.z));
+        curve_coord_n = vec3<f32>(f32(i2.x), f32(i2.y), f32(i2.z));
+    }
 
     let c = mapRange(0.0, 
                      f32(visualization_params.iterator_end_index),
