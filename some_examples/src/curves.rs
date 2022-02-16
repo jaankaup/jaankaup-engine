@@ -10,7 +10,7 @@ use jaankaup_core::template::{
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
-use jaankaup_core::buffer::{buffer_from_data, to_vec};
+use jaankaup_core::buffer::{buffer_from_data};
 use jaankaup_core::wgpu;
 use jaankaup_core::winit;
 use jaankaup_core::log;
@@ -107,15 +107,15 @@ impl KeyboardManager {
         if let Some(v) = self.keys.get_mut(key) {
 
             match state_key {
-                Some(InputState::Pressed(st)) => {
+                Some(InputState::Pressed(_)) => {
                     let delta = (input.get_time_delta() / 1000000) as f64;
                     // println!("delta == {:}", delta);
                     v.0 = delta;
                 }
-                Some(InputState::Down(s, e)) => {
+                Some(InputState::Down(_, _)) => {
                     let delta = (input.get_time_delta() / 1000000) as f64;
                     v.0 = v.0 + delta;
-                    if (v.0 > v.1) {
+                    if v.0 > v.1 {
                         v.0 = v.0 - v.1;
                         result = true;
                     }
@@ -143,7 +143,6 @@ struct DebugVisualizator {
     pub camera: Camera,
     pub histogram: Histogram,
     pub draw_count: u32,
-    pub update: bool,
     pub visualization_params: VisualizationParams,
     pub temp_visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
@@ -161,31 +160,28 @@ impl Application for DebugVisualizator {
 
         log::info!("Adapter limits are: ");
 
-        let adapter_limits = configuration.adapter.limits(); 
+        // let adapter_limits = configuration.adapter.limits(); 
 
-        log::info!("max_compute_workgroup_storage_size: {:?}", adapter_limits.max_compute_workgroup_storage_size);
-        log::info!("max_compute_invocations_per_workgroup: {:?}", adapter_limits.max_compute_invocations_per_workgroup);
-        log::info!("max_compute_workgroup_size_x: {:?}", adapter_limits.max_compute_workgroup_size_x);
-        log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
-        log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
-        log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
+        // log::info!("max_compute_workgroup_storage_size: {:?}", adapter_limits.max_compute_workgroup_storage_size);
+        // log::info!("max_compute_invocations_per_workgroup: {:?}", adapter_limits.max_compute_invocations_per_workgroup);
+        // log::info!("max_compute_workgroup_size_x: {:?}", adapter_limits.max_compute_workgroup_size_x);
+        // log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
+        // log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
+        // log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
-        // buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
 
         let mut keys = KeyboardManager::init();
-        keys.register_key(Key::L, 100.0);
-        keys.register_key(Key::K, 100.0);
+        keys.register_key(Key::L, 20.0);
+        keys.register_key(Key::K, 20.0);
         keys.register_key(Key::Key1, 10.0);
         keys.register_key(Key::Key2, 10.0);
         keys.register_key(Key::Key3, 10.0);
         keys.register_key(Key::Key4, 10.0);
         keys.register_key(Key::Key9, 10.0);
         keys.register_key(Key::Key0, 10.0);
-        //keys.register_key(Key::T, 10000000.0);
-        //keys.register_key(Key::Y, 10000000.0);
-        keys.register_key(Key::NumpadSubtract, 60.0);
-        keys.register_key(Key::NumpadAdd, 60.0);
+        keys.register_key(Key::NumpadSubtract, 50.0);
+        keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
@@ -234,7 +230,6 @@ impl Application for DebugVisualizator {
 
         println!("Creating compute object.");
 
-        // let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
         let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
 
         let params = VisualizationParams {
@@ -293,7 +288,7 @@ impl Application for DebugVisualizator {
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("compute_visuzlizer_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/curves.wgsl"))),
                     
                     }),
                     Some("Visualizer Compute object"),
@@ -369,46 +364,11 @@ impl Application for DebugVisualizator {
                                                &histogram.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
-
-                                               // vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                               //         buffer: &buffers.get(&"visualization_params".to_string()).unwrap(),
-                                               //         offset: 0,
-                                               //         size: Some(core::num::NonZeroU64::new(40)),
-                                               // }),
-                                               // &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                               //         buffer: &histogram.get_histogram_buffer(),
-                                               //         offset: Some(core::num::NonZeroU64::new(8)),
-                                               //         size: None,
-                                               // }),
-                                               // &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                               //         buffer: &buffers.get(&"debug_arrays".to_string()).unwrap(),
-                                               //         offset: 0,
-                                               //         size: None,
-                                               // }),
-                                               // &wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                               //         buffer: &buffers.get(&"output".to_string()).unwrap(),
-                                               //         offset: 0,
-                                               //         size: None,
-                                               // }),
                                           ]
                                       ]
         );
 
         println!("Creating render bind groups.");
-
-        // Create bind groups for basic render pipeline and grass/rock textures.
-        let render_bind_groups = create_bind_groups(
-                                    &configuration.device,
-                                    &render_object.bind_group_layout_entries,
-                                    &render_object.bind_group_layouts,
-                                    &vec![
-                                        vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                buffer: &camera.get_camera_uniform(&configuration.device),
-                                                offset: 0,
-                                                size: None,
-                                        })],
-                                    ]
-        );
  
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
@@ -421,7 +381,6 @@ impl Application for DebugVisualizator {
             camera: camera,
             histogram: histogram,
             draw_count: 0,
-            update: true,
             visualization_params: params,
             temp_visualization_params: temp_params,
             keys: keys,
@@ -445,7 +404,7 @@ impl Application for DebugVisualizator {
 
         // let mut items_available: i32 = 32768; 
         let mut items_available: i32 = 4096; 
-        let mut dispatch_x = 64;
+        let dispatch_x = 64;
         let mut clear = true;
         let mut i = dispatch_x * 64;
 
@@ -465,10 +424,6 @@ impl Application for DebugVisualizator {
 
             let counter = self.histogram.get_values(device, queue);
             self.draw_count = counter[0];
-            // println!("draw_count == {}", self.draw_count);
-            // println!("items_available == {}", items_available);
-
-            // set_values_cpu_version(&self, queue, !vec[0, counter[1]);
 
             let mut encoder_render = device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor {
@@ -476,7 +431,6 @@ impl Application for DebugVisualizator {
             });
 
             items_available = items_available - dispatch_x as i32 * 64; 
-            // println!("items_available == {}", items_available);
 
             // Draw the cube.
             draw(&mut encoder_render,
@@ -487,13 +441,11 @@ impl Application for DebugVisualizator {
                  &self.buffers.get("output").unwrap(),
                  0..self.draw_count, // TODO: Cube 
                  clear
-                 //true
             );
             queue.submit(Some(encoder_render.finish()));
             clear = items_available <= 0;
             self.histogram.set_values_cpu_version(queue, &vec![0, i]);
             i = i + dispatch_x*64;
-            // if (items_available <= 0) { break; } 
         }
 
         self.screen.prepare_for_rendering();
@@ -502,6 +454,7 @@ impl Application for DebugVisualizator {
         self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
     }
 
+    #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input_cache: &InputCache) {
     }
 
@@ -510,23 +463,9 @@ impl Application for DebugVisualizator {
         self.camera.resize(sc_desc.width as f32, sc_desc.height as f32);
     }
 
+    #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
-
-        if self.update {
-            // let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
-            // self.compute_object.dispatch(
-            //     &self.compute_bind_groups,
-            //     &mut encoder,
-            //     512, 1, 1, Some("aabb dispatch")
-            // );
-            // queue.submit(Some(encoder.finish()));
-            // let counter = self.histogram.get_values(device, queue);
-            // self.draw_count = counter[0];
-            // println!("{:?}", counter);
-            // self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
-            // self.update = false;
-        }
 
         if self.keys.test_key(&Key::L, input) { 
             self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
@@ -567,39 +506,12 @@ impl Application for DebugVisualizator {
             }
         }
         if self.keys.test_key(&Key::NumpadAdd, input) { 
-        //if self.keys.test_key(&Key::Y, input) { 
             let ei = self.temp_visualization_params.iterator_end_index;
             if ei <= 4096 - THREAD_COUNT {
                 self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
                 self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
             }
         }
-
-        // if self.keys.test_key(&Key::Key9, input) { 
-        //         self.visualization_params.iterator_start_index = 0;
-        //         self.visualization_params.iterator_end_index = 4096;
-        // }
-
-        // let state_k = input.key_state(&Key::K);
-        // let mut change = false;
-        // 
-        // match state_l {
-        //     Some(InputState::Down(s, e)) => {
-        //         let delta = (e - s) as f64 / 1000000.0;
-        //         if let Some(v) = self.keys.get_mut(&Key::L) {
-        //             println!("size ....{:}", *v );
-        //             *v = *v + delta; 
-        //             if *v > 1000.0 {
-        //                 println!("updating ....{:}", delta);
-        //                 self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        //                 *v = 0.0;
-        //             }
-        //         }
-        //     },
-        //     _ => { }
-        // }
-
-        // println!("{:?}", state_l);
 
         if self.block64mode {
             queue.write_buffer(
