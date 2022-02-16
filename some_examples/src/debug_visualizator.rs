@@ -31,6 +31,8 @@ const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 vert
 /// The size of draw buffer;
 const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
+const THREAD_COUNT: u32 = 64;
+
 // 
 //  Arrow  
 //
@@ -82,12 +84,14 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
 
 struct KeyboardManager {
     keys: HashMap<Key, (f64, f64)>,
+    // tick: u64,
 }
 
 impl KeyboardManager {
     pub fn init() -> Self {
         Self {
             keys: HashMap::<Key, (f64, f64)>::new(),
+            // last_tick: 0,
         }
     }
 
@@ -100,21 +104,27 @@ impl KeyboardManager {
         let state_key = input.key_state(key);
         let mut result = false;
 
-        match state_key {
-            Some(InputState::Down(s, e)) => {
-                let delta = (e - s) as f64 / 1000000.0;
-                if let Some(v) = self.keys.get_mut(key) {
-                    // println!("size ....{:}", *v );
-                    v.0 = v.0 + delta; 
-                    if v.0 > v.1 {
-                        println!("updating ....{:}", delta);
-                        //self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-                        v.0 = 0.0;
+        if let Some(v) = self.keys.get_mut(key) {
+
+            match state_key {
+                Some(InputState::Pressed(st)) => {
+                    let delta = (input.get_time_delta() / 1000000) as f64;
+                    // println!("delta == {:}", delta);
+                    v.0 = delta;
+                }
+                Some(InputState::Down(s, e)) => {
+                    let delta = (input.get_time_delta() / 1000000) as f64;
+                    v.0 = v.0 + delta;
+                    if (v.0 > v.1) {
+                        v.0 = v.0 - v.1;
                         result = true;
                     }
+                },
+                Some(InputState::Released(_, _)) => {
+                    v.0 = 0.0; 
                 }
-            },
-            _ => { }
+                _ => { }
+            }
         }
 
         return result;
@@ -135,7 +145,9 @@ struct DebugVisualizator {
     pub draw_count: u32,
     pub update: bool,
     pub visualization_params: VisualizationParams,
+    pub temp_visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
+    pub block64mode: bool,
 }
 
 impl DebugVisualizator {
@@ -162,12 +174,18 @@ impl Application for DebugVisualizator {
         // buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
 
         let mut keys = KeyboardManager::init();
-        keys.register_key(Key::L, 1000.0);
-        keys.register_key(Key::K, 1000.0);
-        keys.register_key(Key::Key1, 1000.0);
-        keys.register_key(Key::Key2, 1000.0);
-        keys.register_key(Key::Key3, 1000.0);
-        keys.register_key(Key::Key4, 1000.0);
+        keys.register_key(Key::L, 100.0);
+        keys.register_key(Key::K, 100.0);
+        keys.register_key(Key::Key1, 10.0);
+        keys.register_key(Key::Key2, 10.0);
+        keys.register_key(Key::Key3, 10.0);
+        keys.register_key(Key::Key4, 10.0);
+        keys.register_key(Key::Key9, 10.0);
+        keys.register_key(Key::Key0, 10.0);
+        //keys.register_key(Key::T, 10000000.0);
+        //keys.register_key(Key::Y, 10000000.0);
+        keys.register_key(Key::NumpadSubtract, 60.0);
+        keys.register_key(Key::NumpadAdd, 60.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
@@ -223,6 +241,14 @@ impl Application for DebugVisualizator {
             max_local_vertex_capacity: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
             iterator_start_index: 0,
             iterator_end_index: 4096,
+            //iterator_end_index: 32768,
+            arrow_size: 0.3,
+        };
+
+        let temp_params = VisualizationParams {
+            max_local_vertex_capacity: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
+            iterator_start_index: 0,
+            iterator_end_index: THREAD_COUNT,
             //iterator_end_index: 32768,
             arrow_size: 0.3,
         };
@@ -397,7 +423,9 @@ impl Application for DebugVisualizator {
             draw_count: 0,
             update: true,
             visualization_params: params,
+            temp_visualization_params: temp_params,
             keys: keys,
+            block64mode: false,
         }
     }
 
@@ -502,22 +530,56 @@ impl Application for DebugVisualizator {
 
         if self.keys.test_key(&Key::L, input) { 
             self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+            self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
         }
         if self.keys.test_key(&Key::K, input) { 
             self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
+            self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
         }
         if self.keys.test_key(&Key::Key1, input) { 
             self.visualization_params.max_local_vertex_capacity = 1;  
+            self.temp_visualization_params.max_local_vertex_capacity = 1;  
         }
         if self.keys.test_key(&Key::Key2, input) { 
             self.visualization_params.max_local_vertex_capacity = 2;
+            self.temp_visualization_params.max_local_vertex_capacity = 2;  
         }
         if self.keys.test_key(&Key::Key3, input) { 
             self.visualization_params.max_local_vertex_capacity = 3;  
+            self.temp_visualization_params.max_local_vertex_capacity = 3;  
         }
         if self.keys.test_key(&Key::Key4, input) { 
             self.visualization_params.max_local_vertex_capacity = 4;  
+            self.temp_visualization_params.max_local_vertex_capacity = 4;  
         }
+        if self.keys.test_key(&Key::Key9, input) { 
+            self.block64mode = true;  
+        }
+        if self.keys.test_key(&Key::Key0, input) { 
+            self.block64mode = false;  
+        }
+        if self.keys.test_key(&Key::NumpadSubtract, input) { 
+        //if self.keys.test_key(&Key::T, input) { 
+            let si = self.temp_visualization_params.iterator_start_index as i32;
+            if si >= THREAD_COUNT as i32 {
+                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
+                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
+            }
+        }
+        if self.keys.test_key(&Key::NumpadAdd, input) { 
+        //if self.keys.test_key(&Key::Y, input) { 
+            let ei = self.temp_visualization_params.iterator_end_index;
+            if ei <= 4096 - THREAD_COUNT {
+                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
+                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
+            }
+        }
+
+        // if self.keys.test_key(&Key::Key9, input) { 
+        //         self.visualization_params.iterator_start_index = 0;
+        //         self.visualization_params.iterator_end_index = 4096;
+        // }
+
         // let state_k = input.key_state(&Key::K);
         // let mut change = false;
         // 
@@ -538,11 +600,21 @@ impl Application for DebugVisualizator {
         // }
 
         // println!("{:?}", state_l);
-        queue.write_buffer(
-            &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-            0,
-            bytemuck::cast_slice(&[self.visualization_params])
-        );
+
+        if self.block64mode {
+            queue.write_buffer(
+                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.temp_visualization_params])
+            );
+        }
+        else {
+            queue.write_buffer(
+                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.visualization_params])
+            );
+        }
     }
 }
 

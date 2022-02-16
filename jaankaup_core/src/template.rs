@@ -148,8 +148,8 @@ impl Loop for BasicLoop {
                 //log::info!("MainEventsCleared....");
                 application.input(&queue, &input);
                 application.update(&device, &queue, &input);
-                window.request_redraw();
                 input.pre_update();
+                window.request_redraw();
             }
             Event::RedrawEventsCleared => {
                 #[cfg(not(target_arch = "wasm32"))]
@@ -188,7 +188,6 @@ impl Loop for BasicLoop {
             _ => { } // Any other events
         } // match event
     }); // run
-
     }
 }
 

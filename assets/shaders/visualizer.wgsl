@@ -293,7 +293,7 @@ fn from_hilbert_index(h: u32, m: u32) -> vec3<u32> {
 ////// MORTON CODE   //////
 ///////////////////////////
 
-fn encode3Dmorton(x: u32, y: u32, z: u32) -> u32 {
+fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
     var x_temp = (x | (x << 16u)) & 0x030000FFu;
         x_temp = (x | (x <<  8u)) & 0x0300F00Fu;
         x_temp = (x | (x <<  4u)) & 0x030C30C3u;
@@ -311,7 +311,7 @@ fn encode3Dmorton(x: u32, y: u32, z: u32) -> u32 {
     return x_temp | (y_temp << 1u) | (z_temp << 2u);
 }
 
-fn get_third_bits(m: u32) -> u32 {
+fn get_third_bits32(m: u32) -> u32 {
     var x = m & 0x9249249u;
     x = (x ^ (x >> 2u))  & 0x30c30c3u;
     x = (x ^ (x >> 4u))  & 0x0300f00fu;
@@ -321,11 +321,11 @@ fn get_third_bits(m: u32) -> u32 {
     return x;
 }
 
-fn decode3Dmorton(m: u32) -> vec3<u32> {
+fn decode3Dmorton32(m: u32) -> vec3<u32> {
     return vec3<u32>(
-        get_third_bits(m),
-        get_third_bits(m >> 1u),
-        get_third_bits(m >> 2u)
+        get_third_bits32(m),
+        get_third_bits32(m >> 1u),
+        get_third_bits32(m >> 2u)
    );
 }
 
@@ -770,7 +770,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let actual_index = global_id.x + counter[1]; 
 
+    //++ if (actual_index >= visualization_params.iterator_end_index - 1u) { return; }
     if (actual_index >= visualization_params.iterator_end_index - 1u) { return; }
+    if (actual_index < visualization_params.iterator_start_index) { return; }
+
     // if (global_id.x >= 5u) { return; }
 
     //let curve_coord =   index_to_uvec3(actual_index,      16u, 16u);
@@ -816,15 +819,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     if (visualization_params.max_vertex_capacity == 4u) {
 
-        let m1 = decode3Dmorton(actual_index);
-        let m2 = decode3Dmorton(actual_index + 1u);
+        let m1 = decode3Dmorton32(actual_index);
+        let m2 = decode3Dmorton32(actual_index + 1u);
 
         curve_coord   = vec3<f32>(f32(m1.x), f32(m1.y), f32(m1.z));
         curve_coord_n = vec3<f32>(f32(m2.x), f32(m2.y), f32(m2.z));
     }
 
     let c = mapRange(0.0, 
-                     f32(visualization_params.iterator_end_index),
+                     // f32(visualization_params.iterator_end_index),
+                     4096.0,
         	     0.0,
         	     255.0, 
         	     f32(actual_index)
