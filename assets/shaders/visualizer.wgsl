@@ -243,7 +243,7 @@ fn to_hilbert_index(p: vec3<u32>, m: u32) -> u32 {
 
     var h = 0u;
 
-    var ve: u32 = 0u;
+    var ve: u32 = 1u;
     var vd: u32 = 0u;
 
     var i: u32 = m - 1u;
@@ -289,6 +289,45 @@ fn from_hilbert_index(h: u32, m: u32) -> vec3<u32> {
     return p;
 }
 
+///////////////////////////
+////// MORTON CODE   //////
+///////////////////////////
+
+fn encode3Dmorton(x: u32, y: u32, z: u32) -> u32 {
+    var x_temp = (x | (x << 16u)) & 0x030000FFu;
+        x_temp = (x | (x <<  8u)) & 0x0300F00Fu;
+        x_temp = (x | (x <<  4u)) & 0x030C30C3u;
+        x_temp = (x | (x <<  2u)) & 0x09249249u;
+
+    var y_temp = (y | (y << 16u)) & 0x030000FFu;
+        y_temp = (y | (y <<  8u)) & 0x0300F00Fu;
+        y_temp = (y | (y <<  4u)) & 0x030C30C3u;
+        y_temp = (y | (y <<  2u)) & 0x09249249u;
+
+    var z_temp = (z | (z << 16u)) & 0x030000FFu;
+        z_temp = (z | (z <<  8u)) & 0x0300F00Fu;
+        z_temp = (z | (z <<  4u)) & 0x030C30C3u;
+        z_temp = (z | (z <<  2u)) & 0x09249249u;
+    return x_temp | (y_temp << 1u) | (z_temp << 2u);
+}
+
+fn get_third_bits(m: u32) -> u32 {
+    var x = m & 0x9249249u;
+    x = (x ^ (x >> 2u))  & 0x30c30c3u;
+    x = (x ^ (x >> 4u))  & 0x0300f00fu;
+    x = (x ^ (x >> 8u))  & 0x30000ffu;
+    x = (x ^ (x >> 16u)) & 0x000003ffu;
+
+    return x;
+}
+
+fn decode3Dmorton(m: u32) -> vec3<u32> {
+    return vec3<u32>(
+        get_third_bits(m),
+        get_third_bits(m >> 1u),
+        get_third_bits(m >> 2u)
+   );
+}
 
 
 fn quaternion_id() -> Quaternion {
@@ -368,7 +407,6 @@ fn vec3_cross(a: vec3<f32>, b: vec3<f32>) -> vec3<f32> {
 fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
 
     let v = cross(a,b);  
-
 
     let a_len = length(a);
     let b_len = length(b);
@@ -776,6 +814,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         curve_coord_n = vec3<f32>(f32(i2.x), f32(i2.y), f32(i2.z));
     }
 
+    if (visualization_params.max_vertex_capacity == 4u) {
+
+        let m1 = decode3Dmorton(actual_index);
+        let m2 = decode3Dmorton(actual_index + 1u);
+
+        curve_coord   = vec3<f32>(f32(m1.x), f32(m1.y), f32(m1.z));
+        curve_coord_n = vec3<f32>(f32(m2.x), f32(m2.y), f32(m2.z));
+    }
+
     let c = mapRange(0.0, 
                      f32(visualization_params.iterator_end_index),
         	     0.0,
@@ -787,7 +834,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         Arrow (
     	    5.0 * vec4<f32>(f32(curve_coord.x), f32(curve_coord.y), f32(curve_coord.z), 0.0),
     	    5.0 * vec4<f32>(f32(curve_coord_n.x), f32(curve_coord_n.y), f32(curve_coord_n.z), 0.0),
-    	    rgba_u32(u32(c), 0u, 255u - u32(c), 255u),
+    	    rgba_u32(u32(255u- u32(c)), 0u, u32(c), 255u),
     	    visualization_params.arrow_size
         ),
         local_id.x,

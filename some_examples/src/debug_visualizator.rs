@@ -167,6 +167,7 @@ impl Application for DebugVisualizator {
         keys.register_key(Key::Key1, 1000.0);
         keys.register_key(Key::Key2, 1000.0);
         keys.register_key(Key::Key3, 1000.0);
+        keys.register_key(Key::Key4, 1000.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
@@ -513,6 +514,9 @@ impl Application for DebugVisualizator {
         }
         if self.keys.test_key(&Key::Key3, input) { 
             self.visualization_params.max_local_vertex_capacity = 3;  
+        }
+        if self.keys.test_key(&Key::Key4, input) { 
+            self.visualization_params.max_local_vertex_capacity = 4;  
         }
         // let state_k = input.key_state(&Key::K);
         // let mut change = false;
