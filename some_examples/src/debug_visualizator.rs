@@ -171,7 +171,7 @@ impl Application for DebugVisualizator {
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.01);
+        camera.set_movement_sensitivity(0.02);
 
         let render_object =
                 RenderObject::init(

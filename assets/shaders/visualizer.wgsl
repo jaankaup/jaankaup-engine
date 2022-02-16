@@ -101,18 +101,6 @@ fn r3(x: i32, y: i32, z: i32) -> i32 {
     return max2 * max2 + max2 + x - y + max3_3 + (max3 - z) * (2 * max3 + 1);
 }
 
-// fn mm_square(d: f64, z: f64) -> f64 {
-//     (z as f64).powf(1.0/d).ceil() 
-// }
-// 
-// fn xd(d: i32, z: i32) -> i32 {
-//     let m = mm_square(d as f64, z as f64);  
-//     let a = z as f64 - m.powf(d as f64) - m.powf((d - 1) as f64);
-//     let b = (m + 1.0).powf(d as f64) - m.powf((d-1) as f64); 
-//     let c = if m < 0.0 { 0.0 } else { m };
-//     (m - (c / b).ceil()) as i32
-// }
-
 fn r2_reverse(z: f32) -> vec2<i32> {
     let m = floor(sqrt(z));
     let t = z - m * m;
@@ -122,25 +110,12 @@ fn r2_reverse(z: f32) -> vec2<i32> {
     }
 }
 
-// fn cbrt2(x: i32) -> i32 {
-// 
-//     let one = 1;
-//     let three = 3;
-//     var result = 0;
-//     let num_bits = 0xffffffff - log2(f32(x));
-//     
-//     
-// }
-
-
 fn cbrt(x: f32) -> f32 {
 
     // CHEATING! The precision of f32 and log2 are not enought.
     let lg2 = log2(x) + 0.00001;
 
     if (x > 0.0) { return exp2(lg2 / 3.0); }
-    //if (x > 0.0) { return exp2(log2(x) / 3.0); }
-    //if (x < 0.0) { return (-1.0)*exp2(log2(-x) / 3.0); }
     return 0.0;
 }
 
@@ -177,8 +152,7 @@ fn mod3_32(x: u32) -> u32 {
     a = (a >>  2u) + (a & 0x3u);
     a = (a >>  2u) + (a & 0x3u);
     a = (a >>  2u) + (a & 0x3u);
-    if (a > 2u) { a = a - 3u; }
-    return a;
+    return select(a, a - 3u, a > 2u);
 }
 
 // Rotate first N bits in place to the right. This is now tuned for 3-bits.
@@ -218,7 +192,9 @@ fn countTrailingZeros(x: u32) -> u32 {
 
 // Calculate the entry point of hypercube i.
 fn e(i: u32) -> u32 {
-    if (i == 0u) { return 0u; } else { return gc(2u * ((i - 1u) / 2u)); }
+    let f = gc(2u * ((i - 1u) / 2u));
+    return select(f, 0u, i == 0u);
+    // if (i == 0u) { return 0u; } else { return gc(2u * ((i - 1u) / 2u)); }
 }
 
 // Calculate the exit point of hypercube i.
@@ -233,13 +209,21 @@ fn g(i: u32) -> u32 {
 
 // Calculate the direction of the arrow whitin a subcube.
 fn d(i: u32) -> u32 {
-    if (i == 0u) { return 0u; }
-    else if ((i & 1u) == 0u) {
-        return mod3_32(g(i - 1u));
-    }
-    else {
-        return mod3_32(g(i));
-    }
+
+    // Avoid branches.
+    let s0 = 0u;
+    let s1 = mod3_32(g(i - 1u));
+    let s2 = mod3_32(g(i));
+
+    return select(select(s1, 0u, i == 0u), s2, (i & 1u) != 0u);
+
+    // if (i == 0u) { return 0u; }
+    // else if ((i & 1u) == 0u) {
+    //     return mod3_32(g(i - 1u));
+    // }
+    // else {
+    //     return mod3_32(g(i));
+    // }
 }
 
 // Transform b.
@@ -264,7 +248,6 @@ fn to_hilbert_index(p: vec3<u32>, m: u32) -> u32 {
 
     var i: u32 = m - 1u;
     loop {
-        if (i == 0u) { break; }
 
         let l = get_bit(p.x, i) | (get_bit(p.y, i) << 1u) | (get_bit(p.z, i) << 2u);
     	let w = inverse_gc(t(l, ve, vd));
@@ -273,6 +256,8 @@ fn to_hilbert_index(p: vec3<u32>, m: u32) -> u32 {
         h = (h << 3u) | w;
 
         i = i - 1u;
+
+        if (i == 0u) { break; }
     }
     return h;
 }
@@ -401,36 +386,7 @@ fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
     }
      
     return quaternion_normalize(Quaternion(w, v.x, v.y, v.z));
-
-    // let a_norm = normalize(a);    
-    // let b_norm = normalize(b);    
-
-    //++ let d = dot(a,b);
-
-    //++ if (d >=1.0 ) {
-    //++     return quaternion_id(); 
-    //++ }
-
-    //++ if (d < -0.999999) {
-    //++     var axis = vec3_cross(vec3<f32>(1.0, 0.0, 0.0), a);
-    //++     if (length(axis) == 0.0) {
-    //++         axis = vec3_cross(vec3<f32>(0.0, 1.0, 0.0), a);
-    //++     }
-    //++     axis = normalize(axis);
-    //++     return axis_angle(axis, PI);
-    //++ }
-    //++ else {
-    //++     let cr = vec3_cross(a, b);
-    //++     let q = Quaternion(1.0 + d, cr.x, cr.y, cr.z);  
-    //++     return quaternion_scale(q, 1.0 / sqrt(length(q.w)));
-    //++ }
-
 }
-
-// fn from_euler_angles(x: f32, y: f32, z: 32) -> Quaternion {
-// 
-// 
-// }
 
 /**
  * [a1] from range min
