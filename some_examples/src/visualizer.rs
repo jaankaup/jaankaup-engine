@@ -285,7 +285,7 @@ impl Application for DebugVisualizator {
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("compute_visuzlizer_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/curves.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
                     
                     }),
                     Some("Visualizer Compute object"),

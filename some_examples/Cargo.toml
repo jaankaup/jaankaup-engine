@@ -19,6 +19,10 @@ name = "curves"
 path = "src/curves.rs"
 
 [[example]]
+name = "visualizer"
+path = "src/visualizer.rs"
+
+[[example]]
 name = "common_functions"
 path = "src/misc_functions.rs"
 

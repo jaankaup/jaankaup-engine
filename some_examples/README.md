@@ -21,5 +21,6 @@ Shortkeys
 * `Key3` "Cube slice" curve.
 * `Key4` Morton code.
 * `Key9` 64 thread mode. This can be changed in the source file: THREAD_COUNT = n.
+* `Key0` Leave 64 thread mode.
 * `l` increase arrow size.
 * `k` decrease arrow size.
