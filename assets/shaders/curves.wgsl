@@ -11,15 +11,24 @@ struct Quaternion {
 };
 
 struct VisualizationParams{
-    max_vertex_capacity: u32;
+    curve_number: u32;
     iterator_start_index: u32;
     iterator_end_index: u32;
     arrow_size: f32;
+    thread_mode: u32;
+    thread_mode_start_index: u32;
+    thread_mode_end_index: u32;
 };
 
 struct Vertex {
     v: vec4<f32>;
     n: vec4<f32>;
+};
+
+struct Triangle {
+    a: Vertex;
+    b: Vertex;
+    c: Vertex;
 };
 
 type Hexaedra = array<Vertex , 8>;
@@ -31,7 +40,7 @@ struct Arrow {
     size:  f32;
 };
 
-let STRIDE: u32 = 64u;
+let THREAD_COUNT: u32 = 256u;
 let PI: f32 = 3.14159265358979323846;
 
 // AABB triangulation.
@@ -53,7 +62,9 @@ var<private> aabb_normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
     vec4<f32>(0.0, -1.0, 0.0, 0.0)
 );
     
-var<workgroup> temp_vertex_data: array<Vertex, 2304>; // 36 * 256 
+// var<workgroup> temp_vertex_data: array<Vertex, 2304>; // 36 * 256 
+
+var<workgroup> thread_group_counter: u32 = 0; 
 
 @group(0)
 @binding(0)
@@ -70,7 +81,7 @@ var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
 @binding(3)
-var<storage,read_write> output: array<Vertex>;
+var<storage,read_write> output: array<Triangle>;
 
 // Map index to 3d coordinate (hexahedron). The x and y dimensions are chosen. The curve goes from left to right, row by row.
 // The z direction is "unlimited".
@@ -442,101 +453,101 @@ fn u32_rgba(c: u32) -> vec4<f32> {
   return vec4<f32>(r,g,b,a);
 }
 
-fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
-                   normals:   ptr<function, array<vec4<f32>, 6>>,
-                   offset: u32) {
+//++ fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
+//++                    normals:   ptr<function, array<vec4<f32>, 6>>,
+//++                    offset: u32) {
+//++ 
+//++     let index = atomicAdd(&counter[0], 36u);
+//++ 
+//++     var i: u32 = 0u;
+//++ 
+//++     loop {
+//++         if (i == 36u) { break; }
+//++         temp_vertex_data[offset + STRIDE * i]  =
+//++             Vertex(
+//++                 (*positions)[vertex_positions[i]],
+//++                 (*normals)[i/6u]
+//++             );
+//++ 
+//++         i = i + 1u;
+//++     }
+//++ 
+//++     workgroupBarrier();
+//++ 
+//++     var i: u32 = 0u;
+//++ 
+//++     loop {
+//++         if (i == 36u) { break; }
+//++     	output[index+i] = temp_vertex_data[offset + STRIDE * i];
+//++         i = i + 1u;
+//++     }
+//++ 
+//++     workgroupBarrier();
+//++ } 
 
-    let index = atomicAdd(&counter[0], 36u);
+//++ fn create_aabb(aabb: AABB, offset: u32, color: u32) {
+//++ 
+//++     // Global start position.
+//++     let index = atomicAdd(&counter[0], 36u);
+//++ 
+//++     //          p3
+//++     //          +-----------------+p2
+//++     //         /|                /|
+//++     //        / |               / |
+//++     //       /  |           p6 /  |
+//++     //   p7 +-----------------+   |
+//++     //      |   |             |   |
+//++     //      |   |p0           |   |p1
+//++     //      |   +-------------|---+  
+//++     //      |  /              |  /
+//++     //      | /               | /
+//++     //      |/                |/
+//++     //      +-----------------+
+//++     //      p4                p5
+//++     //
+//++ 
+//++     // Decode color information to the fourth component.
+//++ 
+//++     let c = f32(color);
+//++ 
+//++     let delta = aabb.max - aabb.min;
+//++ 
+//++     var positions = array<vec4<f32>, 8>(
+//++     	vec4<f32>(aabb.min.xyz, c),
+//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
+//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
+//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
+//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
+//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
+//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
+//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+//++     );
+//++     
+//++     var i: u32 = 0u;
+//++ 
+//++     loop {
+//++         if (i == 36u) { break; }
+//++         temp_vertex_data[offset + STRIDE * i]  = Vertex(
+//++                                                     positions[vertex_positions[i]],
+//++                                                     vec4<f32>(aabb_normals[i/6u])
+//++         );
+//++         i = i + 1u;
+//++     }
+//++ 
+//++     workgroupBarrier();
+//++ 
+//++     var i: u32 = 0u;
+//++ 
+//++     loop {
+//++         if (i == 36u) { break; }
+//++     	output[index+i] = temp_vertex_data[offset + STRIDE * i];
+//++         i = i + 1u;
+//++     }
+//++ 
+//++     workgroupBarrier();
+//++ }
 
-    var i: u32 = 0u;
-
-    loop {
-        if (i == 36u) { break; }
-        temp_vertex_data[offset + STRIDE * i]  =
-            Vertex(
-                (*positions)[vertex_positions[i]],
-                (*normals)[i/6u]
-            );
-
-        i = i + 1u;
-    }
-
-    workgroupBarrier();
-
-    var i: u32 = 0u;
-
-    loop {
-        if (i == 36u) { break; }
-    	output[index+i] = temp_vertex_data[offset + STRIDE * i];
-        i = i + 1u;
-    }
-
-    workgroupBarrier();
-} 
-
-fn create_aabb(aabb: AABB, offset: u32, color: u32) {
-
-    // Global start position.
-    let index = atomicAdd(&counter[0], 36u);
-
-    //          p3
-    //          +-----------------+p2
-    //         /|                /|
-    //        / |               / |
-    //       /  |           p6 /  |
-    //   p7 +-----------------+   |
-    //      |   |             |   |
-    //      |   |p0           |   |p1
-    //      |   +-------------|---+  
-    //      |  /              |  /
-    //      | /               | /
-    //      |/                |/
-    //      +-----------------+
-    //      p4                p5
-    //
-
-    // Decode color information to the fourth component.
-
-    let c = f32(color);
-
-    let delta = aabb.max - aabb.min;
-
-    var positions = array<vec4<f32>, 8>(
-    	vec4<f32>(aabb.min.xyz, c),
-    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
-    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
-    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
-    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
-    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
-    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
-    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
-    );
-    
-    var i: u32 = 0u;
-
-    loop {
-        if (i == 36u) { break; }
-        temp_vertex_data[offset + STRIDE * i]  = Vertex(
-                                                    positions[vertex_positions[i]],
-                                                    vec4<f32>(aabb_normals[i/6u])
-        );
-        i = i + 1u;
-    }
-
-    workgroupBarrier();
-
-    var i: u32 = 0u;
-
-    loop {
-        if (i == 36u) { break; }
-    	output[index+i] = temp_vertex_data[offset + STRIDE * i];
-        i = i + 1u;
-    }
-
-    workgroupBarrier();
-}
-
-fn create_arrow(arr: Arrow, offset: u32) {
+fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
 
     var direction = arr.end_pos.xyz - arr.start_pos.xyz;
     let array_length = length(direction);
@@ -597,7 +608,28 @@ fn create_arrow(arr: Arrow, offset: u32) {
         vec4<f32>(n5, 0.0)
     );
 
-    store_hexaedron(&positions, &normals, offset);
+    var i: u32 = 0u;
+
+    loop {
+        if (i == 12u) { break; }
+        output[thread_group_counter + i * offset + local_index]  = 
+            Triangle(
+            	Vertex(
+            	    positions[vertex_positions[i*3u]],
+            	    normals[(i*3u)/6u]
+            	),
+            	Vertex(
+            	    positions[vertex_positions[i*3u+1u]],
+            	    normals[(i*3u)/6u]
+            	),
+            	Vertex(
+            	    positions[vertex_positions[i*3u+2u]],
+            	    normals[(i*3u)/6u]
+            	)
+        );
+
+        i = i + 1u;
+    }
 
     let from_origo_x_top_arr = vec3<f32>(1.0, 3.0 * arr.size, 3.0 * arr.size);
 
@@ -637,7 +669,7 @@ fn create_arrow(arr: Arrow, offset: u32) {
 
     let the_pos_head = arr.start_pos.xyz;
 
-    var positions_head = array<vec4<f32>, 8>(
+    positions = array<vec4<f32>, 8>(
         vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p0) - direction * 0.5, c),
         vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p1) - direction * 0.5, c),
         vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p2) - direction * 0.5, c),
@@ -648,20 +680,20 @@ fn create_arrow(arr: Arrow, offset: u32) {
         vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p7) - direction * 0.5, c)
     );
 
-    n0 = normalize(cross(positions_head[5u].xyz - positions_head[6u].xyz,
-                         positions_head[4u].xyz - positions_head[6u].xyz));
-    n1 = normalize(cross(positions_head[1u].xyz - positions_head[2u].xyz,
-                         positions_head[5u].xyz - positions_head[2u].xyz));
-    n2 = normalize(cross(positions_head[0u].xyz - positions_head[3u].xyz,
-                         positions_head[1u].xyz - positions_head[3u].xyz));
-    n3 = normalize(cross(positions_head[4u].xyz - positions_head[7u].xyz,
-                         positions_head[0u].xyz - positions_head[7u].xyz));
-    n4 = normalize(cross(positions_head[3u].xyz - positions_head[7u].xyz,
-                         positions_head[6u].xyz - positions_head[7u].xyz));
-    n5 = normalize(cross(positions_head[0u].xyz - positions_head[5u].xyz,
-                         positions_head[4u].xyz - positions_head[5u].xyz));
+    n0 = normalize(cross(positions[5u].xyz - positions[6u].xyz,
+                         positions[4u].xyz - positions[6u].xyz));
+    n1 = normalize(cross(positions[1u].xyz - positions[2u].xyz,
+                         positions[5u].xyz - positions[2u].xyz));
+    n2 = normalize(cross(positions[0u].xyz - positions[3u].xyz,
+                         positions[1u].xyz - positions[3u].xyz));
+    n3 = normalize(cross(positions[4u].xyz - positions[7u].xyz,
+                         positions[0u].xyz - positions[7u].xyz));
+    n4 = normalize(cross(positions[3u].xyz - positions[7u].xyz,
+                         positions[6u].xyz - positions[7u].xyz));
+    n5 = normalize(cross(positions[0u].xyz - positions[5u].xyz,
+                         positions[4u].xyz - positions[5u].xyz));
 
-    var normals_head = array<vec4<f32>, 6> (
+    normals = array<vec4<f32>, 6> (
     	vec4<f32>(n0, 0.0),
     	vec4<f32>(n1,  0.0),
     	vec4<f32>(n2,  0.0),
@@ -670,25 +702,49 @@ fn create_arrow(arr: Arrow, offset: u32) {
     	vec4<f32>(n5, 0.0)
     );
 
-    // workgroupBarrier();
-    store_hexaedron(&positions_head, &normals_head, offset);
+    var j: u32 = 0u;
+
+    let stride = offset * 12u;
+
+    loop {
+        if (j == 12u) { break; }
+        output[thread_group_counter + offset * 12u + j * offset + local_index]  = 
+            Triangle(
+            	Vertex(
+            	    positions[vertex_positions[j*3u]],
+            	    normals[(j*3u)/6u]
+            	),
+            	Vertex(
+            	    positions[vertex_positions[j*3u+1u]],
+            	    normals[(j*3u)/6u]
+            	),
+            	Vertex(
+            	    positions[vertex_positions[j*3u+2u]],
+            	    normals[(j*3u)/6u]
+            	)
+        );
+
+        j = j + 1u;
+    }
 }
 
 @stage(compute)
-@workgroup_size(64,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
-        @builtin(local_invocation_index) local_index: u32,
-        @builtin(global_invocation_id)   global_id: vec3<u32>) {
+        @builtin(workgroup_id) work_group_id: vec3<u32>,
+        @builtin(global_invocation_id)   global_id: vec3<u32>,
+        @builtin(local_invocation_index) local_index: u32) {
 
     let actual_index = global_id.x + counter[1]; 
 
     if (actual_index >= visualization_params.iterator_end_index - 1u) { return; }
-    if (actual_index < visualization_params.iterator_start_index) { return; }
+    // if (counter[1] >= visualization_params.iterator_end_index) || counter[1] +  { return; }
+    // if (actual_index < visualization_params.iterator_start_index) { return; }
 
     var curve_coord   = vec3<f32>(0.0);
     var curve_coord_n = vec3<f32>(0.0);
 
-    if (visualization_params.max_vertex_capacity == 1u) {
+    if (visualization_params.curve_number == 1u) {
 
         let h1 =   from_hilbert_index(actual_index, 4u);
         let h2 = from_hilbert_index(actual_index + 1u, 4u);
@@ -697,7 +753,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         curve_coord_n = vec3<f32>(f32(h2.x), f32(h2.y), f32(h2.z));
     }
 
-    if (visualization_params.max_vertex_capacity == 2u) {
+    if (visualization_params.curve_number == 2u) {
 
         let r1 = r3_reverse(f32(actual_index));
         let r2 = r3_reverse(f32(actual_index + 1u));
@@ -706,7 +762,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         curve_coord_n = vec3<f32>(f32(r2.x), f32(r2.y), f32(r2.z));
     }
 
-    if (visualization_params.max_vertex_capacity == 3u) {
+    if (visualization_params.curve_number == 3u) {
 
         let i1 = index_to_uvec3(actual_index,      16u, 16u);
         let i2 = index_to_uvec3(actual_index + 1u, 16u, 16u);
@@ -715,7 +771,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         curve_coord_n = vec3<f32>(f32(i2.x), f32(i2.y), f32(i2.z));
     }
 
-    if (visualization_params.max_vertex_capacity == 4u) {
+    if (visualization_params.curve_number == 4u) {
 
         let m1 = decode3Dmorton32(actual_index);
         let m2 = decode3Dmorton32(actual_index + 1u);
@@ -731,13 +787,36 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         	     f32(actual_index)
     );
 
+    let work_group_start_index = work_group_id.x * THREAD_COUNT;
+    // if (work_group_start_index >= visualization_params.iterator_end_index) { return; }
+    // if (work_group_start_index + THREAD_COUNT < visualization_params.iterator_end_index) { return; }
+
+    // Check!
+    var delta = abs(
+                    min(
+                        i32(visualization_params.iterator_end_index) - i32(work_group_id.x * THREAD_COUNT), i32(THREAD_COUNT)
+                        // i32(visualization_params.iterator_end_index) - i32(counter[0]), i32(THREAD_COUNT)
+                    )
+    );
+
+    if (visualization_params.thread_mode == 1u) {
+        delta = i32(min(visualization_params.iterator_end_index - counter[1] - 1u, THREAD_COUNT));
+    }
+
+
+    if (local_index == 0u) {
+    	thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
+    }
+    workgroupBarrier();
+
     create_arrow(
         Arrow (
     	    5.0 * vec4<f32>(f32(curve_coord.x), f32(curve_coord.y), f32(curve_coord.z), 0.0),
     	    5.0 * vec4<f32>(f32(curve_coord_n.x), f32(curve_coord_n.y), f32(curve_coord_n.z), 0.0),
     	    rgba_u32(u32(255u- u32(c)), 0u, u32(c), 255u),
-    	    visualization_params.arrow_size
+    	    visualization_params.arrow_size,
         ),
-        local_id.x,
+        u32(delta),
+        local_index
     );
 }

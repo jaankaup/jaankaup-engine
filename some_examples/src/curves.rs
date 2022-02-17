@@ -57,10 +57,14 @@ struct Arrow {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct VisualizationParams{
-    max_local_vertex_capacity: u32,
+    curve_number: u32,
     iterator_start_index: u32,
     iterator_end_index: u32,
     arrow_size: f32,
+    thread_mode: u32,
+    thread_mode_start_index: u32,
+    thread_mode_end_index: u32,
+    _padding: u32,
     // current_iterator_index: u32,
 }
 
@@ -78,6 +82,7 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
     fn required_limits() -> wgpu::Limits {
         let mut limits = wgpu::Limits::default();
         limits.max_storage_buffers_per_shader_stage = 8;
+        limits.max_compute_workgroup_size_x = 512;
         limits
     }
 }
@@ -230,19 +235,27 @@ impl Application for DebugVisualizator {
         let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
 
         let params = VisualizationParams {
-            max_local_vertex_capacity: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
+            curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
             iterator_start_index: 0,
             iterator_end_index: 4096,
             //iterator_end_index: 32768,
             arrow_size: 0.3,
+            thread_mode: 0,
+            thread_mode_start_index: 0,
+            thread_mode_end_index: 0,
+            _padding: 0,
         };
 
         let temp_params = VisualizationParams {
-            max_local_vertex_capacity: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
+            curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
             iterator_start_index: 0,
             iterator_end_index: THREAD_COUNT,
             //iterator_end_index: 32768,
             arrow_size: 0.3,
+            thread_mode: 1,
+            thread_mode_start_index: 0,
+            thread_mode_end_index: 0,
+            _padding: 0,
         };
 
         buffers.insert(
@@ -399,11 +412,25 @@ impl Application for DebugVisualizator {
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        // @workgroup_size(512,1,1)
+        let thread_count: u32 = 256;
+
         // let mut items_available: i32 = 32768; 
-        let mut items_available: i32 = 4096; 
-        let dispatch_x = 64;
+        let mut items_available: i32 = // self.visualization_params.iterator_end_index as i32; //4096; 
+            if !self.block64mode { self.visualization_params.iterator_end_index as i32 }
+            else { THREAD_COUNT as i32 };
+        let dispatch_x: u32 = if !self.block64mode { items_available as u32 / thread_count }
+                              else {
+                                  if THREAD_COUNT == thread_count { 1 }
+                                  else { std::cmp::max(1, THREAD_COUNT / thread_count) }
+                              };
+
         let mut clear = true;
-        let mut i = dispatch_x * 64;
+        let mut actual_index = if !self.block64mode { dispatch_x * thread_count }
+                               else { self.temp_visualization_params.iterator_start_index };
+        let mut clear = true;
+
+        if self.block64mode { self.histogram.set_values_cpu_version(queue, &vec![0, actual_index]); }
 
         while items_available > 0 {
 
@@ -420,14 +447,16 @@ impl Application for DebugVisualizator {
             queue.submit(Some(encoder_command.finish()));
 
             let counter = self.histogram.get_values(device, queue);
-            self.draw_count = counter[0];
+            self.draw_count = counter[0] * 3;
+
+            println!("self.draw_count == {}", self.draw_count);
 
             let mut encoder_render = device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
             });
 
-            items_available = items_available - dispatch_x as i32 * 64; 
+            items_available = items_available - (dispatch_x * thread_count ) as i32;
 
             // Draw the cube.
             draw(&mut encoder_render,
@@ -441,8 +470,8 @@ impl Application for DebugVisualizator {
             );
             queue.submit(Some(encoder_render.finish()));
             clear = items_available <= 0;
-            self.histogram.set_values_cpu_version(queue, &vec![0, i]);
-            i = i + dispatch_x*64;
+            self.histogram.set_values_cpu_version(queue, &vec![0, actual_index]);
+            actual_index = actual_index + dispatch_x*thread_count;
         }
 
         self.screen.prepare_for_rendering();
@@ -473,20 +502,20 @@ impl Application for DebugVisualizator {
             self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
         }
         if self.keys.test_key(&Key::Key1, input) { 
-            self.visualization_params.max_local_vertex_capacity = 1;  
-            self.temp_visualization_params.max_local_vertex_capacity = 1;  
+            self.visualization_params.curve_number = 1;  
+            self.temp_visualization_params.curve_number = 1;  
         }
         if self.keys.test_key(&Key::Key2, input) { 
-            self.visualization_params.max_local_vertex_capacity = 2;
-            self.temp_visualization_params.max_local_vertex_capacity = 2;  
+            self.visualization_params.curve_number = 2;
+            self.temp_visualization_params.curve_number = 2;  
         }
         if self.keys.test_key(&Key::Key3, input) { 
-            self.visualization_params.max_local_vertex_capacity = 3;  
-            self.temp_visualization_params.max_local_vertex_capacity = 3;  
+            self.visualization_params.curve_number = 3;  
+            self.temp_visualization_params.curve_number = 3;  
         }
         if self.keys.test_key(&Key::Key4, input) { 
-            self.visualization_params.max_local_vertex_capacity = 4;  
-            self.temp_visualization_params.max_local_vertex_capacity = 4;  
+            self.visualization_params.curve_number = 4;  
+            self.temp_visualization_params.curve_number = 4;  
         }
         if self.keys.test_key(&Key::Key9, input) { 
             self.block64mode = true;  
