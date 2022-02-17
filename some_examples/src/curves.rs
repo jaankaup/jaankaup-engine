@@ -449,8 +449,6 @@ impl Application for DebugVisualizator {
             let counter = self.histogram.get_values(device, queue);
             self.draw_count = counter[0] * 3;
 
-            println!("self.draw_count == {}", self.draw_count);
-
             let mut encoder_render = device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
@@ -465,7 +463,7 @@ impl Application for DebugVisualizator {
                  &self.render_bind_groups,
                  &self.render_object.pipeline,
                  &self.buffers.get("output").unwrap(),
-                 0..self.draw_count, // TODO: Cube 
+                 0..self.draw_count, 
                  clear
             );
             queue.submit(Some(encoder_render.finish()));
