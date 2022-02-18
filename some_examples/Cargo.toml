@@ -15,6 +15,10 @@ name = "basic"
 path = "src/basic.rs"
 
 [[example]]
+name = "mc"
+path = "src/mc.rs"
+
+[[example]]
 name = "curves"
 path = "src/curves.rs"
 

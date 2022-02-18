@@ -42,11 +42,9 @@ struct VisualizationParams{
     arrow_size: f32,
 }
 
-impl_convert!{Arrow}
+struct McFeatures {}
 
-struct DebugVisualizatorFeatures {}
-
-impl WGPUFeatures for DebugVisualizatorFeatures {
+impl WGPUFeatures for McFeatures {
     fn optional_features() -> wgpu::Features {
         wgpu::Features::empty()
     }
@@ -63,29 +61,67 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
 
 
 // State for this application.
-struct DebugVisualizator {
+struct Mc {
     pub screen: ScreenTexture, 
     pub render_object: RenderObject, 
     pub render_bind_groups: Vec<wgpu::BindGroup>,
-    pub compute_object: ComputeObject, 
-    pub compute_bind_groups: Vec<wgpu::BindGroup>,
-    // pub _textures: HashMap<String, Texture>,
+    // pub compute_object: ComputeObject, 
+    // pub compute_bind_groups: Vec<wgpu::BindGroup>,
+    pub textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
     pub histogram: Histogram,
     pub draw_count: u32,
-    pub visualization_params: VisualizationParams,
-    pub temp_visualization_params: VisualizationParams,
+    // pub visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
-    pub block64mode: bool,
 }
 
-impl DebugVisualizator {
+impl Mc {
 
+        fn create_textures(configuration: &WGPUConfiguration, textures: &mut HashMap<String, Texture>) {
+        log::info!("Creating textures.");
+        let grass_texture = Texture::create_from_bytes(
+            &configuration.queue,
+            &configuration.device,
+            &configuration.sc_desc,
+            1,
+            &include_bytes!("../../assets/textures/grass2.png")[..],
+            None);
+        let rock_texture = Texture::create_from_bytes(
+            &configuration.queue,
+            &configuration.device,
+            &configuration.sc_desc,
+            1,
+            &include_bytes!("../../assets/textures/rock.png")[..],
+            None);
+        let slime_texture = Texture::create_from_bytes(
+            &configuration.queue,
+            &configuration.device,
+            &configuration.sc_desc,
+            1,
+            &include_bytes!("../../assets/textures/lava.png")[..],
+            //&include_bytes!("../../assets/textures/slime.png")[..],
+            None);
+        let slime_texture2 = Texture::create_from_bytes(
+            &configuration.queue,
+            &configuration.device,
+            &configuration.sc_desc,
+            1,
+            //&include_bytes!("../../assets/textures/slime2.png")[..],
+            //&include_bytes!("../../assets/textures/xXqQP0.png")[..],
+            &include_bytes!("../../assets/textures/luava.png")[..],
+            None);
+        log::info!("Textures created OK.");
+
+        textures.insert("grass".to_string(), grass_texture);
+        textures.insert("rock".to_string(), rock_texture);
+        textures.insert("slime".to_string(), slime_texture);
+        textures.insert("slime2".to_string(), slime_texture2);
+    }
 }
 
-//#[allow(unused_variables)]
-impl Application for DebugVisualizator {
+impl Application for Mc {
+
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
@@ -101,18 +137,19 @@ impl Application for DebugVisualizator {
         // log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
+        let mut textures: HashMap<String, Texture> = HashMap::new();
 
         let mut keys = KeyboardManager::init();
-        keys.register_key(Key::L, 20.0);
-        keys.register_key(Key::K, 20.0);
-        keys.register_key(Key::Key1, 10.0);
-        keys.register_key(Key::Key2, 10.0);
-        keys.register_key(Key::Key3, 10.0);
-        keys.register_key(Key::Key4, 10.0);
-        keys.register_key(Key::Key9, 10.0);
-        keys.register_key(Key::Key0, 10.0);
-        keys.register_key(Key::NumpadSubtract, 50.0);
-        keys.register_key(Key::NumpadAdd, 50.0);
+        // keys.register_key(Key::L, 20.0);
+        // keys.register_key(Key::K, 20.0);
+        // keys.register_key(Key::Key1, 10.0);
+        // keys.register_key(Key::Key2, 10.0);
+        // keys.register_key(Key::Key3, 10.0);
+        // keys.register_key(Key::Key4, 10.0);
+        // keys.register_key(Key::Key9, 10.0);
+        // keys.register_key(Key::Key0, 10.0);
+        // keys.register_key(Key::NumpadSubtract, 50.0);
+        // keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
@@ -126,7 +163,7 @@ impl Application for DebugVisualizator {
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_debug_visualizator_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
                     
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
@@ -143,9 +180,46 @@ impl Application for DebugVisualizator {
                                 count: None,
                             },
                         ],
+                        // Group 1
+                        vec![wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Texture {
+                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                    view_dimension: wgpu::TextureViewDimension::D2,
+                                    multisampled: false,
+                                },
+                                count: None,
+                            },
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                                count: None,
+                            },
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 2,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Texture {
+                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                    view_dimension: wgpu::TextureViewDimension::D2,
+                                    multisampled: false,
+                                },
+                                count: None,
+                            },
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 3,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                                count: None,
+                            }
+                        ]
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera.")
         );
+
+        Mc::create_textures(&configuration, &mut textures);
+
         let render_bind_groups = create_bind_groups(
                                      &configuration.device,
                                      &render_object.bind_group_layout_entries,
@@ -156,174 +230,177 @@ impl Application for DebugVisualizator {
                                                  offset: 0,
                                                  size: None,
                                          })],
+                                        vec![&wgpu::BindingResource::TextureView(&textures.get("slime").unwrap().view),
+                                             &wgpu::BindingResource::Sampler(&textures.get("slime").unwrap().sampler),
+                                             &wgpu::BindingResource::TextureView(&textures.get("slime2").unwrap().view),
+                                             &wgpu::BindingResource::Sampler(&textures.get("slime2").unwrap().sampler)
+                                        ]
                                      ]
         );
 
         println!("Creating compute object.");
 
-        let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
+        let histogram = Histogram::init(&configuration.device, &vec![0; 1]);
 
-        let params = VisualizationParams {
-            curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
-            iterator_start_index: 0,
-            iterator_end_index: 4096,
-            //iterator_end_index: 32768,
-            arrow_size: 0.3,
-            thread_mode: 0,
-            thread_mode_start_index: 0,
-            thread_mode_end_index: 0,
-            _padding: 0,
-        };
+        //++ let params = VisualizationParams {
+        //++     curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
+        //++     iterator_start_index: 0,
+        //++     iterator_end_index: 4096,
+        //++     //iterator_end_index: 32768,
+        //++     arrow_size: 0.3,
+        //++     thread_mode: 0,
+        //++     thread_mode_start_index: 0,
+        //++     thread_mode_end_index: 0,
+        //++     _padding: 0,
+        //++ };
 
-        let temp_params = VisualizationParams {
-            curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
-            iterator_start_index: 0,
-            iterator_end_index: THREAD_COUNT,
-            //iterator_end_index: 32768,
-            arrow_size: 0.3,
-            thread_mode: 1,
-            thread_mode_start_index: 0,
-            thread_mode_end_index: 0,
-            _padding: 0,
-        };
+        //++ let temp_params = VisualizationParams {
+        //++     curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
+        //++     iterator_start_index: 0,
+        //++     iterator_end_index: THREAD_COUNT,
+        //++     //iterator_end_index: 32768,
+        //++     arrow_size: 0.3,
+        //++     thread_mode: 1,
+        //++     thread_mode_start_index: 0,
+        //++     thread_mode_end_index: 0,
+        //++     _padding: 0,
+        //++ };
 
-        buffers.insert(
-            "visualization_params".to_string(),
-            buffer_from_data::<VisualizationParams>(
-            &configuration.device,
-            &vec![params],
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            None)
-        );
+        //++ buffers.insert(
+        //++     "visualization_params".to_string(),
+        //++     buffer_from_data::<VisualizationParams>(
+        //++     &configuration.device,
+        //++     &vec![params],
+        //++     wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //++     None)
+        //++ );
 
-        buffers.insert(
-            "debug_arrays".to_string(),
-            buffer_from_data::<Arrow>(
-                &configuration.device,
-                &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
-                              end_pos:   [4.0, 3.0, 0.0, 1.0],
-                              color: encode_rgba_u32(0, 0, 255, 255),
-                              size: 0.2,
-                              _padding: [0, 0]}],
-                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                Some("Debug array buffer")
-            )
-        );
+        //++ buffers.insert(
+        //++     "debug_arrays".to_string(),
+        //++     buffer_from_data::<Arrow>(
+        //++         &configuration.device,
+        //++         &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
+        //++                       end_pos:   [4.0, 3.0, 0.0, 1.0],
+        //++                       color: encode_rgba_u32(0, 0, 255, 255),
+        //++                       size: 0.2,
+        //++                       _padding: [0, 0]}],
+        //++         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //++         Some("Debug array buffer")
+        //++     )
+        //++ );
 
-        buffers.insert(
-            "output".to_string(),
-            configuration.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("draw buffer"),
-                size: VERTEX_BUFFER_SIZE as u64, 
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })
-        );
+        //++ buffers.insert(
+        //++     "output".to_string(),
+        //++     configuration.device.create_buffer(&wgpu::BufferDescriptor {
+        //++         label: Some("draw buffer"),
+        //++         size: VERTEX_BUFFER_SIZE as u64, 
+        //++         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //++         mapped_at_creation: false,
+        //++     })
+        //++ );
 
 
-        let compute_object =
-                ComputeObject::init(
-                    &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("compute_visuzlizer_wgsl"),
-                        source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/curves.wgsl"))),
-                    
-                    }),
-                    Some("Visualizer Compute object"),
-                    &vec![
-                        vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> visualization_params: VisualizationParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> counter: Counter;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read> counter: array<Arrow>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage,read_write> output: array<VertexBuffer>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                        ],
-                    ]
-        );
+        //++ let compute_object =
+        //++         ComputeObject::init(
+        //++             &configuration.device,
+        //++             &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        //++                 label: Some("compute_visuzlizer_wgsl"),
+        //++                 source: wgpu::ShaderSource::Wgsl(
+        //++                     Cow::Borrowed(include_str!("../../assets/shaders/curves.wgsl"))),
+        //++             
+        //++             }),
+        //++             Some("Visualizer Compute object"),
+        //++             &vec![
+        //++                 vec![
+        //++                     // @group(0)
+        //++                     // @binding(0)
+        //++                     // var<uniform> visualization_params: VisualizationParams;
+        //++                     wgpu::BindGroupLayoutEntry {
+        //++                         binding: 0,
+        //++                         visibility: wgpu::ShaderStages::COMPUTE,
+        //++                         ty: wgpu::BindingType::Buffer {
+        //++                             ty: wgpu::BufferBindingType::Uniform,
+        //++                             has_dynamic_offset: false,
+        //++                             min_binding_size: None,
+        //++                         },
+        //++                         count: None,
+        //++                     },
+        //++                     // @group(0)
+        //++                     // @binding(1)
+        //++                     // var<storage, read_write> counter: Counter;
+        //++                     wgpu::BindGroupLayoutEntry {
+        //++                         binding: 1,
+        //++                         visibility: wgpu::ShaderStages::COMPUTE,
+        //++                         ty: wgpu::BindingType::Buffer {
+        //++                             ty: wgpu::BufferBindingType::Storage { read_only: false },
+        //++                             has_dynamic_offset: false,
+        //++                             min_binding_size: None,
+        //++                         },
+        //++                         count: None,
+        //++                     },
+        //++                     // @group(0)
+        //++                     // @binding(2)
+        //++                     // var<storage, read> counter: array<Arrow>;
+        //++                     wgpu::BindGroupLayoutEntry {
+        //++                         binding: 2,
+        //++                         visibility: wgpu::ShaderStages::COMPUTE,
+        //++                         ty: wgpu::BindingType::Buffer {
+        //++                             ty: wgpu::BufferBindingType::Storage { read_only: false },
+        //++                             has_dynamic_offset: false,
+        //++                             min_binding_size: None,
+        //++                         },
+        //++                         count: None,
+        //++                     },
+        //++                     // @group(0)
+        //++                     // @binding(3)
+        //++                     // var<storage,read_write> output: array<VertexBuffer>;
+        //++                     wgpu::BindGroupLayoutEntry {
+        //++                         binding: 3,
+        //++                         visibility: wgpu::ShaderStages::COMPUTE,
+        //++                         ty: wgpu::BindingType::Buffer {
+        //++                             ty: wgpu::BufferBindingType::Storage { read_only: false },
+        //++                             has_dynamic_offset: false,
+        //++                             min_binding_size: None,
+        //++                         },
+        //++                         count: None,
+        //++                     },
+        //++                 ],
+        //++             ]
+        //++ );
 
-        println!("Creating compute bind groups.");
+        //++ println!("Creating compute bind groups.");
 
-        println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
+        //++ println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
 
-        let compute_bind_groups = create_bind_groups(
-                                      &configuration.device,
-                                      &compute_object.bind_group_layout_entries,
-                                      &compute_object.bind_group_layouts,
-                                      &vec![
-                                          vec![
-                                               &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
-                                               &histogram.get_histogram_buffer().as_entire_binding(),
-                                               &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
-                                               &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
-                                          ]
-                                      ]
-        );
+        //++ let compute_bind_groups = create_bind_groups(
+        //++                               &configuration.device,
+        //++                               &compute_object.bind_group_layout_entries,
+        //++                               &compute_object.bind_group_layouts,
+        //++                               &vec![
+        //++                                   vec![
+        //++                                        &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
+        //++                                        &histogram.get_histogram_buffer().as_entire_binding(),
+        //++                                        &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
+        //++                                        &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
+        //++                                   ]
+        //++                               ]
+        //++ );
 
-        println!("Creating render bind groups.");
+        //++ println!("Creating render bind groups.");
  
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
             render_bind_groups: render_bind_groups,
-            compute_object: compute_object,
-            compute_bind_groups: compute_bind_groups,
-            // _textures: textures,
+            //compute_object: compute_object,
+            //compute_bind_groups: compute_bind_groups,
+            textures: textures,
             buffers: buffers,
             camera: camera,
             histogram: histogram,
             draw_count: 0,
-            visualization_params: params,
-            temp_visualization_params: temp_params,
+            // visualization_params: params,
             keys: keys,
-            block64mode: false,
         }
     }
 
@@ -333,78 +410,32 @@ impl Application for DebugVisualizator {
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration) {
 
-        self.screen.acquire_screen_texture(
-            &device,
-            &sc_desc,
-            &surface
-        );
+        // self.screen.acquire_screen_texture(
+        //     &device,
+        //     &sc_desc,
+        //     &surface
+        // );
 
-        let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
+        // let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // @workgroup_size(512,1,1)
-        let thread_count: u32 = 256;
+        // let clear = true;
 
-        // let mut items_available: i32 = 32768; 
-        let mut items_available: i32 = // self.visualization_params.iterator_end_index as i32; //4096; 
-            if !self.block64mode { self.visualization_params.iterator_end_index as i32 }
-            else { THREAD_COUNT as i32 };
-        let dispatch_x: u32 = if !self.block64mode { items_available as u32 / thread_count }
-                              else {
-                                  if THREAD_COUNT == thread_count { 1 }
-                                  else { std::cmp::max(1, THREAD_COUNT / thread_count) }
-                              };
+            // draw(&mut encoder_render,
+            //      &view,
+            //      self.screen.depth_texture.as_ref().unwrap(),
+            //      &self.render_bind_groups,
+            //      &self.render_object.pipeline,
+            //      &self.buffers.get("output").unwrap(),
+            //      0..self.draw_count, 
+            //      clear
+            // );
+            // queue.submit(Some(encoder_render.finish()));
+            // self.histogram.set_values_cpu_version(queue, &vec![0]);
 
-        let mut clear = true;
-        let mut actual_index = if !self.block64mode { dispatch_x * thread_count }
-                               else { self.temp_visualization_params.iterator_start_index };
-        let mut clear = true;
-
-        if self.block64mode { self.histogram.set_values_cpu_version(queue, &vec![0, actual_index]); }
-
-        while items_available > 0 {
-
-            let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
-
-            // Take 128 * 64 = 8192 items.
-            self.compute_object.dispatch(
-                &self.compute_bind_groups,
-                &mut encoder_command,
-                dispatch_x, 1, 1, Some("aabb dispatch")
-            );
-
-            // Submit compute.
-            queue.submit(Some(encoder_command.finish()));
-
-            let counter = self.histogram.get_values(device, queue);
-            self.draw_count = counter[0] * 3;
-
-            let mut encoder_render = device.create_command_encoder(
-                &wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-            });
-
-            items_available = items_available - (dispatch_x * thread_count ) as i32;
-
-            // Draw the cube.
-            draw(&mut encoder_render,
-                 &view,
-                 self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_bind_groups,
-                 &self.render_object.pipeline,
-                 &self.buffers.get("output").unwrap(),
-                 0..self.draw_count, 
-                 clear
-            );
-            queue.submit(Some(encoder_render.finish()));
-            clear = items_available <= 0;
-            self.histogram.set_values_cpu_version(queue, &vec![0, actual_index]);
-            actual_index = actual_index + dispatch_x*thread_count;
-        }
-
-        self.screen.prepare_for_rendering();
+        // self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
+        // self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
     }
 
     #[allow(unused)]
@@ -419,72 +450,11 @@ impl Application for DebugVisualizator {
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
-
-        if self.keys.test_key(&Key::L, input) { 
-            self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-            self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        }
-        if self.keys.test_key(&Key::K, input) { 
-            self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
-            self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
-        }
-        if self.keys.test_key(&Key::Key1, input) { 
-            self.visualization_params.curve_number = 1;  
-            self.temp_visualization_params.curve_number = 1;  
-        }
-        if self.keys.test_key(&Key::Key2, input) { 
-            self.visualization_params.curve_number = 2;
-            self.temp_visualization_params.curve_number = 2;  
-        }
-        if self.keys.test_key(&Key::Key3, input) { 
-            self.visualization_params.curve_number = 3;  
-            self.temp_visualization_params.curve_number = 3;  
-        }
-        if self.keys.test_key(&Key::Key4, input) { 
-            self.visualization_params.curve_number = 4;  
-            self.temp_visualization_params.curve_number = 4;  
-        }
-        if self.keys.test_key(&Key::Key9, input) { 
-            self.block64mode = true;  
-        }
-        if self.keys.test_key(&Key::Key0, input) { 
-            self.block64mode = false;  
-        }
-        if self.keys.test_key(&Key::NumpadSubtract, input) { 
-        //if self.keys.test_key(&Key::T, input) { 
-            let si = self.temp_visualization_params.iterator_start_index as i32;
-            if si >= THREAD_COUNT as i32 {
-                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
-                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
-            }
-        }
-        if self.keys.test_key(&Key::NumpadAdd, input) { 
-            let ei = self.temp_visualization_params.iterator_end_index;
-            if ei <= 4096 - THREAD_COUNT {
-                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
-                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
-            }
-        }
-
-        if self.block64mode {
-            queue.write_buffer(
-                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-                0,
-                bytemuck::cast_slice(&[self.temp_visualization_params])
-            );
-        }
-        else {
-            queue.write_buffer(
-                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-                0,
-                bytemuck::cast_slice(&[self.visualization_params])
-            );
-        }
     }
 }
 
 fn main() {
     
-    jaankaup_core::template::run_loop::<DebugVisualizator, BasicLoop, DebugVisualizatorFeatures>(); 
+    jaankaup_core::template::run_loop::<Mc, BasicLoop, McFeatures>(); 
     println!("Finished...");
 }
