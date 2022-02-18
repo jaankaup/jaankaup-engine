@@ -402,3 +402,49 @@ impl InputCache {
         }
     }
 }
+
+pub struct KeyboardManager {
+    keys: HashMap<Key, (f64, f64)>,
+}
+
+impl KeyboardManager {
+    pub fn init() -> Self {
+        Self {
+            keys: HashMap::<Key, (f64, f64)>::new(),
+        }
+    }
+
+    pub fn register_key(&mut self, key: Key, threshold: f64) {
+        self.keys.insert(key, (0.0, threshold)); 
+    }
+
+    pub fn test_key(&mut self, key: &Key, input: &InputCache) -> bool {
+        
+        let state_key = input.key_state(key);
+        let mut result = false;
+
+        if let Some(v) = self.keys.get_mut(key) {
+
+            match state_key {
+                Some(InputState::Pressed(_)) => {
+                    let delta = (input.get_time_delta() / 1000000) as f64;
+                    v.0 = delta;
+                }
+                Some(InputState::Down(_, _)) => {
+                    let delta = (input.get_time_delta() / 1000000) as f64;
+                    v.0 = v.0 + delta;
+                    if v.0 > v.1 {
+                        v.0 = v.0 - v.1;
+                        result = true;
+                    }
+                },
+                Some(InputState::Released(_, _)) => {
+                    v.0 = 0.0; 
+                }
+                _ => { }
+            }
+        }
+
+        return result;
+    }
+}

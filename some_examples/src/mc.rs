@@ -8,7 +8,7 @@ use jaankaup_core::template::{
         BasicLoop,
 };
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
-use jaankaup_core::input::{KeyboardManager, InputCache};
+use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::buffer::{buffer_from_data};
 use jaankaup_core::wgpu;
@@ -33,39 +33,13 @@ const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
 const THREAD_COUNT: u32 = 64;
 
-// 
-//  Arrow  
-//
-//  +----------------+
-//  | start: [3;f32] |
-//  | end: [3;f32]   |
-//  | color: u32     |
-//  | size: f32      |
-//  +----------------+
-//
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct Arrow {
-    start_pos: [f32 ; 4],
-    end_pos: [f32 ; 4],
-    color: u32,
-    size: f32,
-    _padding: [u32; 2]
-}
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct VisualizationParams{
-    curve_number: u32,
+    max_number_of_vertices: u32,
     iterator_start_index: u32,
     iterator_end_index: u32,
     arrow_size: f32,
-    thread_mode: u32,
-    thread_mode_start_index: u32,
-    thread_mode_end_index: u32,
-    _padding: u32,
-    // current_iterator_index: u32,
 }
 
 impl_convert!{Arrow}
@@ -82,56 +56,11 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
     fn required_limits() -> wgpu::Limits {
         let mut limits = wgpu::Limits::default();
         limits.max_storage_buffers_per_shader_stage = 8;
-        limits.max_compute_workgroup_size_x = 512;
+        // limits.max_compute_workgroup_size_x = 512;
         limits
     }
 }
 
-// struct KeyboardManager {
-//     keys: HashMap<Key, (f64, f64)>,
-// }
-// 
-// impl KeyboardManager {
-//     pub fn init() -> Self {
-//         Self {
-//             keys: HashMap::<Key, (f64, f64)>::new(),
-//         }
-//     }
-// 
-//     pub fn register_key(&mut self, key: Key, threshold: f64) {
-//         self.keys.insert(key, (0.0, threshold)); 
-//     }
-// 
-//     pub fn test_key(&mut self, key: &Key, input: &InputCache) -> bool {
-//         
-//         let state_key = input.key_state(key);
-//         let mut result = false;
-// 
-//         if let Some(v) = self.keys.get_mut(key) {
-// 
-//             match state_key {
-//                 Some(InputState::Pressed(_)) => {
-//                     let delta = (input.get_time_delta() / 1000000) as f64;
-//                     v.0 = delta;
-//                 }
-//                 Some(InputState::Down(_, _)) => {
-//                     let delta = (input.get_time_delta() / 1000000) as f64;
-//                     v.0 = v.0 + delta;
-//                     if v.0 > v.1 {
-//                         v.0 = v.0 - v.1;
-//                         result = true;
-//                     }
-//                 },
-//                 Some(InputState::Released(_, _)) => {
-//                     v.0 = 0.0; 
-//                 }
-//                 _ => { }
-//             }
-//         }
-// 
-//         return result;
-//     }
-// }
 
 // State for this application.
 struct DebugVisualizator {
@@ -428,6 +357,7 @@ impl Application for DebugVisualizator {
         let mut clear = true;
         let mut actual_index = if !self.block64mode { dispatch_x * thread_count }
                                else { self.temp_visualization_params.iterator_start_index };
+        let mut clear = true;
 
         if self.block64mode { self.histogram.set_values_cpu_version(queue, &vec![0, actual_index]); }
 
