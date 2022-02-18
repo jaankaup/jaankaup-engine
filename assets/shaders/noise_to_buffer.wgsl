@@ -1,36 +1,20 @@
-[[block]]
-struct Dimensions {
-    dim: [[stride(16)]] array<vec3<u32>>;
+struct NoiseParams {
+    global_dim: vec3<u32>;
+    local_dim: vec3<u32>;
+    time: u32;
 };
 
-[[block]]
-struct FutureUsage {
-    something: [[stride(16)]] array<vec4<f32>>;
-};
-
-[[block]]
 struct Output {
-    output: [[stride(4)]] array<f32>;
+    output: array<f32>;
 };
 
-// TODO: uniform. Compine binding 0 & 1
-[[group(0), binding(0)]]
-var<storage, read> the_number_of_workgroups: Dimensions;
-//var<storage> the_number_of_workgroups: [[access(read)]] Dimensions;
+@group(0)
+@binding(0)
+var<uniform> noise_params: NoiseParams;
 
-// TODO: uniform.
-[[group(0), binding(1)]]
-var<storage, read> dimensions: Dimensions;
-//var<storage> dimensions: [[access(read)]] Dimensions;
-
-[[group(0), binding(2)]]
-//var<storage> future_usage1: [[stride(16)]] FutureUsage;
-var<storage, read> future_usage1: FutureUsage;
-
-[[group(0), binding(3)]]
+@group(0)
+@binding(1)
 var<storage, read_write> noise_output: Output;
-//var<storage> noise_output: [[stride(4)]] Output;
-//var<storage> noise_output: [[access(write)]] Output;
 
 fn mod(x: vec4<f32>, y: vec4<f32>) -> vec4<f32> {
   return x - y * floor(x/y); 
@@ -39,7 +23,6 @@ fn permute(x: vec4<f32>) -> vec4<f32> {return mod(((x*34.0)+vec4<f32>(1.0))*x, v
 fn taylorInvSqrt(r: vec4<f32>) -> vec4<f32> {return 1.79284291400159 * vec4<f32>(1.0) - 0.85373472095314 * r;}
 fn fade(t: vec4<f32>) -> vec4<f32> {return t*t*t*(t*(t*6.0-vec4<f32>(15.0))+vec4<f32>(10.0));}
 
-//fn cnoise(P: vec4<u32>, rep: vec4<u32>) -> f32 {
 fn cnoise(P: vec4<f32>) -> f32 {
   var Pi0 = floor(P); // Integer part for indexing
   var Pi1 = Pi0 + 1.0; // Integer part + 1
@@ -272,23 +255,61 @@ fn cnoise(P: vec4<f32>) -> f32 {
 //++     return v;
 //++ }
 
-fn index1D_to_index3D(global_index: vec3<u32>) -> vec3<u32> {
+fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u32> {
 	var index: u32 = global_index.x;
-	var wh: u32 = dimensions.dim[0].x * dimensions.dim[0].y;
+	var wh: u32 = x_dim * y_dim;
 	let z: u32 = index / wh;
 	index = index - z * wh;
-	let y: u32 = index / dimensions.dim[0].x;
-	index = index - y * dimensions.dim[0].x;
+	let y: u32 = index / x_dim;
+	index = index - y * x_dim;
 	let x: u32 = index;
 	return vec3<u32>(x, y, z);	
 }
 
-[[stage(compute), workgroup_size(64,1,1)]]
-fn main([[builtin(local_invocation_id)]] local_id: vec3<u32>,
-        [[builtin(local_invocation_index)]] local_index: u32,
-        [[builtin(global_invocation_id)]] global_id: vec3<u32>) {
+fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
+    var x_temp = (x | (x << 16u)) & 0x030000FFu;
+        x_temp = (x | (x <<  8u)) & 0x0300F00Fu;
+        x_temp = (x | (x <<  4u)) & 0x030C30C3u;
+        x_temp = (x | (x <<  2u)) & 0x09249249u;
 
-  let coordinate3D = index1D_to_index3D(global_id);
+    var y_temp = (y | (y << 16u)) & 0x030000FFu;
+        y_temp = (y | (y <<  8u)) & 0x0300F00Fu;
+        y_temp = (y | (y <<  4u)) & 0x030C30C3u;
+        y_temp = (y | (y <<  2u)) & 0x09249249u;
+
+    var z_temp = (z | (z << 16u)) & 0x030000FFu;
+        z_temp = (z | (z <<  8u)) & 0x0300F00Fu;
+        z_temp = (z | (z <<  4u)) & 0x030C30C3u;
+        z_temp = (z | (z <<  2u)) & 0x09249249u;
+    return x_temp | (y_temp << 1u) | (z_temp << 2u);
+}
+
+fn get_third_bits32(m: u32) -> u32 {
+    var x = m & 0x9249249u;
+    x = (x ^ (x >> 2u))  & 0x30c30c3u;
+    x = (x ^ (x >> 4u))  & 0x0300f00fu;
+    x = (x ^ (x >> 8u))  & 0x30000ffu;
+    x = (x ^ (x >> 16u)) & 0x000003ffu;
+
+    return x;
+}
+
+fn decode3Dmorton32(m: u32) -> vec3<u32> {
+    return vec3<u32>(
+        get_third_bits32(m),
+        get_third_bits32(m >> 1u),
+        get_third_bits32(m >> 2u)
+   );
+}
+
+@stage(compute)
+@workgroup_size(64,1,1)
+fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
+        @builtin(workgroup_id) work_group_id: vec3<u32>,
+        @builtin(global_invocation_id)   global_id: vec3<u32>,
+        @builtin(local_invocation_index) local_index: u32) {
+
+  let coordinate3D = decode3Dmorton32(global_id.x);
  
   let fx = f32(coordinate3D.x) * 0.06;
   let fy = f32(coordinate3D.y) * 0.06;
@@ -300,13 +321,11 @@ fn main([[builtin(local_invocation_id)]] local_id: vec3<u32>,
   let noise_c = cnoise(
         vec4<f32>(
             vec3<f32>(fz, fy, fx) +
-            vec3<f32>(noise_velocity*future_usage1.something[0].x),
+            vec3<f32>(noise_velocity * f32(noise_params.time)),
         1.0)
   );
-  let result_value = fy - 0.25 - wave_height_factor * noise_c; // - 0.5*noise_a;
+  let result_value = fy - 0.25 - wave_height_factor * noise_c;
 
   noise_output.output[global_id.x] = result_value;
-  //noise_output.output[global_id.x] = 1.0;
-
 }
 

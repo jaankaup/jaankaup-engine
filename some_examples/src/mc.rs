@@ -25,6 +25,21 @@ use bytemuck::{Pod, Zeroable};
 use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
+const GLOBAL_NOISE_X_DIMENSION: u32 = 1; 
+const GLOBAL_NOISE_Y_DIMENSION: u32 = 1; 
+const GLOBAL_NOISE_Z_DIMENSION: u32 = 1; 
+const LOCAL_NOISE_X_DIMENSION:  u32 = 256; 
+const LOCAL_NOISE_Y_DIMENSION:  u32 = 256; 
+const LOCAL_NOISE_Z_DIMENSION:  u32 = 256; 
+
+const NOISE_BUFFER_SIZE: u32 = GLOBAL_NOISE_X_DIMENSION *
+                               GLOBAL_NOISE_Y_DIMENSION *
+                               GLOBAL_NOISE_Z_DIMENSION *
+                               LOCAL_NOISE_X_DIMENSION *
+                               LOCAL_NOISE_Y_DIMENSION *
+                               LOCAL_NOISE_Z_DIMENSION *
+                               size_of::<f32>() as u32;
+
 /// The number of vertices per chunk.
 const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
 
@@ -35,11 +50,11 @@ const THREAD_COUNT: u32 = 64;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct VisualizationParams{
-    max_number_of_vertices: u32,
-    iterator_start_index: u32,
-    iterator_end_index: u32,
-    arrow_size: f32,
+struct NoiseParams {
+    global_dim: [u32; 4],
+    local_dim: [u32; 4],
+    time: u32,
+    _pad: [u32; 3],
 }
 
 struct McFeatures {}
@@ -59,14 +74,13 @@ impl WGPUFeatures for McFeatures {
     }
 }
 
-
 // State for this application.
 struct Mc {
     pub screen: ScreenTexture, 
     pub render_object: RenderObject, 
     pub render_bind_groups: Vec<wgpu::BindGroup>,
-    // pub compute_object: ComputeObject, 
-    // pub compute_bind_groups: Vec<wgpu::BindGroup>,
+    pub noise_compute_object: ComputeObject, 
+    pub noise_compute_bind_groups: Vec<wgpu::BindGroup>,
     pub textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
@@ -298,93 +312,91 @@ impl Application for Mc {
         //++         mapped_at_creation: false,
         //++     })
         //++ );
+        //
+        
+        let noise_params = NoiseParams {
+            global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION, 0],
+            local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION, 0],
+            time: 123,
+            _pad: [0,0,0],
+        };
 
+        buffers.insert(
+            "noise_params".to_string(),
+            buffer_from_data::<NoiseParams>(
+            &configuration.device,
+            &vec![noise_params],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
 
-        //++ let compute_object =
-        //++         ComputeObject::init(
-        //++             &configuration.device,
-        //++             &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-        //++                 label: Some("compute_visuzlizer_wgsl"),
-        //++                 source: wgpu::ShaderSource::Wgsl(
-        //++                     Cow::Borrowed(include_str!("../../assets/shaders/curves.wgsl"))),
-        //++             
-        //++             }),
-        //++             Some("Visualizer Compute object"),
-        //++             &vec![
-        //++                 vec![
-        //++                     // @group(0)
-        //++                     // @binding(0)
-        //++                     // var<uniform> visualization_params: VisualizationParams;
-        //++                     wgpu::BindGroupLayoutEntry {
-        //++                         binding: 0,
-        //++                         visibility: wgpu::ShaderStages::COMPUTE,
-        //++                         ty: wgpu::BindingType::Buffer {
-        //++                             ty: wgpu::BufferBindingType::Uniform,
-        //++                             has_dynamic_offset: false,
-        //++                             min_binding_size: None,
-        //++                         },
-        //++                         count: None,
-        //++                     },
-        //++                     // @group(0)
-        //++                     // @binding(1)
-        //++                     // var<storage, read_write> counter: Counter;
-        //++                     wgpu::BindGroupLayoutEntry {
-        //++                         binding: 1,
-        //++                         visibility: wgpu::ShaderStages::COMPUTE,
-        //++                         ty: wgpu::BindingType::Buffer {
-        //++                             ty: wgpu::BufferBindingType::Storage { read_only: false },
-        //++                             has_dynamic_offset: false,
-        //++                             min_binding_size: None,
-        //++                         },
-        //++                         count: None,
-        //++                     },
-        //++                     // @group(0)
-        //++                     // @binding(2)
-        //++                     // var<storage, read> counter: array<Arrow>;
-        //++                     wgpu::BindGroupLayoutEntry {
-        //++                         binding: 2,
-        //++                         visibility: wgpu::ShaderStages::COMPUTE,
-        //++                         ty: wgpu::BindingType::Buffer {
-        //++                             ty: wgpu::BufferBindingType::Storage { read_only: false },
-        //++                             has_dynamic_offset: false,
-        //++                             min_binding_size: None,
-        //++                         },
-        //++                         count: None,
-        //++                     },
-        //++                     // @group(0)
-        //++                     // @binding(3)
-        //++                     // var<storage,read_write> output: array<VertexBuffer>;
-        //++                     wgpu::BindGroupLayoutEntry {
-        //++                         binding: 3,
-        //++                         visibility: wgpu::ShaderStages::COMPUTE,
-        //++                         ty: wgpu::BindingType::Buffer {
-        //++                             ty: wgpu::BufferBindingType::Storage { read_only: false },
-        //++                             has_dynamic_offset: false,
-        //++                             min_binding_size: None,
-        //++                         },
-        //++                         count: None,
-        //++                     },
-        //++                 ],
-        //++             ]
-        //++ );
+        buffers.insert(
+            "noise_output".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Noise output buffer"),
+                size: NOISE_BUFFER_SIZE as u64, 
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        );
+
+        let noise_compute_object =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("noise compute object"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),
+                    
+                    }),
+                    Some("Visualizer Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0)
+                            // @binding(0)
+                            // var<uniform> noise_params: NoiseParams;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(1)
+                            // var<storage, read_write> counter: Counter;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                        ],
+                    ]
+        );
 
         //++ println!("Creating compute bind groups.");
 
         //++ println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
 
-        //++ let compute_bind_groups = create_bind_groups(
-        //++                               &configuration.device,
-        //++                               &compute_object.bind_group_layout_entries,
-        //++                               &compute_object.bind_group_layouts,
-        //++                               &vec![
-        //++                                   vec![
-        //++                                        &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
-        //++                                        &histogram.get_histogram_buffer().as_entire_binding(),
-        //++                                        &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
-        //++                                        &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
-        //++                                   ]
-        //++                               ]
-        //++ );
+        let noise_compute_bind_groups = create_bind_groups(
+                                           &configuration.device,
+                                           &noise_compute_object.bind_group_layout_entries,
+                                           &noise_compute_object.bind_group_layouts,
+                                           &vec![
+                                               vec![
+                                                    &buffers.get(&"noise_params".to_string()).unwrap().as_entire_binding(),
+                                                    &buffers.get(&"noise_output".to_string()).unwrap().as_entire_binding()
+                                               ]
+                                           ]
+        );
 
         //++ println!("Creating render bind groups.");
  
@@ -392,8 +404,8 @@ impl Application for Mc {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
             render_bind_groups: render_bind_groups,
-            //compute_object: compute_object,
-            //compute_bind_groups: compute_bind_groups,
+            noise_compute_object: noise_compute_object,
+            noise_compute_bind_groups: noise_compute_bind_groups,
             textures: textures,
             buffers: buffers,
             camera: camera,
