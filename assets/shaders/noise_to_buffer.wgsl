@@ -303,46 +303,34 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
 }
 
 @stage(compute)
-@workgroup_size(64,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32) {
 
-  
-  let noise_velocity = 2.4;
-  let wave_height_factor = 0.2;
-  //let actual_global_id = work_group_id.x * 64u * 4u + local_id.x; 
+    let scene_center = vec4<f32>(vec3<f32>(noise_params.global_dim * noise_params.local_dim), 0.0) * 0.5;
 
-  let actual_global_id = global_id.x + 256u * work_group_id.x; 
+    let offset = 256u;
 
-  // let a0 = vec4<f32>(decode3Dmorton32(actual_global_id), 1.0);
-  // let a1 = vec4<f32>(decode3Dmorton32(actual_global_id + 64u), 1.0);
-  // let a2 = vec4<f32>(decode3Dmorton32(actual_global_id + 128u), 1.0);
-  // let a3 = vec4<f32>(decode3Dmorton32(actual_global_id + 192u), 1.0);
+    let noise_velocity = 2.4;
+    let wave_height_factor = 0.2;
 
-  //++ let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(global_id.x)) , 1.0) * 0.2 ; //  + a0.y ;
-  let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id))       , 1.0) * 0.2 ; //  + a0.y ;
-  let c1 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + 64u)) , 1.0) * 0.2 ; //  + a1.y ;
-  let c2 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + 128u)) , 1.0) * 0.2; //  + a2.y ;
-  let c3 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + 192u)) , 1.0) * 0.2; //  + a3.y ;
+    let actual_global_id = local_id.x + offset * 4u * work_group_id.x; 
+
+    let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id))       , 1.0);
+    let c1 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset)) , 1.0);
+    let c2 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 2u)) , 1.0);
+    let c3 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 3u)) , 1.0);
+
+    let ball0 = pow(c0.x - scene_center.x, 2.0) + pow(c0.y - scene_center.y, 2.0) + pow(c0.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
+    let ball1 = pow(c1.x - scene_center.x, 2.0) + pow(c1.y - scene_center.y, 2.0) + pow(c1.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
+    let ball2 = pow(c2.x - scene_center.x, 2.0) + pow(c2.y - scene_center.y, 2.0) + pow(c2.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
+    let ball3 = pow(c3.x - scene_center.x, 2.0) + pow(c3.y - scene_center.y, 2.0) + pow(c3.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
  
-  // noise_output.output[actual_global_id]       =  cnoise(c0 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
-  // noise_output.output[actual_global_id + 64u]  = cnoise(c1 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
-  // noise_output.output[actual_global_id + 128u] = cnoise(c2 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
-  // noise_output.output[actual_global_id + 192u] = cnoise(c3 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
-
-  //++ noise_output.output[global_id.x] = cnoise(c0);
-
-  noise_output.output[actual_global_id]        = cnoise(c0);
-  noise_output.output[actual_global_id + 64u]  = cnoise(c1);
-  noise_output.output[actual_global_id + 128u] = cnoise(c2);
-  noise_output.output[actual_global_id + 192u] = cnoise(c3);
-
-  // let noise_c = cnoise( vec4<f32>( vec3<f32>(fz, fy, fx) + vec3<f32>(noise_velocity * f32(noise_params.time)), 1.0)
-  // );
-  // let result_value = fy - 0.25 - wave_height_factor * noise_c;
-
-  // noise_output.output[global_id.x] = result_value;
+    noise_output.output[actual_global_id]               = ball0 + cnoise(c0 * 0.2) * 1300.0;
+    noise_output.output[actual_global_id + offset]      = ball1 + cnoise(c1 * 0.2) * 1300.0;
+    noise_output.output[actual_global_id + offset * 2u] = ball2 + cnoise(c2 * 0.2) * 1300.0;
+    noise_output.output[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2) * 1300.0;
 }
 

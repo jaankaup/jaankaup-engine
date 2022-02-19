@@ -29,9 +29,9 @@ pub use ev::VirtualKeyCode as Key;
 const GLOBAL_NOISE_X_DIMENSION: u32 = 1; 
 const GLOBAL_NOISE_Y_DIMENSION: u32 = 1; 
 const GLOBAL_NOISE_Z_DIMENSION: u32 = 1; 
-const LOCAL_NOISE_X_DIMENSION:  u32 = 64; 
-const LOCAL_NOISE_Y_DIMENSION:  u32 = 64; 
-const LOCAL_NOISE_Z_DIMENSION:  u32 = 64; 
+const LOCAL_NOISE_X_DIMENSION:  u32 = 128; 
+const LOCAL_NOISE_Y_DIMENSION:  u32 = 128; 
+const LOCAL_NOISE_Z_DIMENSION:  u32 = 128; 
 
 const NOISE_BUFFER_SIZE: u32 = GLOBAL_NOISE_X_DIMENSION *
                                GLOBAL_NOISE_Y_DIMENSION *
@@ -41,7 +41,7 @@ const NOISE_BUFFER_SIZE: u32 = GLOBAL_NOISE_X_DIMENSION *
                                LOCAL_NOISE_Z_DIMENSION *
                                size_of::<f32>() as u32;
 
-const MC_OUTPUT_BUFFER_SIZE: u32 = NOISE_BUFFER_SIZE * 64;
+const MC_OUTPUT_BUFFER_SIZE: u32 = NOISE_BUFFER_SIZE * 8;
 
 /// The number of vertices per chunk.
 const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
@@ -298,9 +298,9 @@ impl Application for McApp {
         ///// The mc struct. /////
 
         let mc_params = McParams {
-                base_position: [0.0, -0.2, 0.0, 0.0],
+                base_position: [0.0, 0.0, 0.0, 1.0],
                 isovalue: 0.0,
-                cube_length: 0.2,
+                cube_length: 1.0,
                 future_usage1: 0.0,
                 future_usage2: 0.0,
                 noise_global_dimension: [GLOBAL_NOISE_X_DIMENSION,
@@ -331,7 +331,7 @@ impl Application for McApp {
             &buffers.get(&"mc_output".to_string()).unwrap(),
         );
 
-        println!("creating histogram");
+        println!("creating noise compute object");
 
         let histogram = Histogram::init(&configuration.device, &vec![0; 1]);
 
@@ -460,7 +460,15 @@ impl Application for McApp {
 
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
+        println!("updating...");
         self.camera.update_from_input(&queue, &input);
+
+        let total_grid_count = GLOBAL_NOISE_X_DIMENSION *
+                               GLOBAL_NOISE_Y_DIMENSION * 
+                               GLOBAL_NOISE_Z_DIMENSION * 
+                               LOCAL_NOISE_X_DIMENSION *  
+                               LOCAL_NOISE_Y_DIMENSION * 
+                               LOCAL_NOISE_Z_DIMENSION; 
 
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
 
@@ -469,13 +477,14 @@ impl Application for McApp {
         self.noise_compute_object.dispatch(
             &self.noise_compute_bind_groups,
             &mut encoder_command,
-            1024, 1, 1, Some("noise dispatch")
-            //4096, 1, 1, Some("noise dispatch")
+            total_grid_count / 1024, 1, 1, Some("noise dispatch")
+            //1024, 1, 1, Some("noise dispatch")
+            // 4096, 1, 1, Some("noise dispatch")
             //65535, 1, 1, Some("noise dispatch")
             //NOISE_BUFFER_SIZE / (64*64*4), 1, 1, Some("noise dispatch")
         );
 
-        self.marching_cubes.dispatch(&mut encoder_command, 4096, 1, 1);
+        self.marching_cubes.dispatch(&mut encoder_command, total_grid_count / 256, 1, 1);
 
         // Submit compute.
         queue.submit(Some(encoder_command.finish()));

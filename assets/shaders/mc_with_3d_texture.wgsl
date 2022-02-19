@@ -447,7 +447,12 @@ fn fbm3(x: vec3<f32>) -> f32 {
 
 fn calculate_density(v: vec3<i32>) -> f32 {
 
-    if (v.x < 0 || v.y < 0 || v.z < 0 || v.x >= 64 || v.y >= 64 || v.z >= 64) { return 0.0; }
+    if (v.x < 0 ||
+        v.y < 0 ||
+        v.z < 0 ||
+        v.x >= i32(mc_uniform.noise_local_dimension.x) ||
+        v.y >= i32(mc_uniform.noise_local_dimension.y) ||
+        v.z >= i32(mc_uniform.noise_local_dimension.z)) { return 0.0; }
 
     // if (encode3Dmorton32(u32(v.x), u32(v.y), u32(v.z)) > 64u*64u*64u) { return 0.0; }
 
@@ -581,7 +586,7 @@ fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u
 }
 
 @stage(compute)
-@workgroup_size(64,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>,
