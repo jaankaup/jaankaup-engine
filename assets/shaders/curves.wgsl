@@ -295,20 +295,21 @@ fn from_hilbert_index(h: u32, m: u32) -> vec3<u32> {
 ///////////////////////////
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
-    var x_temp = (x | (x << 16u)) & 0x030000FFu;
-        x_temp = (x | (x <<  8u)) & 0x0300F00Fu;
-        x_temp = (x | (x <<  4u)) & 0x030C30C3u;
-        x_temp = (x | (x <<  2u)) & 0x09249249u;
+    var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
+        x_temp = (x_temp | (x_temp <<  8u)) & 0x0300F00Fu;
+        x_temp = (x_temp | (x_temp <<  4u)) & 0x030C30C3u;
+        x_temp = (x_temp | (x_temp <<  2u)) & 0x09249249u;
 
-    var y_temp = (y | (y << 16u)) & 0x030000FFu;
-        y_temp = (y | (y <<  8u)) & 0x0300F00Fu;
-        y_temp = (y | (y <<  4u)) & 0x030C30C3u;
-        y_temp = (y | (y <<  2u)) & 0x09249249u;
+    var y_temp = (y      | (y      << 16u)) & 0x030000FFu;
+        y_temp = (y_temp | (y_temp <<  8u)) & 0x0300F00Fu;
+        y_temp = (y_temp | (y_temp <<  4u)) & 0x030C30C3u;
+        y_temp = (y_temp | (y_temp <<  2u)) & 0x09249249u;
 
-    var z_temp = (z | (z << 16u)) & 0x030000FFu;
-        z_temp = (z | (z <<  8u)) & 0x0300F00Fu;
-        z_temp = (z | (z <<  4u)) & 0x030C30C3u;
-        z_temp = (z | (z <<  2u)) & 0x09249249u;
+    var z_temp = (z      | (z      << 16u)) & 0x030000FFu;
+        z_temp = (z_temp | (z_temp <<  8u)) & 0x0300F00Fu;
+        z_temp = (z_temp | (z_temp <<  4u)) & 0x030C30C3u;
+        z_temp = (z_temp | (z_temp <<  2u)) & 0x09249249u;
+
     return x_temp | (y_temp << 1u) | (z_temp << 2u);
 }
 

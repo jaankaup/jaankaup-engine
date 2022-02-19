@@ -115,8 +115,16 @@ pub struct MarchingCubes {
 
 impl MarchingCubes {
 
+    pub fn get_counter_value(&self, device:&wgpu::Device, queue: &wgpu::Queue) -> u32 {
+        self.buffer_counter.get_values(device, queue)[0]
+    }
+
+    pub fn reset_counter_value(&self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        self.buffer_counter.set_values_cpu_version(queue, &vec![0]);
+    }
+
     pub fn init_with_noise_buffer(device: &wgpu::Device,
-                                  mc_params: McParams,
+                                  mc_params: &McParams,
                                   mc_shader: &wgpu::ShaderModule,
                                   noise_buffer: &wgpu::Buffer,
                                   output_buffer: &wgpu::Buffer,
@@ -189,7 +197,7 @@ impl MarchingCubes {
 
         let mc_params_buffer = buffer_from_data::<McParams>(
                 &device,
-                &[mc_params],
+                &[*mc_params],
                 wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
                 None
         );
@@ -210,7 +218,7 @@ impl MarchingCubes {
 
         Self {
             compute_object: compute_object,
-            mc_params: mc_params,
+            mc_params: *mc_params,
             mc_params_buffer: mc_params_buffer,
             buffer_counter: histogram,
             bind_groups: bind_groups,
@@ -218,15 +226,14 @@ impl MarchingCubes {
     }
 
     pub fn dispatch(&self,
-                    device: &wgpu::Device,
                     encoder: &mut wgpu::CommandEncoder,
                     x: u32, y: u32, z: u32) {
 
-        let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Marhing cubes command encoder descriptor.") });
+        // let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Marhing cubes command encoder descriptor.") });
 
         self.compute_object.dispatch(
             &self.bind_groups,
-            &mut encoder_command,
+            encoder,
             x, y, z, Some("mc dispatch")
         );
     }

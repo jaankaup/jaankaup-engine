@@ -1,15 +1,11 @@
-// struct Counter {
-//     counter: atomic<u32>;
-// };
-
 struct McParams {
     base_position: vec4<f32>;
     isovalue: f32;
     cube_length: f32;
     for_future_usage1: f32;
     for_future_usage2: f32;
-    noise_global_dimension: vec3<u32>, 
-    noise_local_dimension: vec3<u32>, 
+    noise_global_dimension: vec3<u32>; 
+    noise_local_dimension: vec3<u32>; 
 };
 
 struct Vertex {
@@ -28,25 +24,29 @@ var<uniform> mc_uniform: McParams;
 
 @group(0)
 @binding(1)
-var<storage, read_write> counter: atomic<u32>;
+var<storage, read_write> counter: array<atomic<u32>>; // atomic<32> doesn't work!
 
 @group(0)
 @binding(2)
-var<storage, write> noise_values: array<Vertex>;
+var<storage, read> noise_values: array<f32>;
 
 @group(0)
 @binding(3)
-var<storage, write> output: array<Vertex>;
+var<storage, read_write> output: array<Vertex>;
 
 var<private> cube: Cube;
 
-let edge_info: array<vec2<i32>, 12> = array<vec2<i32>, 12>(
+//let edge_info: array<vec2<i32>, 12> = array<vec2<i32>, 12>(
+// TODO: uniform!
+var<private> edge_info: array<vec2<i32>, 12> = array<vec2<i32>, 12>(
         vec2<i32>(0,1), vec2<i32>(1,2), vec2<i32>(2,3), vec2<i32>(3,0), 
         vec2<i32>(4,5), vec2<i32>(5,6), vec2<i32>(6,7), vec2<i32>(7,4), 
         vec2<i32>(0,4), vec2<i32>(1,5), vec2<i32>(2,6), vec2<i32>(3,7)
 ); 
 
-let triTable: array<u32, 1280> = array<u32, 1280>(
+//let triTable: array<u32, 1280> = array<u32, 1280>(
+// TODO: uniform!
+var<private> triTable: array<u32, 1280> = array<u32, 1280>(
     16777215u , 16777215u , 16777215u , 16777215u , 16777215u ,
     2051u     , 16777215u , 16777215u , 16777215u , 16777215u ,
     265u      , 16777215u , 16777215u , 16777215u , 16777215u ,
@@ -305,6 +305,44 @@ let triTable: array<u32, 1280> = array<u32, 1280>(
     16777215u ,16777215u ,16777215u ,16777215u ,16777215u
 );
 
+fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
+    var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
+        x_temp = (x_temp | (x_temp <<  8u)) & 0x0300F00Fu;
+        x_temp = (x_temp | (x_temp <<  4u)) & 0x030C30C3u;
+        x_temp = (x_temp | (x_temp <<  2u)) & 0x09249249u;
+
+    var y_temp = (y      | (y      << 16u)) & 0x030000FFu;
+        y_temp = (y_temp | (y_temp <<  8u)) & 0x0300F00Fu;
+        y_temp = (y_temp | (y_temp <<  4u)) & 0x030C30C3u;
+        y_temp = (y_temp | (y_temp <<  2u)) & 0x09249249u;
+
+    var z_temp = (z      | (z      << 16u)) & 0x030000FFu;
+        z_temp = (z_temp | (z_temp <<  8u)) & 0x0300F00Fu;
+        z_temp = (z_temp | (z_temp <<  4u)) & 0x030C30C3u;
+        z_temp = (z_temp | (z_temp <<  2u)) & 0x09249249u;
+
+    return x_temp | (y_temp << 1u) | (z_temp << 2u);
+}
+
+fn get_third_bits32(m: u32) -> u32 {
+    var x = m & 0x9249249u;
+    x = (x ^ (x >> 2u))  & 0x30c30c3u;
+    x = (x ^ (x >> 4u))  & 0x300f00fu;
+    x = (x ^ (x >> 8u))  & 0x30000ffu;
+    x = (x ^ (x >> 16u)) & 0x3ffu;
+
+    return x;
+}
+
+fn decode3Dmorton32(m: u32) -> vec3<u32> {
+    return vec3<u32>(
+        get_third_bits32(m),
+        get_third_bits32(m >> 1u),
+        get_third_bits32(m >> 2u)
+   );
+}
+
+
 // Noise functions copied from https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83 and converted to wgsl.
 
 fn hash(n: f32) -> f32 {
@@ -406,41 +444,60 @@ fn fbm3(x: vec3<f32>) -> f32 {
 
 // Marching cubes.
 
-fn calculate_density(v: vec3<f32>) -> f32 {
 
-    let noise_a = fbm(v.z * 1.2);
-    let noise_b = noise3(v.zyx * 1.1);
-    let noise_c = noise((v.x + 5.0) * 1.1);
-    let noise_d = fbm2(v.yy * 0.2);
+fn calculate_density(v: vec3<i32>) -> f32 {
 
-    let heko = abs(6.0*fbm3(v*0.4));
-    let something = 1.5 * noise_a - 2.45 * noise_b - 4.5 * sin(v.z * 0.2);
-    return v.y + 0.62 * something - 0.1 * heko - 2.5 * noise_c + 5.0 * noise_d;
+    if (v.x < 0 || v.y < 0 || v.z < 0 || v.x >= 64 || v.y >= 64 || v.z >= 64) { return 0.0; }
+
+    // if (encode3Dmorton32(u32(v.x), u32(v.y), u32(v.z)) > 64u*64u*64u) { return 0.0; }
+
+    return noise_values[
+	encode3Dmorton32(
+            u32(v.x), u32(v.y), u32(v.z)
+        )
+    ];
 }
 
 fn calculate_case() -> u32 {
 
   var result: u32 = 0u;
-  result = result | (select(1u, 0u, cube.vertices[7].a < mc_uniform.isovalue) << 7u);
-  result = result | (select(1u, 0u, cube.vertices[6].a < mc_uniform.isovalue) << 6u);
-  result = result | (select(1u, 0u, cube.vertices[5].a < mc_uniform.isovalue) << 5u);
-  result = result | (select(1u, 0u, cube.vertices[4].a < mc_uniform.isovalue) << 4u);
-  result = result | (select(1u, 0u, cube.vertices[3].a < mc_uniform.isovalue) << 3u);
-  result = result | (select(1u, 0u, cube.vertices[2].a < mc_uniform.isovalue) << 2u);
-  result = result | (select(1u, 0u, cube.vertices[1].a < mc_uniform.isovalue) << 1u);
-  result = result | (select(1u, 0u, cube.vertices[0].a < mc_uniform.isovalue) << 0u);
+
+  result = result | (select(0u, 1u,  cube.vertices[7].a < mc_uniform.isovalue) << 7u);
+  result = result | (select(0u, 1u,  cube.vertices[6].a < mc_uniform.isovalue) << 6u);
+  result = result | (select(0u, 1u,  cube.vertices[5].a < mc_uniform.isovalue) << 5u);
+  result = result | (select(0u, 1u,  cube.vertices[4].a < mc_uniform.isovalue) << 4u);
+  result = result | (select(0u, 1u,  cube.vertices[3].a < mc_uniform.isovalue) << 3u);
+  result = result | (select(0u, 1u,  cube.vertices[2].a < mc_uniform.isovalue) << 2u);
+  result = result | (select(0u, 1u,  cube.vertices[1].a < mc_uniform.isovalue) << 1u);
+  result = result | (select(0u, 1u,  cube.vertices[0].a < mc_uniform.isovalue) << 0u);
 
   return result;
 }
 
-fn calculate_normal(pos: vec3<f32>) -> vec3<f32> {
+fn calculate_normal(pos: vec3<i32>) -> vec3<f32> {
 
-  let right: f32   = calculate_density(pos + vec3<f32>(mc_uniform.cube_length, 0.0, 0.0));
-  let left: f32    = calculate_density(pos - vec3<f32>(mc_uniform.cube_length, 0.0, 0.0));
-  let up: f32      = calculate_density(pos + vec3<f32>(0.0, mc_uniform.cube_length, 0.0));
-  let down: f32    = calculate_density(pos - vec3<f32>(0.0, mc_uniform.cube_length, 0.0));
-  let z_minus: f32 = calculate_density(pos + vec3<f32>(0.0, 0.0, mc_uniform.cube_length));
-  let z: f32       = calculate_density(pos - vec3<f32>(0.0, 0.0, mc_uniform.cube_length));
+  // let r = pos + vec3<f32>(1, 0, 0);
+  // let l = pos - vec3<f32>(1, 0, 0);
+  // let u = pos + vec3<f32>(0, 1, 0);
+  // let d = pos - vec3<f32>(0, 1, 0);
+  // let z_m = pos + vec3<f32>(0, 0, 1);
+  // let z_p = pos - vec3<f32>(0, 0, 1);
+
+  // var right: f32   = 0.0;
+  // var left: f32    = 0.0;
+  // var up: f32      = 0.0;
+  // var down: f32    = 0.0;
+  // var z_minus: f32 = 0.0;
+  // var z: f32       = 0.0;
+
+  // if (r < 0) 
+
+  let right: f32   = calculate_density(pos + vec3<i32>(1, 0, 0));
+  let left: f32    = calculate_density(pos - vec3<i32>(1, 0, 0));
+  let up: f32      = calculate_density(pos + vec3<i32>(0, 1, 0));
+  let down: f32    = calculate_density(pos - vec3<i32>(0, 1, 0));
+  let z_minus: f32 = calculate_density(pos + vec3<i32>(0, 0, 1));
+  let z: f32       = calculate_density(pos - vec3<i32>(0, 0, 1));
 
   var grad: vec3<f32>;
   grad.x = right - left;
@@ -456,10 +513,10 @@ fn interpolateV(va: vec4<f32>, vb: vec4<f32>) -> vec4<f32> {
     if (abs(mc_uniform.isovalue - va.w) < 0.0001) {
        return vec4<f32>(va.xyz, 1.0);
     }
-    elseif (abs(mc_uniform.isovalue - vb.w) < 0.00001) {
+    else if (abs(mc_uniform.isovalue - vb.w) < 0.00001) {
        return vec4<f32>(vb.xyz, 1.0);
     }
-    elseif (abs(va.w-vb.w) < 0.00001) {
+    else if (abs(va.w-vb.w) < 0.00001) {
        return vec4<f32>(va.xyz, 1.0);
     }
     
@@ -481,10 +538,10 @@ fn interpolateN(na: vec4<f32>, nb: vec4<f32>, densityA: f32, densityB: f32) -> v
     if (abs(mc_uniform.isovalue - densityA) < 0.00001) {
         return vec4<f32>(normalize(na.xyz), 0.0);
     }
-    elseif (abs(mc_uniform.isovalue - densityB) < 0.00001) {
+    else if (abs(mc_uniform.isovalue - densityB) < 0.00001) {
         return vec4<f32>(normalize(nb.xyz), 0.0);
      }
-    elseif (abs(densityA-densityB) < 0.00001) {
+    else if (abs(densityA-densityB) < 0.00001) {
         return vec4<f32>(normalize(na.xyz), 0.0);
      }
      
@@ -500,8 +557,7 @@ fn interpolateN(na: vec4<f32>, nb: vec4<f32>, densityA: f32, densityB: f32) -> v
 fn createVertex(edgeValue: i32, arrayIndex: i32) {
 
     let edge = edge_info[edgeValue];
-
-    // TODO: ptr when its implemented.
+ 
     let vert_a: vec4<f32> = cube.vertices[edge.x];
     let vert_b: vec4<f32> = cube.vertices[edge.y];
 
@@ -510,7 +566,18 @@ fn createVertex(edgeValue: i32, arrayIndex: i32) {
     v.v = interpolateV(vert_a, vert_b);
     v.n = interpolateN(cube.normals[edge.x], cube.normals[edge.y], vert_a.a, vert_b.a);
 
-    output.data[arrayIndex] = v;
+    output[arrayIndex] = v;
+}
+
+fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u32> {
+	var index: u32 = global_index.x;
+	var wh: u32 = x_dim * y_dim;
+	let z: u32 = index / wh;
+	index = index - z * wh;
+	let y: u32 = index / x_dim;
+	index = index - y * x_dim;
+	let x: u32 = index;
+	return vec3<u32>(x, y, z);	
 }
 
 @stage(compute)
@@ -520,5 +587,76 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32) {
 
+    // Create and scale cube base position.
+    // let coordinate3D = vec3<i32>(decode3Dmorton32(global_id.x + 65536u * global_id.y));
+    let coordinate3D = vec3<i32>(decode3Dmorton32(global_id.x));
 
+    //let position = vec3<f32>(f32(global_id.x), f32(global_id.y), f32(global_id.z)) * mc_uniform.cube_length + mc_uniform.base_position.xyz;
+    let position = coordinate3D; //global_id.x + 65536 * global_id.y;
+
+    // Create cube corner coordinates. 
+    // let p0 = position;
+    // let p3 = position + vec3<f32>(0.0                      , mc_uniform.cube_length   , 0.0);
+    // let p2 = position + vec3<f32>(mc_uniform.cube_length   , mc_uniform.cube_length   , 0.0);
+    // let p1 = position + vec3<f32>(mc_uniform.cube_length   , 0.0                      , 0.0);
+    // let p4 = position + vec3<f32>(0.0                      , 0.0                      , mc_uniform.cube_length);
+    // let p7 = position + vec3<f32>(0.0                      , mc_uniform.cube_length   , mc_uniform.cube_length);
+    // let p6 = position + vec3<f32>(mc_uniform.cube_length   , mc_uniform.cube_length   , mc_uniform.cube_length);
+    // let p5 = position + vec3<f32>(mc_uniform.cube_length   , 0.0                      , mc_uniform.cube_length);
+
+    let p0 = position;
+    let p3 = position + vec3<i32>(0 , 1 , 0);
+    let p2 = position + vec3<i32>(1 , 1 , 0);
+    let p1 = position + vec3<i32>(1 , 0 , 0);
+    let p4 = position + vec3<i32>(0 , 0 , 1);
+    let p7 = position + vec3<i32>(0 , 1 , 1);
+    let p6 = position + vec3<i32>(1 , 1 , 1);
+    let p5 = position + vec3<i32>(1 , 0 , 1);
+
+    // Cube corner positions and density values.
+    cube.vertices[0] = vec4<f32>(vec3<f32>(p0) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p0));
+    cube.vertices[1] = vec4<f32>(vec3<f32>(p1) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p1));
+    cube.vertices[2] = vec4<f32>(vec3<f32>(p2) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p2));
+    cube.vertices[3] = vec4<f32>(vec3<f32>(p3) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p3));
+    cube.vertices[4] = vec4<f32>(vec3<f32>(p4) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p4));
+    cube.vertices[5] = vec4<f32>(vec3<f32>(p5) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p5));
+    cube.vertices[6] = vec4<f32>(vec3<f32>(p6) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p6));
+    cube.vertices[7] = vec4<f32>(vec3<f32>(p7) * mc_uniform.cube_length + mc_uniform.base_position.xyz, calculate_density(p7));
+    
+    // Calculate the cube case number.
+    let cube_case = calculate_case();
+      
+    // This cube doesn't create any triangles.
+    if (cube_case == 0u || cube_case == 255u) { return; }
+
+    // Calculate normals for cube corners.
+    cube.normals[0] = vec4<f32>(calculate_normal(p0), 0.0);
+    cube.normals[1] = vec4<f32>(calculate_normal(p1), 0.0);
+    cube.normals[2] = vec4<f32>(calculate_normal(p2), 0.0);
+    cube.normals[3] = vec4<f32>(calculate_normal(p3), 0.0);
+    cube.normals[4] = vec4<f32>(calculate_normal(p4), 0.0);
+    cube.normals[5] = vec4<f32>(calculate_normal(p5), 0.0);
+    cube.normals[6] = vec4<f32>(calculate_normal(p6), 0.0);
+    cube.normals[7] = vec4<f32>(calculate_normal(p7), 0.0);
+
+    let OFFSET: u32 = 5u;
+
+    var i: u32 = 0u;
+
+    loop {
+ 	if (i == 5u) { break; }
+
+        let base_index: u32 = triTable[cube_case * OFFSET + i];
+
+        if (base_index != 16777215u) { 
+
+            let index = atomicAdd(&counter[0], 3u);
+
+            // Create the triangle vertices and normals.
+            createVertex(i32((base_index & 0xff0000u) >> 16u), i32(index));
+            createVertex(i32((base_index & 0xff00u) >> 8u)   , i32(index+1u));
+            createVertex(i32( base_index & 0xffu),            i32(index+2u));
+        }
+	i = i + 1u;
+    }
 }

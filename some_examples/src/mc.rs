@@ -20,6 +20,7 @@ use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
 use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_algorithms::histogram::Histogram;
+use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use bytemuck::{Pod, Zeroable};
 
 use winit::event as ev;
@@ -28,9 +29,9 @@ pub use ev::VirtualKeyCode as Key;
 const GLOBAL_NOISE_X_DIMENSION: u32 = 1; 
 const GLOBAL_NOISE_Y_DIMENSION: u32 = 1; 
 const GLOBAL_NOISE_Z_DIMENSION: u32 = 1; 
-const LOCAL_NOISE_X_DIMENSION:  u32 = 256; 
-const LOCAL_NOISE_Y_DIMENSION:  u32 = 256; 
-const LOCAL_NOISE_Z_DIMENSION:  u32 = 256; 
+const LOCAL_NOISE_X_DIMENSION:  u32 = 64; 
+const LOCAL_NOISE_Y_DIMENSION:  u32 = 64; 
+const LOCAL_NOISE_Z_DIMENSION:  u32 = 64; 
 
 const NOISE_BUFFER_SIZE: u32 = GLOBAL_NOISE_X_DIMENSION *
                                GLOBAL_NOISE_Y_DIMENSION *
@@ -39,6 +40,8 @@ const NOISE_BUFFER_SIZE: u32 = GLOBAL_NOISE_X_DIMENSION *
                                LOCAL_NOISE_Y_DIMENSION *
                                LOCAL_NOISE_Z_DIMENSION *
                                size_of::<f32>() as u32;
+
+const MC_OUTPUT_BUFFER_SIZE: u32 = NOISE_BUFFER_SIZE * 64;
 
 /// The number of vertices per chunk.
 const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
@@ -57,9 +60,9 @@ struct NoiseParams {
     _pad: [u32; 3],
 }
 
-struct McFeatures {}
+struct McAppFeatures {}
 
-impl WGPUFeatures for McFeatures {
+impl WGPUFeatures for McAppFeatures {
     fn optional_features() -> wgpu::Features {
         wgpu::Features::empty()
     }
@@ -75,7 +78,7 @@ impl WGPUFeatures for McFeatures {
 }
 
 // State for this application.
-struct Mc {
+struct McApp {
     pub screen: ScreenTexture, 
     pub render_object: RenderObject, 
     pub render_bind_groups: Vec<wgpu::BindGroup>,
@@ -88,9 +91,10 @@ struct Mc {
     pub draw_count: u32,
     // pub visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
+    pub marching_cubes: MarchingCubes,
 }
 
-impl Mc {
+impl McApp {
 
         fn create_textures(configuration: &WGPUConfiguration, textures: &mut HashMap<String, Texture>) {
         log::info!("Creating textures.");
@@ -134,8 +138,7 @@ impl Mc {
     }
 }
 
-impl Application for Mc {
-
+impl Application for McApp {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
@@ -229,10 +232,11 @@ impl Application for Mc {
                             }
                         ]
                     ],
-                    Some("Debug visualizator vvvvnnnn renderer with camera.")
+                    Some("vvvvnnnn renderer with camera."),
+                    false
         );
 
-        Mc::create_textures(&configuration, &mut textures);
+        McApp::create_textures(&configuration, &mut textures);
 
         let render_bind_groups = create_bind_groups(
                                      &configuration.device,
@@ -244,76 +248,16 @@ impl Application for Mc {
                                                  offset: 0,
                                                  size: None,
                                          })],
-                                        vec![&wgpu::BindingResource::TextureView(&textures.get("slime").unwrap().view),
-                                             &wgpu::BindingResource::Sampler(&textures.get("slime").unwrap().sampler),
-                                             &wgpu::BindingResource::TextureView(&textures.get("slime2").unwrap().view),
-                                             &wgpu::BindingResource::Sampler(&textures.get("slime2").unwrap().sampler)
+                                        vec![&wgpu::BindingResource::TextureView(&textures.get("grass").unwrap().view),
+                                             &wgpu::BindingResource::Sampler(&textures.get("grass").unwrap().sampler),
+                                             &wgpu::BindingResource::TextureView(&textures.get("rock").unwrap().view),
+                                             &wgpu::BindingResource::Sampler(&textures.get("rock").unwrap().sampler)
                                         ]
                                      ]
         );
 
         println!("Creating compute object.");
 
-        let histogram = Histogram::init(&configuration.device, &vec![0; 1]);
-
-        //++ let params = VisualizationParams {
-        //++     curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
-        //++     iterator_start_index: 0,
-        //++     iterator_end_index: 4096,
-        //++     //iterator_end_index: 32768,
-        //++     arrow_size: 0.3,
-        //++     thread_mode: 0,
-        //++     thread_mode_start_index: 0,
-        //++     thread_mode_end_index: 0,
-        //++     _padding: 0,
-        //++ };
-
-        //++ let temp_params = VisualizationParams {
-        //++     curve_number: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
-        //++     iterator_start_index: 0,
-        //++     iterator_end_index: THREAD_COUNT,
-        //++     //iterator_end_index: 32768,
-        //++     arrow_size: 0.3,
-        //++     thread_mode: 1,
-        //++     thread_mode_start_index: 0,
-        //++     thread_mode_end_index: 0,
-        //++     _padding: 0,
-        //++ };
-
-        //++ buffers.insert(
-        //++     "visualization_params".to_string(),
-        //++     buffer_from_data::<VisualizationParams>(
-        //++     &configuration.device,
-        //++     &vec![params],
-        //++     wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //++     None)
-        //++ );
-
-        //++ buffers.insert(
-        //++     "debug_arrays".to_string(),
-        //++     buffer_from_data::<Arrow>(
-        //++         &configuration.device,
-        //++         &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
-        //++                       end_pos:   [4.0, 3.0, 0.0, 1.0],
-        //++                       color: encode_rgba_u32(0, 0, 255, 255),
-        //++                       size: 0.2,
-        //++                       _padding: [0, 0]}],
-        //++         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //++         Some("Debug array buffer")
-        //++     )
-        //++ );
-
-        //++ buffers.insert(
-        //++     "output".to_string(),
-        //++     configuration.device.create_buffer(&wgpu::BufferDescriptor {
-        //++         label: Some("draw buffer"),
-        //++         size: VERTEX_BUFFER_SIZE as u64, 
-        //++         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //++         mapped_at_creation: false,
-        //++     })
-        //++ );
-        //
-        
         let noise_params = NoiseParams {
             global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION, 0],
             local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION, 0],
@@ -340,6 +284,57 @@ impl Application for Mc {
             })
         );
 
+        buffers.insert(
+            "mc_output".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Mc output buffer"),
+                size: MC_OUTPUT_BUFFER_SIZE as u64, 
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        );
+        
+
+        ///// The mc struct. /////
+
+        let mc_params = McParams {
+                base_position: [0.0, -0.2, 0.0, 0.0],
+                isovalue: 0.0,
+                cube_length: 0.2,
+                future_usage1: 0.0,
+                future_usage2: 0.0,
+                noise_global_dimension: [GLOBAL_NOISE_X_DIMENSION,
+                                         GLOBAL_NOISE_Y_DIMENSION,
+                                         GLOBAL_NOISE_Z_DIMENSION,
+                                         0
+                ],
+                noise_local_dimension: [LOCAL_NOISE_X_DIMENSION,
+                                         LOCAL_NOISE_Y_DIMENSION,
+                                         LOCAL_NOISE_Z_DIMENSION,
+                                         0
+                ],
+        };
+
+        println!("compiling mc shader");
+        let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("mc compute shader"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),
+                        }
+        );
+
+        let mc_instance = MarchingCubes::init_with_noise_buffer(
+            &configuration.device,
+            &mc_params,
+            &mc_shader,
+            &buffers.get(&"noise_output".to_string()).unwrap(),
+            &buffers.get(&"mc_output".to_string()).unwrap(),
+        );
+
+        println!("creating histogram");
+
+        let histogram = Histogram::init(&configuration.device, &vec![0; 1]);
+
         let noise_compute_object =
                 ComputeObject::init(
                     &configuration.device,
@@ -349,7 +344,7 @@ impl Application for Mc {
                             Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),
                     
                     }),
-                    Some("Visualizer Compute object"),
+                    Some("Noise compute object"),
                     &vec![
                         vec![
                             // @group(0)
@@ -413,6 +408,7 @@ impl Application for Mc {
             draw_count: 0,
             // visualization_params: params,
             keys: keys,
+            marching_cubes: mc_instance,
         }
     }
 
@@ -422,32 +418,35 @@ impl Application for Mc {
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration) {
 
-        // self.screen.acquire_screen_texture(
-        //     &device,
-        //     &sc_desc,
-        //     &surface
-        // );
+        self.screen.acquire_screen_texture(
+            &device,
+            &sc_desc,
+            &surface
+        );
 
-        // let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // let clear = true;
+        let clear = true;
 
-            // draw(&mut encoder_render,
-            //      &view,
-            //      self.screen.depth_texture.as_ref().unwrap(),
-            //      &self.render_bind_groups,
-            //      &self.render_object.pipeline,
-            //      &self.buffers.get("output").unwrap(),
-            //      0..self.draw_count, 
-            //      clear
-            // );
-            // queue.submit(Some(encoder_render.finish()));
-            // self.histogram.set_values_cpu_version(queue, &vec![0]);
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
 
-        // self.screen.prepare_for_rendering();
+        println!("self.draw_count = {}", self.draw_count);
+        draw(&mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_bind_groups,
+             &self.render_object.pipeline,
+             &self.buffers.get("mc_output").unwrap(),
+             0..self.draw_count, 
+             clear
+        );
+        queue.submit(Some(encoder.finish()));
+        self.histogram.set_values_cpu_version(queue, &vec![0]);
+
+        self.screen.prepare_for_rendering();
 
         // Reset counter.
-        // self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
+        self.marching_cubes.reset_counter_value(device, queue);
     }
 
     #[allow(unused)]
@@ -462,11 +461,34 @@ impl Application for Mc {
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
+
+        let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
+
+        println!("{}", NOISE_BUFFER_SIZE / (64*64*4));
+
+        self.noise_compute_object.dispatch(
+            &self.noise_compute_bind_groups,
+            &mut encoder_command,
+            1024, 1, 1, Some("noise dispatch")
+            //4096, 1, 1, Some("noise dispatch")
+            //65535, 1, 1, Some("noise dispatch")
+            //NOISE_BUFFER_SIZE / (64*64*4), 1, 1, Some("noise dispatch")
+        );
+
+        self.marching_cubes.dispatch(&mut encoder_command, 4096, 1, 1);
+
+        // Submit compute.
+        queue.submit(Some(encoder_command.finish()));
+
+        self.draw_count = self.marching_cubes.get_counter_value(device, queue);
+
+        // let counter = self.histogram.get_values(device, queue);
+        // self.draw_count = counter[0] * 3;
     }
 }
 
 fn main() {
     
-    jaankaup_core::template::run_loop::<Mc, BasicLoop, McFeatures>(); 
+    jaankaup_core::template::run_loop::<McApp, BasicLoop, McAppFeatures>(); 
     println!("Finished...");
 }

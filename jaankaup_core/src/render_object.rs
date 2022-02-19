@@ -15,11 +15,13 @@ impl ComputeObject {
             ) -> Self {
 
 
+        println!("1");
         let bind_group_layouts = create_bind_group_layouts(device, bind_group_layout_entries);
 
         // TODO: create labeling.
         // let pipeline_layout_label = format!("{} {}", label.push_str(" pipeline_layout");
 
+        println!("2");
         // Create pipeline layout.
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: label,
@@ -27,6 +29,7 @@ impl ComputeObject {
             push_constant_ranges: &[],
         });
 
+        println!("3");
         // Create the pipeline.
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: label,
@@ -34,6 +37,7 @@ impl ComputeObject {
             module: &wgsl_module,
             entry_point: "main",
         });
+        println!("4");
 
         Self {
             bind_group_layouts: bind_group_layouts,
@@ -68,6 +72,7 @@ impl RenderObject {
                 vertex_attributes: &Vec<wgpu::VertexFormat>,
                 bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
                 label: wgpu::Label,
+                ccw: bool,
                 ) -> Self {
 
         let bind_group_layouts = create_bind_group_layouts(device, bind_group_layout_entries);
@@ -100,7 +105,7 @@ impl RenderObject {
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
+                front_face: if ccw { wgpu::FrontFace::Ccw } else { wgpu::FrontFace::Cw },
                 cull_mode: Some(wgpu::Face::Back),
                 // cull_mode: Some(wgpu::Face::Front),
                 unclipped_depth: false, // ???
@@ -331,22 +336,3 @@ pub fn draw(encoder: &mut wgpu::CommandEncoder,
     
     render_pass.draw(range, 0..1);
 }
-
-// pub fn create_bind_group_layouts(device: &wgpu::Device,
-//                                  bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>)
-//                                  -> Vec<wgpu::BindGroupLayout> {
-// 
-//     let mut bind_group_layouts: Vec<wgpu::BindGroupLayout> = Vec::new();
-//     
-//     for ve in bind_group_layout_entries.iter() {
-//         bind_group_layouts.push(
-//             device.create_bind_group_layout(
-//                 &wgpu::BindGroupLayoutDescriptor {
-//                     entries: &ve,
-//                     label: None,
-//                 }
-//             )
-//         );
-//     }
-//     bind_group_layouts
-// }

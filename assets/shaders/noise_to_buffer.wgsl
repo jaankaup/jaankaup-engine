@@ -267,20 +267,20 @@ fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u
 }
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
-    var x_temp = (x | (x << 16u)) & 0x030000FFu;
-        x_temp = (x | (x <<  8u)) & 0x0300F00Fu;
-        x_temp = (x | (x <<  4u)) & 0x030C30C3u;
-        x_temp = (x | (x <<  2u)) & 0x09249249u;
+    var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
+        x_temp = (x_temp | (x_temp <<  8u)) & 0x0300F00Fu;
+        x_temp = (x_temp | (x_temp <<  4u)) & 0x030C30C3u;
+        x_temp = (x_temp | (x_temp <<  2u)) & 0x09249249u;
 
-    var y_temp = (y | (y << 16u)) & 0x030000FFu;
-        y_temp = (y | (y <<  8u)) & 0x0300F00Fu;
-        y_temp = (y | (y <<  4u)) & 0x030C30C3u;
-        y_temp = (y | (y <<  2u)) & 0x09249249u;
+    var y_temp = (y      | (y      << 16u)) & 0x030000FFu;
+        y_temp = (y_temp | (y_temp <<  8u)) & 0x0300F00Fu;
+        y_temp = (y_temp | (y_temp <<  4u)) & 0x030C30C3u;
+        y_temp = (y_temp | (y_temp <<  2u)) & 0x09249249u;
 
-    var z_temp = (z | (z << 16u)) & 0x030000FFu;
-        z_temp = (z | (z <<  8u)) & 0x0300F00Fu;
-        z_temp = (z | (z <<  4u)) & 0x030C30C3u;
-        z_temp = (z | (z <<  2u)) & 0x09249249u;
+    var z_temp = (z      | (z      << 16u)) & 0x030000FFu;
+        z_temp = (z_temp | (z_temp <<  8u)) & 0x0300F00Fu;
+        z_temp = (z_temp | (z_temp <<  4u)) & 0x030C30C3u;
+        z_temp = (z_temp | (z_temp <<  2u)) & 0x09249249u;
     return x_temp | (y_temp << 1u) | (z_temp << 2u);
 }
 
@@ -309,23 +309,40 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32) {
 
-  let coordinate3D = decode3Dmorton32(global_id.x);
- 
-  let fx = f32(coordinate3D.x) * 0.06;
-  let fy = f32(coordinate3D.y) * 0.06;
-  let fz = f32(coordinate3D.z) * 0.06;
-
-  let noise_velocity = 0.4;
+  
+  let noise_velocity = 2.4;
   let wave_height_factor = 0.2;
+  //let actual_global_id = work_group_id.x * 64u * 4u + local_id.x; 
 
-  let noise_c = cnoise(
-        vec4<f32>(
-            vec3<f32>(fz, fy, fx) +
-            vec3<f32>(noise_velocity * f32(noise_params.time)),
-        1.0)
-  );
-  let result_value = fy - 0.25 - wave_height_factor * noise_c;
+  let actual_global_id = global_id.x + 256u * work_group_id.x; 
 
-  noise_output.output[global_id.x] = result_value;
+  // let a0 = vec4<f32>(decode3Dmorton32(actual_global_id), 1.0);
+  // let a1 = vec4<f32>(decode3Dmorton32(actual_global_id + 64u), 1.0);
+  // let a2 = vec4<f32>(decode3Dmorton32(actual_global_id + 128u), 1.0);
+  // let a3 = vec4<f32>(decode3Dmorton32(actual_global_id + 192u), 1.0);
+
+  //++ let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(global_id.x)) , 1.0) * 0.2 ; //  + a0.y ;
+  let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id))       , 1.0) * 0.2 ; //  + a0.y ;
+  let c1 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + 64u)) , 1.0) * 0.2 ; //  + a1.y ;
+  let c2 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + 128u)) , 1.0) * 0.2; //  + a2.y ;
+  let c3 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + 192u)) , 1.0) * 0.2; //  + a3.y ;
+ 
+  // noise_output.output[actual_global_id]       =  cnoise(c0 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
+  // noise_output.output[actual_global_id + 64u]  = cnoise(c1 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
+  // noise_output.output[actual_global_id + 128u] = cnoise(c2 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
+  // noise_output.output[actual_global_id + 192u] = cnoise(c3 + vec4<f32>(noise_velocity, 1.0, 1.0, 1.0));
+
+  //++ noise_output.output[global_id.x] = cnoise(c0);
+
+  noise_output.output[actual_global_id]        = cnoise(c0);
+  noise_output.output[actual_global_id + 64u]  = cnoise(c1);
+  noise_output.output[actual_global_id + 128u] = cnoise(c2);
+  noise_output.output[actual_global_id + 192u] = cnoise(c3);
+
+  // let noise_c = cnoise( vec4<f32>( vec3<f32>(fz, fy, fx) + vec3<f32>(noise_velocity * f32(noise_params.time)), 1.0)
+  // );
+  // let result_value = fy - 0.25 - wave_height_factor * noise_c;
+
+  // noise_output.output[global_id.x] = result_value;
 }
 
