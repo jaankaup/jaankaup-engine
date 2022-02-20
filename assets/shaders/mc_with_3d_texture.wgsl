@@ -507,7 +507,8 @@ fn calculate_normal(pos: vec3<i32>) -> vec3<f32> {
   var grad: vec3<f32>;
   grad.x = right - left;
   grad.y = up - down;
-  grad.z = z - z_minus;
+  grad.z = z_minus - z;
+  //grad.z = z - z_minus;
   return normalize(grad); // TODO: check if is this necessery
 }
 
