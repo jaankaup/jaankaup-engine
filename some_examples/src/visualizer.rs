@@ -133,6 +133,8 @@ struct DebugVisualizator {
     pub screen: ScreenTexture, 
     pub render_object: RenderObject, 
     pub render_bind_groups: Vec<wgpu::BindGroup>,
+    pub render_object_vvvc: RenderObject,
+    pub render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     pub compute_object: ComputeObject, 
     pub compute_bind_groups: Vec<wgpu::BindGroup>,
     // pub _textures: HashMap<String, Texture>,
@@ -212,7 +214,8 @@ impl Application for DebugVisualizator {
                         ],
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
-                    true
+                    true,
+                    wgpu::PrimitiveTopology::TriangleList
         );
         let render_bind_groups = create_bind_groups(
                                      &configuration.device,
@@ -254,7 +257,8 @@ impl Application for DebugVisualizator {
                         ],
                     ],
                     Some("Debug visualizator vvvc renderer with camera."),
-                    true
+                    true,
+                    wgpu::PrimitiveTopology::PointList
         );
         let render_bind_groups_vvvc = create_bind_groups(
                                      &configuration.device,
@@ -429,6 +433,8 @@ impl Application for DebugVisualizator {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
             render_bind_groups: render_bind_groups,
+            render_object_vvvc: render_object_vvvc,
+            render_bind_groups_vvvc: render_bind_groups_vvvc,
             compute_object: compute_object,
             compute_bind_groups: compute_bind_groups,
             // _textures: textures,
@@ -471,7 +477,7 @@ impl Application for DebugVisualizator {
             self.compute_object.dispatch(
                 &self.compute_bind_groups,
                 &mut encoder_command,
-                dispatch_x, 1, 1, Some("aabb dispatch")
+                dispatch_x, 1, 1, Some("font visualizer dispatch")
             );
 
             // Submit compute.
@@ -479,6 +485,7 @@ impl Application for DebugVisualizator {
 
             let counter = self.histogram.get_values(device, queue);
             self.draw_count = counter[0];
+            println!("self.draw_count  == {}", self.draw_count); 
 
             let mut encoder_render = device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor {
@@ -491,8 +498,8 @@ impl Application for DebugVisualizator {
             draw(&mut encoder_render,
                  &view,
                  self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_bind_groups,
-                 &self.render_object.pipeline,
+                 &self.render_bind_groups_vvvc,
+                 &self.render_object_vvvc.pipeline,
                  &self.buffers.get("output").unwrap(),
                  0..self.draw_count, // TODO: Cube 
                  clear
@@ -522,66 +529,66 @@ impl Application for DebugVisualizator {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
 
-        if self.keys.test_key(&Key::L, input) { 
-            self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-            self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        }
-        if self.keys.test_key(&Key::K, input) { 
-            self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
-            self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
-        }
-        if self.keys.test_key(&Key::Key1, input) { 
-            self.visualization_params.max_local_vertex_capacity = 1;  
-            self.temp_visualization_params.max_local_vertex_capacity = 1;  
-        }
-        if self.keys.test_key(&Key::Key2, input) { 
-            self.visualization_params.max_local_vertex_capacity = 2;
-            self.temp_visualization_params.max_local_vertex_capacity = 2;  
-        }
-        if self.keys.test_key(&Key::Key3, input) { 
-            self.visualization_params.max_local_vertex_capacity = 3;  
-            self.temp_visualization_params.max_local_vertex_capacity = 3;  
-        }
-        if self.keys.test_key(&Key::Key4, input) { 
-            self.visualization_params.max_local_vertex_capacity = 4;  
-            self.temp_visualization_params.max_local_vertex_capacity = 4;  
-        }
-        if self.keys.test_key(&Key::Key9, input) { 
-            self.block64mode = true;  
-        }
-        if self.keys.test_key(&Key::Key0, input) { 
-            self.block64mode = false;  
-        }
-        if self.keys.test_key(&Key::NumpadSubtract, input) { 
-        //if self.keys.test_key(&Key::T, input) { 
-            let si = self.temp_visualization_params.iterator_start_index as i32;
-            if si >= THREAD_COUNT as i32 {
-                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
-                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
-            }
-        }
-        if self.keys.test_key(&Key::NumpadAdd, input) { 
-            let ei = self.temp_visualization_params.iterator_end_index;
-            if ei <= 4096 - THREAD_COUNT {
-                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
-                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
-            }
-        }
+        // if self.keys.test_key(&Key::L, input) { 
+        //     self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+        //     self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+        // }
+        // if self.keys.test_key(&Key::K, input) { 
+        //     self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
+        //     self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
+        // }
+        // if self.keys.test_key(&Key::Key1, input) { 
+        //     self.visualization_params.max_local_vertex_capacity = 1;  
+        //     self.temp_visualization_params.max_local_vertex_capacity = 1;  
+        // }
+        // if self.keys.test_key(&Key::Key2, input) { 
+        //     self.visualization_params.max_local_vertex_capacity = 2;
+        //     self.temp_visualization_params.max_local_vertex_capacity = 2;  
+        // }
+        // if self.keys.test_key(&Key::Key3, input) { 
+        //     self.visualization_params.max_local_vertex_capacity = 3;  
+        //     self.temp_visualization_params.max_local_vertex_capacity = 3;  
+        // }
+        // if self.keys.test_key(&Key::Key4, input) { 
+        //     self.visualization_params.max_local_vertex_capacity = 4;  
+        //     self.temp_visualization_params.max_local_vertex_capacity = 4;  
+        // }
+        // if self.keys.test_key(&Key::Key9, input) { 
+        //     self.block64mode = true;  
+        // }
+        // if self.keys.test_key(&Key::Key0, input) { 
+        //     self.block64mode = false;  
+        // }
+        // if self.keys.test_key(&Key::NumpadSubtract, input) { 
+        // //if self.keys.test_key(&Key::T, input) { 
+        //     let si = self.temp_visualization_params.iterator_start_index as i32;
+        //     if si >= THREAD_COUNT as i32 {
+        //         self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
+        //         self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
+        //     }
+        // }
+        // if self.keys.test_key(&Key::NumpadAdd, input) { 
+        //     let ei = self.temp_visualization_params.iterator_end_index;
+        //     if ei <= 4096 - THREAD_COUNT {
+        //         self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
+        //         self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
+        //     }
+        // }
 
-        if self.block64mode {
-            queue.write_buffer(
-                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-                0,
-                bytemuck::cast_slice(&[self.temp_visualization_params])
-            );
-        }
-        else {
-            queue.write_buffer(
-                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-                0,
-                bytemuck::cast_slice(&[self.visualization_params])
-            );
-        }
+        // if self.block64mode {
+        //     queue.write_buffer(
+        //         &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+        //         0,
+        //         bytemuck::cast_slice(&[self.temp_visualization_params])
+        //     );
+        // }
+        // else {
+        //     queue.write_buffer(
+        //         &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+        //         0,
+        //         bytemuck::cast_slice(&[self.visualization_params])
+        //     );
+        // }
     }
 }
 

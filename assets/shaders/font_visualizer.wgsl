@@ -68,23 +68,23 @@ let PI: f32 = 3.14159265358979323846;
 // FONT STUFF
 
 var<private> bez_indices: array<u32, 17> = array<u32, 17>(
-    1953524840u,
-    4278978564u,
-    4279768080u,
-    4294909980u,
-    4281083940u,
-    4281873456u,
-    4282662972u,
-    4294920240u,
-    1481920588u,
-    4284768348u,
-    4294967040u,
-    4294930536u,
-    4294931564u,
-    2694617236u,
-    2223012984u,
-    4287663240u,
-    4294967295u
+	1953524840u,
+	4278978564u,
+	4279768080u,
+	4294909980u,
+	4281083940u,
+	4281873456u,
+	4282662972u,
+	4294920240u,
+	1481920588u,
+	4284768348u,
+	4294967040u,
+	4294930536u,
+	4294931564u,
+	2694617236u,
+	2223012984u,
+	4287663240u,
+	4294967295u,
 );
 
 var<private> bez_table: array<vec4<f32>, 164> = array<vec4<f32>, 164>(
@@ -420,7 +420,8 @@ fn bezier_4c(n: u32, c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>,
         let mt3 = mt2 * mt;
         let result = c0.xyz * mt3 + c1.xyz * 3.0 * mt2*t + c2.xyz * 3.0 * mt*t2 + c3.xyz * t3;
         let dist = min(max(1.0, distance(camera.pos.xyz, result)), 255.0);
-        output[index] = vec4<f32>(
+        // output[index] = vec4<f32>(
+        output[index + u32(i)] = vec4<f32>(
             result, 
             f32(rgba_u32(
                 r,
@@ -476,4 +477,23 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         	     255.0, 
         	     f32(actual_index)
     );
+ 
+    if (global_id.x == 0u) {
+         create_char(0u, 400u, vec4<f32>(0.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(1u, 400u, vec4<f32>(1.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(2u, 400u, vec4<f32>(2.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(3u, 400u, vec4<f32>(3.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(4u, 400u, vec4<f32>(4.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(5u, 400u, vec4<f32>(5.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(6u, 400u, vec4<f32>(6.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(7u, 400u, vec4<f32>(7.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(8u, 400u, vec4<f32>(8.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(9u, 400u, vec4<f32>(9.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(10u, 400u, vec4<f32>(10.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(11u, 400u, vec4<f32>(11.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(12u, 400u, vec4<f32>(12.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(13u, 400u, vec4<f32>(13.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(14u, 400u, vec4<f32>(14.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(15u, 400u, vec4<f32>(15.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+    }
 }

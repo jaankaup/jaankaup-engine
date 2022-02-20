@@ -73,6 +73,7 @@ impl RenderObject {
                 bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
                 label: wgpu::Label,
                 ccw: bool,
+                topology: wgpu::PrimitiveTopology,
                 ) -> Self {
 
         let bind_group_layouts = create_bind_group_layouts(device, bind_group_layout_entries);
@@ -103,7 +104,8 @@ impl RenderObject {
                     }],
             },
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
+                //topology: wgpu::PrimitiveTopology::TriangleList,
+                topology: topology,
                 strip_index_format: None,
                 front_face: if ccw { wgpu::FrontFace::Ccw } else { wgpu::FrontFace::Cw },
                 cull_mode: Some(wgpu::Face::Back),
