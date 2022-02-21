@@ -1,7 +1,6 @@
 struct VertexOutput {
-    @builtin(position) my_pos: vec4<f32>;
-    @location(0) pos: vec3<f32>;
-    @location(1) @interpolate(flat) col: u32;
+    @builtin(position) final_pos: vec4<f32>;
+    @location(0) @interpolate(flat) col: vec4<f32>;
 };
 
 struct Camera {
@@ -22,15 +21,14 @@ fn decode_color(c: u32) -> vec4<f32> {
 }
 
 @stage(vertex)
-fn vs_main(@location(0) pos: vec3<f32>, @location(1) @interpolate(flat) col: u32) -> VertexOutput {
-    var out: VertexOutput;
-    out.my_pos = camerauniform.u_view_proj * vec4<f32>(pos, 1.0);
-    out.pos = pos;
-    out.col = col;
-    return out;
+fn vs_main(@location(0) pos: vec3<f32>, @location(1) col: u32) -> VertexOutput {
+    return VertexOutput(
+                 camerauniform.u_view_proj * vec4<f32>(pos, 1.0),
+                 decode_color(col)
+    );
 }
 
 @stage(fragment)
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(decode_color(in.col).xyz, 1.0);
+    return in.col;
 }

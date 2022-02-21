@@ -27,6 +27,11 @@ struct Vertex {
     n: vec4<f32>;
 };
 
+struct VVVC {
+    pos: vec3<f32>;
+    col: u32;
+};
+
 type Hexaedra = array<Vertex , 8>;
 
 struct Arrow {
@@ -60,7 +65,7 @@ var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
 @binding(4)
-var<storage,read_write> output: array<vec4<f32>>;
+var<storage,read_write> output: array<VVVC>;
 
 let STRIDE: u32 = 64u;
 let PI: f32 = 3.14159265358979323846;
@@ -403,7 +408,7 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 
 /// FONT STUFF
 
-fn bezier_4c(n: u32, c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, r: u32, g: u32, b: u32) {
+fn bezier_4c(n: u32, c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, color: u32) {
 
     if (n < 4u) { return; }
 
@@ -420,19 +425,11 @@ fn bezier_4c(n: u32, c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>,
         let mt3 = mt2 * mt;
         let result = c0.xyz * mt3 + c1.xyz * 3.0 * mt2*t + c2.xyz * 3.0 * mt*t2 + c3.xyz * t3;
         let dist = min(max(1.0, distance(camera.pos.xyz, result)), 255.0);
-        // output[index] = vec4<f32>(
-        output[index + u32(i)] = vec4<f32>(
-            result, 
-            f32(rgba_u32(
-                r,
-                g,
-                b,
-                u32(dist)
-        )));
+        output[index + u32(i)] = VVVC(result, color);
     }
 }
 
-fn create_char(char_index: u32, num_points: u32, offset: vec4<f32>, r: u32, g: u32, b: u32) {
+fn create_char(char_index: u32, num_points: u32, offset: vec4<f32>, color: u32) {
 
     let index = bez_indices[char_index];
 
@@ -456,9 +453,7 @@ fn create_char(char_index: u32, num_points: u32, offset: vec4<f32>, r: u32, g: u
             FONT_SIZE * bez_table[bez_index + 1u] + offset,
             FONT_SIZE * bez_table[bez_index + 2u] + offset,
             FONT_SIZE * bez_table[bez_index + 3u] + offset,
-            r,
-            g,
-            b
+            color,
         );
     }
 }
@@ -477,23 +472,25 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         	     255.0, 
         	     f32(actual_index)
     );
+
+    let col = rgba_u32(255u, 0u, 0u, 255u);
  
     if (global_id.x == 0u) {
-         create_char(0u, 400u, vec4<f32>(0.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(1u, 400u, vec4<f32>(1.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(2u, 400u, vec4<f32>(2.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(3u, 400u, vec4<f32>(3.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(4u, 400u, vec4<f32>(4.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(5u, 400u, vec4<f32>(5.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(6u, 400u, vec4<f32>(6.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(7u, 400u, vec4<f32>(7.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(8u, 400u, vec4<f32>(8.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(9u, 400u, vec4<f32>(9.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(10u, 400u, vec4<f32>(10.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(11u, 400u, vec4<f32>(11.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(12u, 400u, vec4<f32>(12.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(13u, 400u, vec4<f32>(13.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(14u, 400u, vec4<f32>(14.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
-         create_char(15u, 400u, vec4<f32>(15.1, 0.1, 0.1, 1.0), 255u, 0u, 0u);
+         create_char(0u, 400u, vec4<f32>(0.1, 0.1, 0.1, 1.0), col);
+         create_char(1u, 400u, vec4<f32>(1.1, 0.1, 0.1, 1.0), col);
+         create_char(2u, 400u, vec4<f32>(2.1, 0.1, 0.1, 1.0), col);
+         create_char(3u, 400u, vec4<f32>(3.1, 0.1, 0.1, 1.0), col);
+         create_char(4u, 400u, vec4<f32>(4.1, 0.1, 0.1, 1.0), col);
+         create_char(5u, 400u, vec4<f32>(5.1, 0.1, 0.1, 1.0), col);
+         create_char(6u, 400u, vec4<f32>(6.1, 0.1, 0.1, 1.0), col);
+         create_char(7u, 400u, vec4<f32>(7.1, 0.1, 0.1, 1.0), col);
+         create_char(8u, 400u, vec4<f32>(8.1, 0.1, 0.1, 1.0), col);
+         create_char(9u, 400u, vec4<f32>(9.1, 0.1, 0.1, 1.0), col);
+         create_char(10u, 400u, vec4<f32>(10.1, 0.1, 0.1, 1.0), col);
+         create_char(11u, 400u, vec4<f32>(11.1, 0.1, 0.1, 1.0), col);
+         create_char(12u, 400u, vec4<f32>(12.1, 0.1, 0.1, 1.0), col);
+         create_char(13u, 400u, vec4<f32>(13.1, 0.1, 0.1, 1.0), col);
+         create_char(14u, 400u, vec4<f32>(14.1, 0.1, 0.1, 1.0), col);
+         create_char(15u, 400u, vec4<f32>(15.1, 0.1, 0.1, 1.0), col);
     }
 }
