@@ -29,7 +29,7 @@ pub use ev::VirtualKeyCode as Key;
 const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
 
 /// The size of draw buffer;
-const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
+const VERTEX_BUFFER_SIZE: usize = 16 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
 const THREAD_COUNT: u32 = 64;
 
@@ -464,8 +464,8 @@ impl Application for DebugVisualizator {
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // let mut items_available: i32 = 32768; 
-        let mut items_available: i32 = 4096; 
-        let dispatch_x = 64;
+        let mut items_available: i32 = 1; 
+        let dispatch_x = 1;
         let mut clear = true;
         let mut i = dispatch_x * 64;
 

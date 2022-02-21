@@ -32,6 +32,19 @@ struct VVVC {
     col: u32;
 };
 
+struct WorkGroupParams {
+    start_index: u32; // Start position of the output buffer.
+    last_index: u32;  // Last legal position.
+};
+
+struct PirateParams {
+    this_offset: u32;      // This thread offset in the current work group.
+    number_of_writes: u32; // Number of points to calculate/store.
+};
+
+var<workgroup> workgroup_params: WorkGroupParams; 
+var<private> private_params: PirateParams; 
+
 type Hexaedra = array<Vertex , 8>;
 
 struct Arrow {
@@ -71,6 +84,11 @@ let STRIDE: u32 = 64u;
 let PI: f32 = 3.14159265358979323846;
 
 // FONT STUFF
+
+// Unsafe for y == 0.
+fn udiv_up_32(x: u32, y: u32) -> u32 {
+  return (x + y - 1u) / y;
+}
 
 var<private> bez_indices: array<u32, 17> = array<u32, 17>(
 	1953524840u,
@@ -408,28 +426,37 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 
 /// FONT STUFF
 
-fn bezier_4c(n: u32, c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, color: u32) {
 
-    if (n < 4u) { return; }
+// @param thread_index
+fn bezier_4c(thread_index: u32, 
+             vertices_per_thread: u32,
+             total_num_points: u32,
+             c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, color: u32) {
 
-    let index = atomicAdd(&counter[0], n);
+    // if (num_points < 1u) { return; }
 
-    // Save position and color to vec4<f32>.
-    // vec4<f32>(x, y, z, c)
-    for (var i: i32 = 0 ; i < i32(n) ; i = i + 1) {
-        let t = f32(i)  / (f32(n) - 1.0);
+    for (var i: u32 = 0u ; i < vertices_per_thread ; i = i + 1u) {
+        let t = f32(i * 64u + thread_index) / (f32(total_num_points) - 1.0);
         let t2 = t * t;
         let t3 = t2 * t;
         let mt = 1.0 - t;
         let mt2 = mt * mt;
         let mt3 = mt2 * mt;
         let result = c0.xyz * mt3 + c1.xyz * 3.0 * mt2*t + c2.xyz * 3.0 * mt*t2 + c3.xyz * t3;
-        let dist = min(max(1.0, distance(camera.pos.xyz, result)), 255.0);
-        output[index + u32(i)] = VVVC(result, color);
+        output[workgroup_params.start_index + 64u * i + thread_index] = VVVC(result, color);
     }
 }
 
-fn create_char(char_index: u32, num_points: u32, offset: vec4<f32>, color: u32) {
+// @param char_index: the index of char.
+// @param local_index: thread_id
+// @param num_poinst: total number of vertices for rendering
+// @param offset: the start position of char.
+// @param color: the color of the char.
+fn create_char(char_index: u32,
+               local_index: u32,
+               num_points: u32,
+               offset: vec4<f32>,
+               color: u32) {
 
     let index = bez_indices[char_index];
 
@@ -445,15 +472,43 @@ fn create_char(char_index: u32, num_points: u32, offset: vec4<f32>, color: u32) 
     for (var i: i32 = 0 ; i<4 ; i = i + 1) {
         let bez_index = indices[u32(i)];
         if (bez_index == 255u) { break; }
+
+        // Relative factor for rendering the bezier curve.
         let bi = bez_table[bez_index];
+
+        // Number of points for this bezier curve. At least one vertex per bezier.
         let count = u32(max(1.0, f32(num_points) * bi.w));
+
+	// Allocate memory from output buffer.
+        if (local_index == 0u) {
+
+            // The start position for storing the vertices.
+            let start_index: u32 = atomicAdd(&counter[0], count);
+
+            // Update the thread group params.
+            workgroup_params = WorkGroupParams (
+                start_index,
+                start_index + u32(count), // the end index. do we need this?
+            );
+        }
+        workgroupBarrier();
+
+        // Create per thead workload (how many vertices to create and store).
+        let chunks_per_thread = i32(udiv_up_32(count, 64u));
+
+    	// // Offset and chunk size (number of vertices to create and store).
+        let vertices_per_thread = select(u32(chunks_per_thread),
+    	                                 u32(max(chunks_per_thread - 1, 0)),
+    	                                 u32(max(chunks_per_thread - 1, 0)) * 64u + local_index >= count);
         bezier_4c(
+            local_index,
+            vertices_per_thread,
             count,
-            FONT_SIZE * bez_table[bez_index    ] + offset,
+            FONT_SIZE * bez_table[bez_index    ]  + offset,
             FONT_SIZE * bez_table[bez_index + 1u] + offset,
             FONT_SIZE * bez_table[bez_index + 2u] + offset,
             FONT_SIZE * bez_table[bez_index + 3u] + offset,
-            color,
+            color
         );
     }
 }
@@ -473,24 +528,50 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         	     f32(actual_index)
     );
 
+
+
+
+    let max_vertex_count = 5000u;
+    let offset = udiv_up_32(max_vertex_count, 64u);
     let col = rgba_u32(255u, 0u, 0u, 255u);
+    let start_position = vec3<f32>(0.1, 0.1, 0.1);
+
+    let dist = min(max(1.0, distance(camera.pos.xyz, start_position)), 255.0);
+    let total_vertex_count = u32(f32(max_vertex_count) / f32(dist));
+
+    // if (local_index == 0) {
+    //     let start_index = atomicAdd(&counter[0], total_vertex_count);
+    //     workgroup_params = WorkGroupParams {
+    //         start_index,
+    //         start_index + total_vertex_count,
+    //     };
+    // }
+    // workgroupBarrier();
+
+    // Calculate the thread stuff.
+
+    // let mut count = if std::cmp::max(chunks_per_thread - 1, 0)  * (64 as i32) + i >= total_vertex_count { std::cmp::max(chunks_per_thread - 1, 0) } else { chunks_per_thread };
+    
  
-    if (global_id.x == 0u) {
-         create_char(0u, 400u, vec4<f32>(0.1, 0.1, 0.1, 1.0), col);
-         create_char(1u, 400u, vec4<f32>(1.1, 0.1, 0.1, 1.0), col);
-         create_char(2u, 400u, vec4<f32>(2.1, 0.1, 0.1, 1.0), col);
-         create_char(3u, 400u, vec4<f32>(3.1, 0.1, 0.1, 1.0), col);
-         create_char(4u, 400u, vec4<f32>(4.1, 0.1, 0.1, 1.0), col);
-         create_char(5u, 400u, vec4<f32>(5.1, 0.1, 0.1, 1.0), col);
-         create_char(6u, 400u, vec4<f32>(6.1, 0.1, 0.1, 1.0), col);
-         create_char(7u, 400u, vec4<f32>(7.1, 0.1, 0.1, 1.0), col);
-         create_char(8u, 400u, vec4<f32>(8.1, 0.1, 0.1, 1.0), col);
-         create_char(9u, 400u, vec4<f32>(9.1, 0.1, 0.1, 1.0), col);
-         create_char(10u, 400u, vec4<f32>(10.1, 0.1, 0.1, 1.0), col);
-         create_char(11u, 400u, vec4<f32>(11.1, 0.1, 0.1, 1.0), col);
-         create_char(12u, 400u, vec4<f32>(12.1, 0.1, 0.1, 1.0), col);
-         create_char(13u, 400u, vec4<f32>(13.1, 0.1, 0.1, 1.0), col);
-         create_char(14u, 400u, vec4<f32>(14.1, 0.1, 0.1, 1.0), col);
-         create_char(15u, 400u, vec4<f32>(15.1, 0.1, 0.1, 1.0), col);
-    }
+    // Create number 1.
+    // local_index == thread_id
+    // total_vertex_count == 400
+    // start position of number 1.
+    // col.
+    create_char(0u, local_index, total_vertex_count, vec4<f32>(0.1, 0.1, 0.1, 1.0), col);
+    create_char(1u, local_index, total_vertex_count, vec4<f32>(1.1, 0.1, 0.1, 1.0), col);
+    create_char(2u, local_index, total_vertex_count, vec4<f32>(2.1, 0.1, 0.1, 1.0), col);
+    create_char(3u, local_index, total_vertex_count, vec4<f32>(3.1, 0.1, 0.1, 1.0), col);
+    create_char(4u, local_index, total_vertex_count, vec4<f32>(4.1, 0.1, 0.1, 1.0), col);
+    create_char(5u, local_index, total_vertex_count, vec4<f32>(5.1, 0.1, 0.1, 1.0), col);
+    create_char(6u, local_index, total_vertex_count, vec4<f32>(6.1, 0.1, 0.1, 1.0), col);
+    create_char(7u, local_index, total_vertex_count, vec4<f32>(7.1, 0.1, 0.1, 1.0), col);
+    create_char(8u, local_index, total_vertex_count, vec4<f32>(8.1, 0.1, 0.1, 1.0), col);
+    create_char(9u, local_index, total_vertex_count, vec4<f32>(9.1, 0.1, 0.1, 1.0), col);
+    create_char(10u, local_index, total_vertex_count, vec4<f32>(10.1, 0.1, 0.1, 1.0), col);
+    create_char(11u, local_index, total_vertex_count, vec4<f32>(11.1, 0.1, 0.1, 1.0), col);
+    create_char(12u, local_index, total_vertex_count, vec4<f32>(12.1, 0.1, 0.1, 1.0), col);
+    create_char(13u, local_index, total_vertex_count, vec4<f32>(13.1, 0.1, 0.1, 1.0), col);
+    create_char(14u, local_index, total_vertex_count, vec4<f32>(14.1, 0.1, 0.1, 1.0), col);
+    create_char(15u, local_index, total_vertex_count, vec4<f32>(15.1, 0.1, 0.1, 1.0), col);
 }
