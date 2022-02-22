@@ -513,6 +513,48 @@ fn create_char(char_index: u32,
     }
 }
 
+var<private> joo: array<u32, 10> =  array<u32, 10> (
+                      1u,
+                      10u,
+                      100u,
+                      1000u,
+                      10000u,
+                      100000u,
+                      1000000u,
+                      10000000u,
+                      100000000u,
+                      1000000000u
+);
+
+fn log_number(n: u32, thread_index: u32, ignore_first: bool, base_pos: vec4<f32>, total_vertex_count: u32, col: u32) {
+       // 4294967295 
+       // 1000000000
+    //uint local_index = local_id_to_x();
+
+    var found = false;
+    var ignore = ignore_first;
+    var temp_n = n;
+    var offset_to_the_right = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+
+    if (n == 0u) {
+        create_char(0u, thread_index, total_vertex_count, base_pos + offset_to_the_right, col);
+    }
+
+    for (var i: i32 = 9 ; i>=0 ; i = i - 1) {
+        let remainder = temp_n / joo[i];  
+        temp_n = temp_n - remainder * joo[i];
+        if (remainder != 0u) {
+            found = true;
+        }
+        if (found == true) {
+            if (ignore == true) { ignore = false; continue; }
+            
+            create_char(remainder, thread_index, total_vertex_count, base_pos + offset_to_the_right, col);
+            offset_to_the_right = offset_to_the_right + vec4<f32>(1.0, 0.0, 0.0, 0.0);
+        }
+    }
+}
+
 @stage(compute)
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -531,13 +573,13 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 
 
-    let max_vertex_count = 5000u;
-    let offset = udiv_up_32(max_vertex_count, 64u);
-    let col = rgba_u32(255u, 0u, 0u, 255u);
-    let start_position = vec3<f32>(0.1, 0.1, 0.1);
+    //++ let max_vertex_count = 5000u;
+    //++ let offset = udiv_up_32(max_vertex_count, 64u);
+    //++ let col = rgba_u32(255u, 0u, 0u, 255u);
+    //++ let start_position = vec3<f32>(0.1, 0.1, 0.1);
 
-    let dist = min(max(1.0, distance(camera.pos.xyz, start_position)), 255.0);
-    let total_vertex_count = u32(f32(max_vertex_count) / f32(dist));
+    //++ let dist = min(max(1.0, distance(camera.pos.xyz, start_position)), 255.0);
+    //++ let total_vertex_count = u32(f32(max_vertex_count) / f32(dist));
 
     // if (local_index == 0) {
     //     let start_index = atomicAdd(&counter[0], total_vertex_count);
@@ -558,20 +600,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // total_vertex_count == 400
     // start position of number 1.
     // col.
-    create_char(0u, local_index, total_vertex_count, vec4<f32>(0.1, 0.1, 0.1, 1.0), col);
-    create_char(1u, local_index, total_vertex_count, vec4<f32>(1.1, 0.1, 0.1, 1.0), col);
-    create_char(2u, local_index, total_vertex_count, vec4<f32>(2.1, 0.1, 0.1, 1.0), col);
-    create_char(3u, local_index, total_vertex_count, vec4<f32>(3.1, 0.1, 0.1, 1.0), col);
-    create_char(4u, local_index, total_vertex_count, vec4<f32>(4.1, 0.1, 0.1, 1.0), col);
-    create_char(5u, local_index, total_vertex_count, vec4<f32>(5.1, 0.1, 0.1, 1.0), col);
-    create_char(6u, local_index, total_vertex_count, vec4<f32>(6.1, 0.1, 0.1, 1.0), col);
-    create_char(7u, local_index, total_vertex_count, vec4<f32>(7.1, 0.1, 0.1, 1.0), col);
-    create_char(8u, local_index, total_vertex_count, vec4<f32>(8.1, 0.1, 0.1, 1.0), col);
-    create_char(9u, local_index, total_vertex_count, vec4<f32>(9.1, 0.1, 0.1, 1.0), col);
-    create_char(10u, local_index, total_vertex_count, vec4<f32>(10.1, 0.1, 0.1, 1.0), col);
-    create_char(11u, local_index, total_vertex_count, vec4<f32>(11.1, 0.1, 0.1, 1.0), col);
-    create_char(12u, local_index, total_vertex_count, vec4<f32>(12.1, 0.1, 0.1, 1.0), col);
-    create_char(13u, local_index, total_vertex_count, vec4<f32>(13.1, 0.1, 0.1, 1.0), col);
-    create_char(14u, local_index, total_vertex_count, vec4<f32>(14.1, 0.1, 0.1, 1.0), col);
-    create_char(15u, local_index, total_vertex_count, vec4<f32>(15.1, 0.1, 0.1, 1.0), col);
+
+    var number = 0u;
+    var base_pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); 
+    for (var i: i32 = 0; i < 200 ; i = i + 1) {
+
+    	let max_vertex_count = 5000u;
+    	let offset = udiv_up_32(max_vertex_count, 64u);
+    	let col = rgba_u32(255u, 0u, 0u, 255u);
+    	let start_position = vec3<f32>(0.1, 0.1, 0.1);
+
+    	let dist = min(max(1.0, distance(camera.pos.xyz, base_pos.xyz)), 255.0);
+    	let total_vertex_count = u32(f32(max_vertex_count) / f32(dist));
+
+        log_number(number, local_index, false, base_pos, total_vertex_count, col);
+        number = number + 12347u;
+        base_pos = base_pos + vec4<f32>(0.0, 1.0, 0.0, 0.0);
+    }
 }
