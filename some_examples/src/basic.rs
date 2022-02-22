@@ -169,7 +169,9 @@ impl Application for BasicApp {
                             }
                         ] // Set 1
                     ],
-                    Some("Basic vvvvnnnn renderer with camera.")
+                    Some("Basic vvvvnnnn renderer with camera."),
+                    true,
+                    wgpu::PrimitiveTopology::TriangleList
         );
 
         // Camera.
