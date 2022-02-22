@@ -541,17 +541,17 @@ fn create_char(char_index: u32,
     }
 }
 
-var<private> joo: array<u32, 10> =  array<u32, 10> (
-                      1u,
-                      10u,
-                      100u,
-                      1000u,
-                      10000u,
-                      100000u,
-                      1000000u,
-                      10000000u,
-                      100000000u,
-                      1000000000u
+var<private> joo: array<i32, 10> =  array<i32, 10> (
+                      1,
+                      10,
+                      100,
+                      1000,
+                      10000,
+                      100000,
+                      1000000,
+                      10000000,
+                      100000000,
+                      1000000000
 );
 
 // @param n : number that should be rendered.
@@ -560,32 +560,34 @@ var<private> joo: array<u32, 10> =  array<u32, 10> (
 // @base_pos : the starting position for rendering. 
 // @total_vertex_count : total number of vertices for rendering. 
 // @cola : the color of the vertices. 
-fn log_number(n: u32, thread_index: u32, ignore_first: bool, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32) {
-       // 4294967295 
-       // 1000000000
-    //uint local_index = local_id_to_x();
+fn log_number(n: i32, thread_index: u32, ignore_first: bool, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32) {
 
     var found = false;
     var ignore = ignore_first;
-    var temp_n = n;
+    var temp_n = abs(n);
 
     // TODO: this should come from function parameter.
     // var offset_to_the_right = vec4<f32>(0.0, 0.0, 0.0, 0.0);
 
-    if (n == 0u) {
-        //create_char(0u, thread_index, total_vertex_count, base_pos + offset_to_the_right, col);
+    if (n == 0) {
         create_char(0u, thread_index, total_vertex_count, *base_pos, col);
         *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0);
     }
 
+    // Add minus if negative.
+    if (n < 0) {
+        create_char(10u, thread_index, total_vertex_count, *base_pos, col);
+        *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0);
+    }
+
     for (var i: i32 = 9 ; i>=0 ; i = i - 1) {
-        let remainder = temp_n / joo[i];  
+        let remainder = temp_n / i32(joo[i]);  
         temp_n = temp_n - remainder * joo[i];
-        found = select(found, true, remainder != 0u);
+        found = select(found, true, remainder != 0);
         if (found == true) {
             if (ignore == true) { ignore = false; continue; }
             
-            create_char(remainder, thread_index, total_vertex_count, *base_pos, col);
+            create_char(u32(remainder), thread_index, total_vertex_count, *base_pos, col);
             *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0);
         }
     }
@@ -608,44 +610,36 @@ fn my_modf(f: f32) -> ModF {
 fn log_float(f: f32, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32) {
 
     if (f == 0.0) {
-        log_number(0u, thread_index, false, base_pos, total_vertex_count, col);
+        log_number(0, thread_index, false, base_pos, total_vertex_count, col);
         *base_pos = *base_pos - vec4<f32>(0.1, 0.0, 0.0, 0.0);
         create_char(13u, thread_index, total_vertex_count, *base_pos, col);
         *base_pos = *base_pos + vec4<f32>(0.3, 0.0, 0.0, 0.0);
 
         for (var i: i32 = 0; i<i32(max_decimals); i = i + 1) {
-            log_number(0u, thread_index, true, base_pos, total_vertex_count, col);
+            log_number(0, thread_index, true, base_pos, total_vertex_count, col);
         }
         return;
     }
 
-    // The sign of given float.
-    let is_negative = f < 0.0;
-
-    // Add minus.
-    if (is_negative) {
-        create_char(10u, thread_index, total_vertex_count, *base_pos, col);
-        *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0);
-    }
+    // // Add minus if negative.
+    // if (f < 0.0) {
+    //     create_char(10u, thread_index, total_vertex_count, *base_pos, col);
+    //     *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0);
+    // }
 
     // Get rid of the minus. Necessery?
-    let f_positive = abs(f);
+    // let f_positive = abs(f);
 
-    let fract_and_whole = my_modf(f_positive); 
+    let fract_and_whole = my_modf(f); 
 
-    // Multiply fractional part and convert to u32. 
-    let fract_part = u32((fract_and_whole.fract + 1.0) * f32(joo[max_decimals]));
+    // Multiply fractional part. 
+    let fract_part = i32((abs(fract_and_whole.fract) + 1.0) * f32(joo[max_decimals]));
 
     // Cast integer part to uint.
-    let integer_part = u32(abs(fract_and_whole.whole));
+    let integer_part = i32(fract_and_whole.whole);
 
     // Parse the integer part.
-    //++ log_number(integer_part, false);
     log_number(integer_part, thread_index, false, base_pos, total_vertex_count, col);
-
-    // Add dot.
-    //char_arrays[local_index].chars[update_counter()] = 13;
-    //log_number (13u, thread_index, false, *base_pos, total_vertex_count, col);
 
     // TODO: create_dot function for this.
     *base_pos = *base_pos - vec4<f32>(0.1, 0.0, 0.0, 0.0);
@@ -653,9 +647,57 @@ fn log_float(f: f32, max_decimals: u32, thread_index: u32, base_pos: ptr<functio
     *base_pos = *base_pos + vec4<f32>(0.3, 0.0, 0.0, 0.0);
 
     // Parse the frag part.
-    //++ log_number(fract_part, true);
-    log_number(fract_part, thread_index, true, base_pos, total_vertex_count, col);
+    log_number(abs(fract_part), thread_index, true, base_pos, total_vertex_count, col);
 }
+
+fn log_vec4_f32(v: vec4<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32) {
+
+    // TODO: create_dot function for this.
+    create_char(11u, thread_index, total_vertex_count, *base_pos, col);
+    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0);
+
+    log_float(v.x, max_decimals, thread_index, base_pos, total_vertex_count, col);
+
+    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0);
+
+    log_float(v.y, max_decimals, thread_index, base_pos, total_vertex_count, col);
+
+    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0);
+
+    log_float(v.w, max_decimals, thread_index, base_pos, total_vertex_count, col);
+
+    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0);
+
+    log_float(v.z, max_decimals, thread_index, base_pos, total_vertex_count, col);
+
+    // TODO: create_dot function for this.
+    *base_pos = *base_pos + vec4<f32>(-0.5, 0.0, 0.0, 0.0);
+    create_char(12u, thread_index, total_vertex_count, *base_pos, col);
+    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0);
+}
+
+fn log_vec3_f32(v: vec3<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32) {
+
+    // TODO: create_dot function for this.
+    create_char(11u, thread_index, total_vertex_count, *base_pos, col);
+    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0);
+
+    log_float(v.x, max_decimals, thread_index, base_pos, total_vertex_count, col);
+
+    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0);
+
+    log_float(v.y, max_decimals, thread_index, base_pos, total_vertex_count, col);
+
+    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0);
+
+    log_float(v.z, max_decimals, thread_index, base_pos, total_vertex_count, col);
+
+    // TODO: create_dot function for this.
+    *base_pos = *base_pos + vec4<f32>(-0.5, 0.0, 0.0, 0.0);
+    create_char(12u, thread_index, total_vertex_count, *base_pos, col);
+    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0);
+}
+ 
 
 @stage(compute)
 @workgroup_size(64,1,1)
@@ -703,9 +745,37 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //var number = 0u;
     var number = -12347.0;
 
-    let col = rgba_u32(255u, 0u, 0u, 255u);
-    var base_pos = vec4<f32>(0.0, 0.0, 0.0, 1.0); 
-    log_float(-99.0045, 5u, local_index, &base_pos, 400u, col);
+    ////////////////////// log_vec3_f32 test ////////////////////////////
+    
+    var col = rgba_u32(255u, 0u, 222u, 255u);    
+    var base_pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    
+    log_vec3_f32(
+        vec3<f32>(-9999.0,-1232.0093, 5.0),      
+        4u,                                  
+        local_index,                             
+        &base_pos,                          
+        800u,                              
+        col                                   
+    );
+
+    ////////////////////// log_vec4_f32 test ////////////////////////////
+    
+    col = rgba_u32(0u, 0u, 252u, 255u);    
+    base_pos = vec4<f32>(0.0, 2.0, 0.0, 1.0);
+    
+    log_vec4_f32(
+        vec4<f32>(89.893, -9999.0,-1232.0093, 5.0),      
+        4u,                                  
+        local_index,                             
+        &base_pos,                          
+        800u,                              
+        col                                   
+    );
+    
+    /////////////////////////////////////////////////////////////////////
+
+    //log_float(-99.0045, 5u, local_index, &base_pos, 400u, col);
 
     // for (var i: i32 = 0; i < 200 ; i = i + 1) {
 
