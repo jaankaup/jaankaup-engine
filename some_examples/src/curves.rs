@@ -217,7 +217,7 @@ impl Application for DebugVisualizator {
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
                     true,
-                    wgpu::PrimitiveTopology::TriangleList,
+                    wgpu::PrimitiveTopology::TriangleList
         );
         let render_bind_groups = create_bind_groups(
                                      &configuration.device,

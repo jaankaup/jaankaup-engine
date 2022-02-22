@@ -233,7 +233,8 @@ impl Application for McApp {
                         ]
                     ],
                     Some("vvvvnnnn renderer with camera."),
-                    false
+                    false,
+                    wgpu::PrimitiveTopology::TriangleList
         );
 
         McApp::create_textures(&configuration, &mut textures);
