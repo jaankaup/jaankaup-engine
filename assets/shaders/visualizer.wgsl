@@ -273,29 +273,20 @@ fn create_aabb(aabb: AABB, offset: u32, color: u32) {
     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
     );
-    
-    var i: u32 = 0u;
 
-    loop {
-        if (i == 36u) { break; }
-        temp_vertex_data[offset + STRIDE * i]  = Vertex(
-                                                    positions[vertex_positions[i]],
-                                                    vec4<f32>(aabb_normals[i/6u])
-        );
-        i = i + 1u;
-    }
+    var normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
+        vec4<f32>(0.0, 0.0, -1.0, 0.0),
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(-1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, -1.0, 0.0, 0.0)
+    );
 
-    workgroupBarrier();
-
-    var i: u32 = 0u;
-
-    loop {
-        if (i == 36u) { break; }
-    	output[index+i] = temp_vertex_data[offset + STRIDE * i];
-        i = i + 1u;
-    }
-
-    workgroupBarrier();
+    store_hexaedron(&positions,
+                    &normals,
+                    offset
+    );
 }
 
 fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32) {
@@ -407,7 +398,8 @@ fn create_arrow(arr: Arrow, offset: u32) {
 
     store_hexaedron(&positions, &normals, offset);
 
-    let from_origo_x_top_arr = vec3<f32>(1.0, 3.0 * arr.size, 3.0 * arr.size);
+    let from_origo_x_top_arr = vec3<f32>(head_size, 3.0 * arr.size, 3.0 * arr.size);
+    //let from_origo_x_top_arr = vec3<f32>(1.0, 3.0 * arr.size, 3.0 * arr.size);
 
     let aabb_top = AABB(
         vec4<f32>((-0.5) * from_origo_x_top_arr, 0.0),
@@ -446,14 +438,14 @@ fn create_arrow(arr: Arrow, offset: u32) {
     let the_pos_head = arr.start_pos.xyz;
 
     var positions_head = array<vec4<f32>, 8>(
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p0) - direction * 0.5, c),
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p1) - direction * 0.5, c),
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p2) - direction * 0.5, c),
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p3) - direction * 0.5, c),
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p4) - direction * 0.5, c),
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p5) - direction * 0.5, c),
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p6) - direction * 0.5, c),
-        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p7) - direction * 0.5, c)
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p0) - direction * 0.5 * head_size, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p1) - direction * 0.5 * head_size, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p2) - direction * 0.5 * head_size, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p3) - direction * 0.5 * head_size, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p4) - direction * 0.5 * head_size, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p5) - direction * 0.5 * head_size, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p6) - direction * 0.5 * head_size, c),
+        vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p7) - direction * 0.5 * head_size, c)
     );
 
     n0 = normalize(cross(positions_head[5u].xyz - positions_head[6u].xyz,
@@ -501,5 +493,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         let col = rgba_u32(255u, u32(i * 6), 200u, 255u);
         let aabb = AABB(vec4<f32>(-3.0 - f32(i), -3.0 - f32(i), -3.0 - f32(i), 0.0), vec4<f32>(8.0 + f32(i), 8.0 + f32(i), 8.0 + f32(i), 0.0)); 
         create_aabb_wire(aabb, 1.5, col, local_index);
+    }
+
+    for (var i: i32 = 0 ; i < 15 ; i = i + 1) {
+        let col = rgba_u32(255u, u32(i * 6), u32(i * 6), 255u);
+        //create_arrow(Arrow(vec4<f32>(13.0, f32((i % 2)) * 15.0, -13.0, 0.0), vec4<f32>(13.0 + f32(i*5), -6.0, f32(i) * 3.0, 0.0), col, 0.4), local_index);
+        create_arrow(Arrow(vec4<f32>(8.0, 20.0 + f32(i*3), -13.0, 0.0), vec4<f32>(13.0 + f32(i*5), -6.0, f32(i) * 3.0, 0.0), col, 0.4), local_index);
+    }
+
+    for (var i: i32 = 0 ; i < 10 ; i = i + 1) {
+        let col = rgba_u32(155u, 0u, 255u, 255u);
+        create_aabb(AABB(vec4<f32>(8.0, 20.0 + f32(i*3), -13.0, 0.0), vec4<f32>(14.0, 22.0 + f32(i*3), -10.0, 0.0)), local_index, col);
     }
 }
