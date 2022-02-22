@@ -156,14 +156,6 @@ fn axis_angle(axis: vec3<f32>, angle: f32) -> Quaternion {
     return Quaternion(cos(half_angle), bl.x, bl.y, bl.z); 
 }
 
-// fn vec3_cross(a: vec3<f32>, b: vec3<f32>) -> vec3<f32> {
-//     return vec3<f32>(
-//         a.y * b.z - a.z * b.y,
-//         a.z * b.x - a.x * b.z,
-//         a.x * b.y - a.y * b.x
-//    );
-// }
-
 fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
 
     let v = cross(a,b);  
@@ -322,31 +314,6 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32) {
         AABB(vec4<f32>(aabb.min.x,  aabb.min.y, aabb.max.z - t, 1.0), vec4<f32>(aabb.min.x + t, aabb.max.y, aabb.max.z, 1.0)),
         AABB(vec4<f32>(aabb.max.x - t, aabb.min.y, aabb.max.z - t, 1.0),  vec4<f32>(aabb.max.x    , aabb.max.y, aabb.max.z, 1.0))
     );
-    // AABB back_bottom = AABB(aabb.min, vec4(aabb.max.x, aabb.min.y + t, aabb.min.z + t, 1.0)),
-
-    //AABB right_bottom = AABB(aabb.min, vec4(aabb.min.x + t, aabb.min.y + t, aabb.max.z, 1.0));
-
-    //AABB left_bottom = AABB(vec4(aabb.max.x - t, aabb.min.y, aabb.min.z, 1.0),
-    //                        vec4(aabb.max.x, aabb.min.y + t, aabb.max.z, 1.0));
-    //AABB front_bottom = AABB(vec4(aabb.min.x, aabb.min.y, aabb.max.z - t, 1.0),
-    //                         vec4(aabb.max.x, aabb.min.y + t, aabb.max.z, 1.0));
-
-    // AABB back_top = AABB(vec4(aabb.min.x, aabb.max.y - t, aabb.min.z, 1.0),  
-    //                      vec4(aabb.max.x, aabb.max.y,     aabb.min.z + t, 1.0));
-    //AABB left_top = AABB(vec4(aabb.min.x,     aabb.max.y - t, aabb.min.z, 1.0),  
-    //                      vec4(aabb.min.x + t, aabb.max.y,     aabb.max.z, 1.0));
-    //AABB right_top = AABB(vec4(aabb.max.x - t, aabb.max.y - t, aabb.min.z, 1.0),  
-    //                      vec4(aabb.max.x,     aabb.max.y,     aabb.max.z, 1.0));
-    //AABB front_top = AABB(vec4(aabb.min.x,     aabb.max.y - t, aabb.max.z - t, 1.0),  
-    //                      vec4(aabb.max.x,     aabb.max.y,     aabb.max.z, 1.0));
-    //AABB back_left_ud = AABB(vec4(aabb.min.x,     aabb.min.y, aabb.min.z, 1.0),  
-    //                         vec4(aabb.min.x + t, aabb.max.y, aabb.min.z + t, 1.0));
-    //AABB back_right_ud = AABB(vec4(aabb.max.x - t, aabb.min.y, aabb.min.z, 1.0),  
-    //                          vec4(aabb.max.x    , aabb.max.y, aabb.min.z + t, 1.0));
-    // AABB front_right_ud = AABB(vec4(aabb.min.x,    aabb.min.y, aabb.max.z - t, 1.0),  
-    //                           vec4(aabb.min.x + t, aabb.max.y, aabb.max.z, 1.0));
-    //AABB front_left_ud = AABB(vec4(aabb.max.x - t, aabb.min.y, aabb.max.z - t, 1.0),  
-    //                          vec4(aabb.max.x    , aabb.max.y, aabb.max.z, 1.0));
 
     var normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
         vec4<f32>(0.0, 0.0, -1.0, 0.0),
@@ -375,18 +342,6 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32) {
                         offset
         );
     }
-    // create_output_points(back_bottom, r, g, b); 
-    // create_output_points(right_bottom, r, g, b); 
-    // create_output_points(left_bottom, r, g, b); 
-    // create_output_points(front_bottom, r, g, b); 
-    // create_output_points(back_top, r, g, b); 
-    // create_output_points(left_top, r, g, b); 
-    // create_output_points(right_top, r, g, b); 
-    // create_output_points(front_top, r, g, b); 
-    // create_output_points(back_left_ud, r, g, b); 
-    // create_output_points(back_right_ud, r, g, b); 
-    // create_output_points(front_right_ud, r, g, b); 
-    // create_output_points(front_left_ud, r, g, b); 
 }
 
 fn create_arrow(arr: Arrow, offset: u32) {
