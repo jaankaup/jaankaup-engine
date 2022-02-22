@@ -697,6 +697,23 @@ fn log_vec3_f32(v: vec3<f32>, max_decimals: u32, thread_index: u32, base_pos: pt
     create_char(12u, thread_index, total_vertex_count, *base_pos, col);
     *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0);
 }
+
+// bit_count must be in range 1..32. Otherwise there will be undefined behaviour. TODO: fix.
+fn log_u32_b2(n: u32, bit_count: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32) {
+
+    var bit_c = select(bit_count, 32u, n > 32u);
+    bit_c = select(bit_count, 1u, n == 0u);
+
+    for (var i: i32 = i32(bit_count) - 1 ; i >= 0 ; i = i - 1) {
+        log_number(select(1, 0, ((n & (1u << u32(i))) >> u32(i)) == 0u),
+                   thread_index,
+                   false,
+                   base_pos,
+                   total_vertex_count,
+                   col
+        );
+    } 
+}
  
 
 @stage(compute)
@@ -773,6 +790,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         col                                   
     );
     
+    ////////////////////// log_u32_b2 test ////////////////////////////
+
+    let numb = 0x7463u;
+    // 111010001100011
+
+    base_pos = vec4<f32>(0.0, 4.0, 0.0, 1.0);
+    log_u32_b2(numb, 32u, local_index, &base_pos, 800u, col);
+
     /////////////////////////////////////////////////////////////////////
 
     //log_float(-99.0045, 5u, local_index, &base_pos, 400u, col);
