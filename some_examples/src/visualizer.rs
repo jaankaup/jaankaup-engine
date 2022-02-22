@@ -137,11 +137,14 @@ struct DebugVisualizator {
     pub render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     pub compute_object: ComputeObject, 
     pub compute_bind_groups: Vec<wgpu::BindGroup>,
+    pub compute_object_arrow: ComputeObject, 
+    pub compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
     // pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
     pub histogram: Histogram,
-    pub draw_count: u32,
+    pub draw_count_points: u32,
+    pub draw_count_triangles: u32,
     pub visualization_params: VisualizationParams,
     pub temp_visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
@@ -427,6 +430,88 @@ impl Application for DebugVisualizator {
                                       ]
         );
 
+        let compute_object_arrow =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("compute_visuzlizer_wgsl array"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
+                    
+                    }),
+                    Some("Visualizer Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0)
+                            // @binding(0)
+                            // var<uniform> visualization_params: VisualizationParams;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(1)
+                            // var<storage, read_write> counter: Counter;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(2)
+                            // var<storage, read> counter: array<Arrow>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 2,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(3)
+                            // var<storage,read_write> output: array<VertexBuffer>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 3,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                        ],
+                    ]
+        );
+
+        let compute_bind_groups_arrow = create_bind_groups(
+                                      &configuration.device,
+                                      &compute_object_arrow.bind_group_layout_entries,
+                                      &compute_object_arrow.bind_group_layouts,
+                                      &vec![
+                                          vec![
+                                               &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
+                                               &histogram.get_histogram_buffer().as_entire_binding(),
+                                               &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
+                                          ]
+                                      ]
+        );
+
         println!("Creating render bind groups.");
  
         Self {
@@ -437,11 +522,14 @@ impl Application for DebugVisualizator {
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             compute_object: compute_object,
             compute_bind_groups: compute_bind_groups,
+            compute_object_arrow: compute_object_arrow, 
+            compute_bind_groups_arrow: compute_bind_groups_arrow,
             // _textures: textures,
             buffers: buffers,
             camera: camera,
             histogram: histogram,
-            draw_count: 0,
+            draw_count_points: 0,
+            draw_count_triangles: 0,
             visualization_params: params,
             temp_visualization_params: temp_params,
             keys: keys,
@@ -480,12 +568,27 @@ impl Application for DebugVisualizator {
                 dispatch_x, 1, 1, Some("font visualizer dispatch")
             );
 
+
             // Submit compute.
             queue.submit(Some(encoder_command.finish()));
 
             let counter = self.histogram.get_values(device, queue);
-            self.draw_count = counter[0];
-            println!("self.draw_count  == {}", self.draw_count); 
+            self.draw_count_points = counter[0];
+            
+            let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
+
+            self.compute_object_arrow.dispatch(
+                &self.compute_bind_groups_arrow,
+                &mut encoder_command,
+                dispatch_x, 1, 1, Some("font visualizer dispatch")
+            );
+
+            queue.submit(Some(encoder_command.finish()));
+
+            let counter2 = self.histogram.get_values(device, queue);
+            self.draw_count_triangles = counter2[0];
+
+            //println!("self.draw_count  == {}", self.draw_count); 
 
             let mut encoder_render = device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor {
@@ -501,7 +604,19 @@ impl Application for DebugVisualizator {
                  &self.render_bind_groups_vvvc,
                  &self.render_object_vvvc.pipeline,
                  &self.buffers.get("output").unwrap(),
-                 0..self.draw_count, // TODO: Cube 
+                 0..self.draw_count_points, // TODO: Cube 
+                 clear
+            );
+
+            clear = false;
+
+            draw(&mut encoder_render,
+                 &view,
+                 self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups,
+                 &self.render_object.pipeline,
+                 &self.buffers.get("output").unwrap(),
+                 self.draw_count_points..self.draw_count_triangles, // TODO: Cube 
                  clear
             );
             queue.submit(Some(encoder_render.finish()));
