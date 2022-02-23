@@ -158,16 +158,6 @@ impl Application for McApp {
         let mut textures: HashMap<String, Texture> = HashMap::new();
 
         let mut keys = KeyboardManager::init();
-        // keys.register_key(Key::L, 20.0);
-        // keys.register_key(Key::K, 20.0);
-        // keys.register_key(Key::Key1, 10.0);
-        // keys.register_key(Key::Key2, 10.0);
-        // keys.register_key(Key::Key3, 10.0);
-        // keys.register_key(Key::Key4, 10.0);
-        // keys.register_key(Key::Key9, 10.0);
-        // keys.register_key(Key::Key0, 10.0);
-        // keys.register_key(Key::NumpadSubtract, 50.0);
-        // keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (50.0, 60.0, 150.0), -90.0, 0.0);
