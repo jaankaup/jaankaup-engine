@@ -25,6 +25,14 @@ use bytemuck::{Pod, Zeroable};
 use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
+const MAX_NUMBERS_OF_ARROWS: usize = 4096; 
+const MAX_NUMBERS_OF_CHARS:  usize = 4096; 
+
+// FMM dimensions.
+const FMM_X: usize = 16; 
+const FMM_Y: usize = 16; 
+const FMM_Z: usize = 16; 
+
 /// The number of vertices per chunk.
 const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; 
 
@@ -45,6 +53,17 @@ struct Arrow {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct Char {
+    start_pos: [f32 ; 4],
+    value: [f32 ; 4],
+    font_size: f32,
+    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+    color: u32,
+    z_offset: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct VisualizationParams{
     max_number_of_vertices: u32,
     iterator_start_index: u32,
@@ -52,7 +71,23 @@ struct VisualizationParams{
     arrow_size: f32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmCell {
+    tag: u32,
+    value: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmParams {
+    blah: f32,
+}
+
 impl_convert!{Arrow}
+impl_convert!{Char}
+impl_convert!{FmmCell}
+impl_convert!{FmmParams}
 
 struct FmmFeatures {}
 
@@ -69,52 +104,6 @@ impl WGPUFeatures for FmmFeatures {
         limits
     }
 }
-
-// struct KeyboardManager {
-//     keys: HashMap<Key, (f64, f64)>,
-// }
-// 
-// impl KeyboardManager {
-//     pub fn init() -> Self {
-//         Self {
-//             keys: HashMap::<Key, (f64, f64)>::new(),
-//         }
-//     }
-// 
-//     pub fn register_key(&mut self, key: Key, threshold: f64) {
-//         self.keys.insert(key, (0.0, threshold)); 
-//     }
-// 
-//     pub fn test_key(&mut self, key: &Key, input: &InputCache) -> bool {
-//         
-//         let state_key = input.key_state(key);
-//         let mut result = false;
-// 
-//         if let Some(v) = self.keys.get_mut(key) {
-// 
-//             match state_key {
-//                 Some(InputState::Pressed(_)) => {
-//                     let delta = (input.get_time_delta() / 1000000) as f64;
-//                     v.0 = delta;
-//                 }
-//                 Some(InputState::Down(_, _)) => {
-//                     let delta = (input.get_time_delta() / 1000000) as f64;
-//                     v.0 = v.0 + delta;
-//                     if v.0 > v.1 {
-//                         v.0 = v.0 - v.1;
-//                         result = true;
-//                     }
-//                 },
-//                 Some(InputState::Released(_, _)) => {
-//                     v.0 = 0.0; 
-//                 }
-//                 _ => { }
-//             }
-//         }
-// 
-//         return result;
-//     }
-// }
 
 // State for this application.
 struct Fmm {
@@ -162,16 +151,7 @@ impl Application for Fmm {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         let mut keys = KeyboardManager::init();
-        keys.register_key(Key::L, 20.0);
-        keys.register_key(Key::K, 20.0);
-        keys.register_key(Key::Key1, 10.0);
-        keys.register_key(Key::Key2, 10.0);
-        keys.register_key(Key::Key3, 10.0);
-        keys.register_key(Key::Key4, 10.0);
-        keys.register_key(Key::Key9, 10.0);
-        keys.register_key(Key::Key0, 10.0);
-        keys.register_key(Key::NumpadSubtract, 50.0);
-        keys.register_key(Key::NumpadAdd, 50.0);
+        // keys.register_key(Key::L, 20.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 40.0), -90.0, 0.0);
@@ -184,7 +164,7 @@ impl Application for Fmm {
                     &configuration.device,
                     &configuration.sc_desc,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("renderer_v4n4_debug_visualizator_wgsl"),
+                        label: Some("renderer_v4n4_debug_visualizator.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
                     
@@ -227,7 +207,7 @@ impl Application for Fmm {
                     &configuration.device,
                     &configuration.sc_desc,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("renderer_v4c1.wgsl"),
+                        label: Some("renderer_v3c1.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
                     
@@ -284,30 +264,61 @@ impl Application for Fmm {
         };
 
         buffers.insert(
-            "visualization_params".to_string(),
-            buffer_from_data::<VisualizationParams>(
+            "fmm_params".to_string(),
+            buffer_from_data::<FmmParams>(
             &configuration.device,
-            &vec![params],
+            &vec![FmmParams { blah: 234.0, }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
 
         buffers.insert(
-            "debug_arrays".to_string(),
-            buffer_from_data::<Arrow>(
-                &configuration.device,
-                &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
-                              end_pos:   [4.0, 3.0, 0.0, 1.0],
-                              color: encode_rgba_u32(0, 0, 255, 255),
-                              size: 0.2,
-                              _padding: [0, 0]}],
-                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                Some("Debug array buffer")
+            "fmm_cells".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_arrays buffer"),
+                size: (FMM_X * FMM_Y * FMM_Z * std::mem::size_of::<FmmCell>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
             )
         );
 
         buffers.insert(
-            "output".to_string(),
+            "output_arrows".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_arrays buffer"),
+                size: (MAX_NUMBERS_OF_ARROWS * std::mem::size_of::<Arrow>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+        buffers.insert(
+            "output_chars".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_chars"),
+                size: (MAX_NUMBERS_OF_CHARS * std::mem::size_of::<Char>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+        // buffers.insert(
+        //     "debug_arrays".to_string(),
+        //     buffer_from_data::<Arrow>(
+        //         &configuration.device,
+        //         &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
+        //                       end_pos:   [4.0, 3.0, 0.0, 1.0],
+        //                       color: encode_rgba_u32(0, 0, 255, 255),
+        //                       size: 0.2,
+        //                       _padding: [0, 0]}],
+        //         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //         Some("Debug array buffer")
+        //     )
+        // );
+
+        buffers.insert(
+            "output_render".to_string(),
             configuration.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("draw buffer"),
                 size: VERTEX_BUFFER_SIZE as u64, 
@@ -316,14 +327,23 @@ impl Application for Fmm {
             })
         );
 
+        buffers.insert(
+            "visualization_params".to_string(),
+            buffer_from_data::<VisualizationParams>(
+            &configuration.device,
+            &vec![params],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
+
 
         let compute_object =
                 ComputeObject::init(
                     &configuration.device,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("compute_visuzlizer_wgsl"),
+                        label: Some("numbers.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/font_visualizer.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/numbers.wgsl"))),
                     
                     }),
                     Some("Visualizer Compute object"),
@@ -400,7 +420,7 @@ impl Application for Fmm {
 
         println!("Creating compute bind groups.");
 
-        println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
+        // println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
 
         let compute_bind_groups = create_bind_groups(
                                       &configuration.device,
@@ -411,8 +431,8 @@ impl Application for Fmm {
                                                &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
                                                &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
                                                &histogram.get_histogram_buffer().as_entire_binding(),
-                                               &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
-                                               &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
+                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
@@ -493,11 +513,108 @@ impl Application for Fmm {
                                           vec![
                                                &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
                                                &histogram.get_histogram_buffer().as_entire_binding(),
-                                               &buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding(),
-                                               &buffers.get(&"output".to_string()).unwrap().as_entire_binding()
+                                               &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
+
+        let compute_object_fmm =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("compute_visuzlizer_wgsl array"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
+                    
+                    }),
+                    Some("Visualizer Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0)
+                            // @binding(0)
+                            // var<uniform> fmm_params: FmmParams;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(1)
+                            // var<storage, read_write> fmm_data: array<FmmCell>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(2)
+                            // var<storage, read_write> counter: array<atomic<u32>>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 2,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(3)
+                            // var<storage,read_write> output_char: array<Char>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 3,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(4)
+                            // var<storage,read_write> output_arrow: array<Arrow>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 4,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                        ],
+                    ]
+        );
+
+        let compute_bind_groups_fmm = create_bind_groups(
+                                      &configuration.device,
+                                      &compute_object_arrow.bind_group_layout_entries,
+                                      &compute_object_arrow.bind_group_layouts,
+                                      &vec![
+                                          vec![
+                                               &buffers.get(&"fmm_params".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"fmm_cells".to_string()).unwrap().as_entire_binding(),
+                                               &histogram.get_histogram_buffer().as_entire_binding(), // create a histogram for fmm.
+                                               &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding()
+                                          ]
+                                      ]
+        );
+
 
         println!("Creating render bind groups.");
  
@@ -589,7 +706,7 @@ impl Application for Fmm {
                  self.screen.depth_texture.as_ref().unwrap(),
                  &self.render_bind_groups_vvvc,
                  &self.render_object_vvvc.pipeline,
-                 &self.buffers.get("output").unwrap(),
+                 &self.buffers.get("output_render").unwrap(),
                  0..self.draw_count_points, // TODO: Cube 
                  clear
             );
@@ -601,7 +718,7 @@ impl Application for Fmm {
                  self.screen.depth_texture.as_ref().unwrap(),
                  &self.render_bind_groups_vvvvnnnn,
                  &self.render_object_vvvvnnnn.pipeline,
-                 &self.buffers.get("output").unwrap(),
+                 &self.buffers.get("output_render").unwrap(),
                  self.draw_count_points..self.draw_count_triangles, // TODO: Cube 
                  clear
             );

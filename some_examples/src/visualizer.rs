@@ -56,6 +56,17 @@ struct Arrow {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct Char {
+    start_pos: [f32 ; 4],
+    value: [f32 ; 4],
+    font_size: f32,
+    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+    color: u32,
+    z_offset: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct VisualizationParams{
     max_number_of_vertices: u32,
     iterator_start_index: u32,
@@ -65,6 +76,7 @@ struct VisualizationParams{
 }
 
 impl_convert!{Arrow}
+impl_convert!{Char}
 
 struct DebugVisualizatorFeatures {}
 
@@ -96,7 +108,7 @@ struct DebugVisualizator {
     // pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
-    pub histogram: Histogram,
+    pub histogram: Histogram, // [arrow counter, aabb counter, aabb wire counter, Char counter,  
     pub draw_count_points: u32,
     pub draw_count_triangles: u32,
     pub visualization_params: VisualizationParams,
@@ -128,16 +140,7 @@ impl Application for DebugVisualizator {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         let mut keys = KeyboardManager::init();
-        keys.register_key(Key::L, 20.0);
-        keys.register_key(Key::K, 20.0);
-        keys.register_key(Key::Key1, 10.0);
-        keys.register_key(Key::Key2, 10.0);
-        keys.register_key(Key::Key3, 10.0);
-        keys.register_key(Key::Key4, 10.0);
-        keys.register_key(Key::Key9, 10.0);
-        keys.register_key(Key::Key0, 10.0);
-        keys.register_key(Key::NumpadSubtract, 50.0);
-        keys.register_key(Key::NumpadAdd, 50.0);
+        // keys.register_key(Key::L, 20.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 40.0), -90.0, 0.0);
@@ -287,12 +290,12 @@ impl Application for DebugVisualizator {
                 ComputeObject::init(
                     &configuration.device,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("compute_visuzlizer_wgsl"),
+                        label: Some("font_visualizer_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/font_visualizer.wgsl"))),
                     
                     }),
-                    Some("Visualizer Compute object"),
+                    Some("Font visualizer Compute object"),
                     &vec![
                         vec![
                             // @group(0)
@@ -496,15 +499,18 @@ impl Application for DebugVisualizator {
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration) {
 
+        // Prepare screen for rendering.
         self.screen.acquire_screen_texture(
             &device,
             &sc_desc,
             &surface
         );
 
+        // The viev.
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut items_available: i32 = 1; 
+        // First, render arrows and cubes.
+        let mut items_available: i32 = 1; // Total number of arrows. 
         let dispatch_x = 1;
         let mut clear = true;
         let mut i = dispatch_x * 64;
@@ -596,66 +602,6 @@ impl Application for DebugVisualizator {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
 
-        // if self.keys.test_key(&Key::L, input) { 
-        //     self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        //     self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        // }
-        // if self.keys.test_key(&Key::K, input) { 
-        //     self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
-        //     self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
-        // }
-        // if self.keys.test_key(&Key::Key1, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 1;  
-        //     self.temp_visualization_params.max_local_vertex_capacity = 1;  
-        // }
-        // if self.keys.test_key(&Key::Key2, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 2;
-        //     self.temp_visualization_params.max_local_vertex_capacity = 2;  
-        // }
-        // if self.keys.test_key(&Key::Key3, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 3;  
-        //     self.temp_visualization_params.max_local_vertex_capacity = 3;  
-        // }
-        // if self.keys.test_key(&Key::Key4, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 4;  
-        //     self.temp_visualization_params.max_local_vertex_capacity = 4;  
-        // }
-        // if self.keys.test_key(&Key::Key9, input) { 
-        //     self.block64mode = true;  
-        // }
-        // if self.keys.test_key(&Key::Key0, input) { 
-        //     self.block64mode = false;  
-        // }
-        // if self.keys.test_key(&Key::NumpadSubtract, input) { 
-        // //if self.keys.test_key(&Key::T, input) { 
-        //     let si = self.temp_visualization_params.iterator_start_index as i32;
-        //     if si >= THREAD_COUNT as i32 {
-        //         self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
-        //         self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
-        //     }
-        // }
-        // if self.keys.test_key(&Key::NumpadAdd, input) { 
-        //     let ei = self.temp_visualization_params.iterator_end_index;
-        //     if ei <= 4096 - THREAD_COUNT {
-        //         self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
-        //         self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
-        //     }
-        // }
-
-        // if self.block64mode {
-        //     queue.write_buffer(
-        //         &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-        //         0,
-        //         bytemuck::cast_slice(&[self.temp_visualization_params])
-        //     );
-        // }
-        // else {
-        //     queue.write_buffer(
-        //         &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-        //         0,
-        //         bytemuck::cast_slice(&[self.visualization_params])
-        //     );
-        // }
     }
 }
 

@@ -127,17 +127,17 @@ impl Application for DebugVisualizator {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-        let mut keys = KeyboardManager::init();
-        keys.register_key(Key::L, 20.0);
-        keys.register_key(Key::K, 20.0);
-        keys.register_key(Key::Key1, 10.0);
-        keys.register_key(Key::Key2, 10.0);
-        keys.register_key(Key::Key3, 10.0);
-        keys.register_key(Key::Key4, 10.0);
-        keys.register_key(Key::Key9, 10.0);
-        keys.register_key(Key::Key0, 10.0);
-        keys.register_key(Key::NumpadSubtract, 50.0);
-        keys.register_key(Key::NumpadAdd, 50.0);
+        // let mut keys = KeyboardManager::init();
+        // keys.register_key(Key::L, 20.0);
+        // keys.register_key(Key::K, 20.0);
+        // keys.register_key(Key::Key1, 10.0);
+        // keys.register_key(Key::Key2, 10.0);
+        // keys.register_key(Key::Key3, 10.0);
+        // keys.register_key(Key::Key4, 10.0);
+        // keys.register_key(Key::Key9, 10.0);
+        // keys.register_key(Key::Key0, 10.0);
+        // keys.register_key(Key::NumpadSubtract, 50.0);
+        // keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (40.0,40.0,120.0), -90.0, 0.0);
@@ -446,66 +446,10 @@ impl Application for DebugVisualizator {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
 
-        if self.keys.test_key(&Key::L, input) { 
-            self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-            self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        }
-        if self.keys.test_key(&Key::K, input) { 
-            self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
-            self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
-        }
-        if self.keys.test_key(&Key::Key1, input) { 
-            self.visualization_params.curve_number = 1;  
-            self.temp_visualization_params.curve_number = 1;  
-        }
-        if self.keys.test_key(&Key::Key2, input) { 
-            self.visualization_params.curve_number = 2;
-            self.temp_visualization_params.curve_number = 2;  
-        }
-        if self.keys.test_key(&Key::Key3, input) { 
-            self.visualization_params.curve_number = 3;  
-            self.temp_visualization_params.curve_number = 3;  
-        }
-        if self.keys.test_key(&Key::Key4, input) { 
-            self.visualization_params.curve_number = 4;  
-            self.temp_visualization_params.curve_number = 4;  
-        }
-        if self.keys.test_key(&Key::Key9, input) { 
-            self.block64mode = true;  
-        }
-        if self.keys.test_key(&Key::Key0, input) { 
-            self.block64mode = false;  
-        }
-        if self.keys.test_key(&Key::NumpadSubtract, input) { 
-        //if self.keys.test_key(&Key::T, input) { 
-            let si = self.temp_visualization_params.iterator_start_index as i32;
-            if si >= THREAD_COUNT as i32 {
-                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
-                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
-            }
-        }
-        if self.keys.test_key(&Key::NumpadAdd, input) { 
-            let ei = self.temp_visualization_params.iterator_end_index;
-            if ei <= 4096 - THREAD_COUNT {
-                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
-                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
-            }
-        }
-
-        if self.block64mode {
-            queue.write_buffer(
-                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-                0,
-                bytemuck::cast_slice(&[self.temp_visualization_params])
-            );
-        }
-        else {
-            queue.write_buffer(
-                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-                0,
-                bytemuck::cast_slice(&[self.visualization_params])
-            );
-        }
+        // if self.keys.test_key(&Key::L, input) { 
+        //     self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+        //     self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+        // }
     }
 }
 

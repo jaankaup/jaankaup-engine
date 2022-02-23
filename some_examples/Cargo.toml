@@ -27,6 +27,10 @@ name = "visualizer"
 path = "src/visualizer.rs"
 
 [[example]]
+name = "fmm"
+path = "src/fmm.rs"
+
+[[example]]
 name = "common_functions"
 path = "src/misc_functions.rs"
 
