@@ -175,7 +175,7 @@ impl Application for BasicApp {
         );
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 5.0, 10.0), -90.0, 0.0);
         camera.set_rotation_sensitivity(0.2);
 
         // Create bind groups for basic render pipeline and grass/rock textures.

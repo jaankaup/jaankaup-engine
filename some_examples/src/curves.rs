@@ -186,7 +186,7 @@ impl Application for DebugVisualizator {
         keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (40.0,40.0,120.0), -90.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 

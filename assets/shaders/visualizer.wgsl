@@ -11,7 +11,7 @@ struct Quaternion {
 };
 
 struct VisualizationParams{
-    max_vertex_capacity: u32;
+    max_number_of_vertices: u32;
     iterator_start_index: u32;
     iterator_end_index: u32;
     arrow_size: f32;

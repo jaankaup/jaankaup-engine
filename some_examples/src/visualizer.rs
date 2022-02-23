@@ -26,10 +26,10 @@ use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
 /// The number of vertices per chunk.
-const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
+const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; 
 
 /// The size of draw buffer;
-const VERTEX_BUFFER_SIZE: usize = 16 * MAX_VERTEX_CAPACITY * size_of::<f32>();
+const VERTEX_BUFFER_SIZE: usize = 16 * MAX_VERTEX_CAPACITY * size_of::<f32>(); // VVVC
 
 const THREAD_COUNT: u32 = 64;
 
@@ -57,7 +57,7 @@ struct Arrow {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct VisualizationParams{
-    max_local_vertex_capacity: u32,
+    max_number_of_vertices: u32,
     iterator_start_index: u32,
     iterator_end_index: u32,
     arrow_size: f32,
@@ -131,8 +131,8 @@ impl KeyboardManager {
 // State for this application.
 struct DebugVisualizator {
     pub screen: ScreenTexture, 
-    pub render_object: RenderObject, 
-    pub render_bind_groups: Vec<wgpu::BindGroup>,
+    pub render_object_vvvvnnnn: RenderObject, 
+    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
     pub render_object_vvvc: RenderObject,
     pub render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     pub compute_object: ComputeObject, 
@@ -186,12 +186,12 @@ impl Application for DebugVisualizator {
         keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 40.0), -90.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
         // vvvvnnnn
-        let render_object =
+        let render_object_vvvvnnnn =
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
@@ -220,10 +220,10 @@ impl Application for DebugVisualizator {
                     true,
                     wgpu::PrimitiveTopology::TriangleList
         );
-        let render_bind_groups = create_bind_groups(
+        let render_bind_groups_vvvvnnnn = create_bind_groups(
                                      &configuration.device,
-                                     &render_object.bind_group_layout_entries,
-                                     &render_object.bind_group_layouts,
+                                     &render_object_vvvvnnnn.bind_group_layout_entries,
+                                     &render_object_vvvvnnnn.bind_group_layouts,
                                      &vec![
                                          vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                                                  buffer: &camera.get_camera_uniform(&configuration.device),
@@ -281,7 +281,7 @@ impl Application for DebugVisualizator {
         let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
 
         let params = VisualizationParams {
-            max_local_vertex_capacity: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
+            max_number_of_vertices: 1,
             iterator_start_index: 0,
             iterator_end_index: 4096,
             //iterator_end_index: 32768,
@@ -289,10 +289,9 @@ impl Application for DebugVisualizator {
         };
 
         let temp_params = VisualizationParams {
-            max_local_vertex_capacity: 1, // curver!!!  MAX_VERTEX_CAPACITY as u32,
+            max_number_of_vertices: 1,
             iterator_start_index: 0,
             iterator_end_index: THREAD_COUNT,
-            //iterator_end_index: 32768,
             arrow_size: 0.3,
         };
 
@@ -516,8 +515,8 @@ impl Application for DebugVisualizator {
  
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            render_object: render_object,
-            render_bind_groups: render_bind_groups,
+            render_object_vvvvnnnn: render_object_vvvvnnnn,
+            render_bind_groups_vvvvnnnn: render_bind_groups_vvvvnnnn,
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             compute_object: compute_object,
@@ -551,7 +550,6 @@ impl Application for DebugVisualizator {
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // let mut items_available: i32 = 32768; 
         let mut items_available: i32 = 1; 
         let dispatch_x = 1;
         let mut clear = true;
@@ -613,8 +611,8 @@ impl Application for DebugVisualizator {
             draw(&mut encoder_render,
                  &view,
                  self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_bind_groups,
-                 &self.render_object.pipeline,
+                 &self.render_bind_groups_vvvvnnnn,
+                 &self.render_object_vvvvnnnn.pipeline,
                  &self.buffers.get("output").unwrap(),
                  self.draw_count_points..self.draw_count_triangles, // TODO: Cube 
                  clear

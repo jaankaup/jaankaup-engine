@@ -92,6 +92,7 @@ struct McApp {
     // pub visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
     pub marching_cubes: MarchingCubes,
+    pub update: bool,
 }
 
 impl McApp {
@@ -169,7 +170,7 @@ impl Application for McApp {
         // keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (50.0, 60.0, 150.0), -90.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
@@ -378,10 +379,6 @@ impl Application for McApp {
                     ]
         );
 
-        //++ println!("Creating compute bind groups.");
-
-        //++ println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
-
         let noise_compute_bind_groups = create_bind_groups(
                                            &configuration.device,
                                            &noise_compute_object.bind_group_layout_entries,
@@ -394,8 +391,6 @@ impl Application for McApp {
                                            ]
         );
 
-        //++ println!("Creating render bind groups.");
- 
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
@@ -410,6 +405,7 @@ impl Application for McApp {
             // visualization_params: params,
             keys: keys,
             marching_cubes: mc_instance,
+            update: true,
         }
     }
 
@@ -431,7 +427,6 @@ impl Application for McApp {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
 
-        println!("self.draw_count = {}", self.draw_count);
         draw(&mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
@@ -461,8 +456,9 @@ impl Application for McApp {
 
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
-        println!("updating...");
         self.camera.update_from_input(&queue, &input);
+
+        if !self.update { return; }
 
         let total_grid_count = GLOBAL_NOISE_X_DIMENSION *
                                GLOBAL_NOISE_Y_DIMENSION * 
@@ -473,16 +469,10 @@ impl Application for McApp {
 
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
 
-        println!("{}", NOISE_BUFFER_SIZE / (64*64*4));
-
         self.noise_compute_object.dispatch(
             &self.noise_compute_bind_groups,
             &mut encoder_command,
             total_grid_count / 1024, 1, 1, Some("noise dispatch")
-            //1024, 1, 1, Some("noise dispatch")
-            // 4096, 1, 1, Some("noise dispatch")
-            //65535, 1, 1, Some("noise dispatch")
-            //NOISE_BUFFER_SIZE / (64*64*4), 1, 1, Some("noise dispatch")
         );
 
         self.marching_cubes.dispatch(&mut encoder_command, total_grid_count / 256, 1, 1);
@@ -491,6 +481,8 @@ impl Application for McApp {
         queue.submit(Some(encoder_command.finish()));
 
         self.draw_count = self.marching_cubes.get_counter_value(device, queue);
+
+        self.update = false;
 
         // let counter = self.histogram.get_values(device, queue);
         // self.draw_count = counter[0] * 3;

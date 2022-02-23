@@ -66,22 +66,6 @@ impl Camera {
 
     pub fn set_movement_sensitivity(&mut self, sensitivity: f32) {
 
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.5, 0.9, 0.0, 0.15)));   // 148
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.25, 0.85, 0.0, 0.0)));  // 149
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.25, 0.55, 0.0, 0.0)));  // 150
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.25, 0.5, 0.0, 0.0)));   // 151
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.5, 0.9, 0.0, 0.15)));   // 152
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.75, 0.85, 0.0, 0.0)));  // 153
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.75, 0.55, 0.0, 0.0)));  // 154
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.75, 0.5, 0.0, 0.0)));   // 155
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.5, 0.1, 0.0, 0.15)));   // 156
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.25, 0.15, 0.0, 0.0)));  // 157
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.25, 0.45, 0.0, 0.0)));  // 158
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.25, 0.5, 0.0, 0.0)));   // 159
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.5, 0.1, 0.0, 0.15)));   // 160
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.75, 0.15, 0.0, 0.0)));  // 161
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.75, 0.45, 0.0, 0.0)));  // 162
-    // println!("{:?}", 0.1 * (cgmath::Vector4::<f32>::new(1.8, 0.0, 0.0, 0.0) + cgmath::Vector4::<f32>::new(0.75, 0.5, 0.0, 0.0)));    // 163
         assert!(sensitivity > 0.0, "Movement sensitivity must be > 0.");
         self.movement_sensitivity = sensitivity;
     }
@@ -148,14 +132,24 @@ impl Camera {
     }
 
     /// TODO: something better.
-    pub fn new(aspect_width: f32, aspect_height: f32) -> Self {
+    pub fn new(aspect_width: f32, aspect_height: f32, start_position: (f32, f32, f32), yaw: f32, pitch: f32) -> Self {
 
         assert!(aspect_height > 0.0, "Height must be > 0.");
         assert!(aspect_width > 0.0, "Width must be > 0.");
 
+        let pitch = clamp(
+            pitch,
+            -89.0,89.0);
+
+        let view = Vector3::new(
+            pitch.to_radians().cos() * yaw.to_radians().cos(),
+            pitch.to_radians().sin(),
+            pitch.to_radians().cos() * yaw.to_radians().sin()
+        ).normalize_to(1.0);
+
         Self {
-            pos: (3.0, 4.0, 1.0).into(),
-            view: Vector3::new(0.0, 0.0, -1.0).normalize(),
+            pos: start_position.into(),
+            view: view, //Vector3::new(0.0, 0.0, -1.0).normalize(),
             up: cgmath::Vector3::unit_y(),
             aspect: aspect_width / aspect_height as f32,
             fov: (45.0,45.0).into(),
@@ -163,8 +157,8 @@ impl Camera {
             zfar: 1000.0,
             movement_sensitivity: 0.003,
             rotation_sensitivity: 0.05,
-            pitch: -80.5,
-            yaw: -50.5,
+            pitch: pitch, // -80.5,
+            yaw: yaw, // -50.5,
             aperture_radius: 0.01,
             focal_distance: 1.0,
             camera_buffer: None,
