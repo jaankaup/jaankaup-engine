@@ -18,7 +18,7 @@ use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
-use jaankaup_core::common_functions::encode_rgba_u32;
+use jaankaup_core::common_functions::{encode_rgba_u32, udiv_up_safe32};
 use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 
@@ -112,14 +112,17 @@ struct Fmm {
     pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
     pub render_object_vvvc: RenderObject,
     pub render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
-    pub compute_object: ComputeObject, 
-    pub compute_bind_groups: Vec<wgpu::BindGroup>,
+    pub compute_object_char: ComputeObject, 
+    pub compute_bind_groups_char: Vec<wgpu::BindGroup>,
     pub compute_object_arrow: ComputeObject, 
     pub compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
+    pub compute_object_fmm: ComputeObject, 
+    pub compute_bind_groups_fmm: Vec<wgpu::BindGroup>,
     // pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
-    pub histogram: Histogram,
+    pub histogram_draw_counts: Histogram,
+    pub histogram_fmm: Histogram,
     pub draw_count_points: u32,
     pub draw_count_triangles: u32,
     pub visualization_params: VisualizationParams,
@@ -154,7 +157,7 @@ impl Application for Fmm {
         // keys.register_key(Key::L, 20.0);
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 40.0), -90.0, 0.0);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -90.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
@@ -246,7 +249,8 @@ impl Application for Fmm {
 
         println!("Creating compute object.");
 
-        let histogram = Histogram::init(&configuration.device, &vec![0; 2]);
+        let histogram_draw_counts = Histogram::init(&configuration.device, &vec![0; 2]);
+        let histogram_fmm = Histogram::init(&configuration.device, &vec![0; 2]);
 
         let params = VisualizationParams {
             max_number_of_vertices: 1,
@@ -262,6 +266,10 @@ impl Application for Fmm {
             iterator_end_index: THREAD_COUNT,
             arrow_size: 0.3,
         };
+        
+        ////////////////////////////////////////////////////
+        ////                 BUFFERS                    ////
+        ////////////////////////////////////////////////////
 
         buffers.insert(
             "fmm_params".to_string(),
@@ -303,19 +311,6 @@ impl Application for Fmm {
                 }
             )
         );
-        // buffers.insert(
-        //     "debug_arrays".to_string(),
-        //     buffer_from_data::<Arrow>(
-        //         &configuration.device,
-        //         &vec![Arrow { start_pos: [0.0, 0.0, 0.0, 1.0],
-        //                       end_pos:   [4.0, 3.0, 0.0, 1.0],
-        //                       color: encode_rgba_u32(0, 0, 255, 255),
-        //                       size: 0.2,
-        //                       _padding: [0, 0]}],
-        //         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //         Some("Debug array buffer")
-        //     )
-        // );
 
         buffers.insert(
             "output_render".to_string(),
@@ -336,8 +331,11 @@ impl Application for Fmm {
             None)
         );
 
+        ////////////////////////////////////////////////////
+        ////                 Compute char               ////
+        ////////////////////////////////////////////////////
 
-        let compute_object =
+        let compute_object_char =
                 ComputeObject::init(
                     &configuration.device,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -422,28 +420,32 @@ impl Application for Fmm {
 
         // println!("{:?}", buffers.get(&"debug_arrays".to_string()).unwrap().as_entire_binding());
 
-        let compute_bind_groups = create_bind_groups(
+        let compute_bind_groups_char = create_bind_groups(
                                       &configuration.device,
-                                      &compute_object.bind_group_layout_entries,
-                                      &compute_object.bind_group_layouts,
+                                      &compute_object_char.bind_group_layout_entries,
+                                      &compute_object_char.bind_group_layouts,
                                       &vec![
                                           vec![
                                                &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
                                                &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
-                                               &histogram.get_histogram_buffer().as_entire_binding(),
+                                               &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
 
+        ////////////////////////////////////////////////////
+        ////               Compute arrow/aabb           ////
+        ////////////////////////////////////////////////////
+
         let compute_object_arrow =
                 ComputeObject::init(
                     &configuration.device,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("compute_visuzlizer_wgsl array"),
+                        label: Some("arrow_aabb.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/arrow_aabb.wgsl"))),
                     
                     }),
                     Some("Visualizer Compute object"),
@@ -512,23 +514,27 @@ impl Application for Fmm {
                                       &vec![
                                           vec![
                                                &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
-                                               &histogram.get_histogram_buffer().as_entire_binding(),
+                                               &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
 
+        ////////////////////////////////////////////////////
+        ////               Compute fmm                  ////
+        ////////////////////////////////////////////////////
+
         let compute_object_fmm =
                 ComputeObject::init(
                     &configuration.device,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("compute_visuzlizer_wgsl array"),
+                        label: Some("fmm.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm.wgsl"))),
                     
                     }),
-                    Some("Visualizer Compute object"),
+                    Some("FMM Compute object"),
                     &vec![
                         vec![
                             // @group(0)
@@ -602,15 +608,15 @@ impl Application for Fmm {
 
         let compute_bind_groups_fmm = create_bind_groups(
                                       &configuration.device,
-                                      &compute_object_arrow.bind_group_layout_entries,
-                                      &compute_object_arrow.bind_group_layouts,
+                                      &compute_object_fmm.bind_group_layout_entries,
+                                      &compute_object_fmm.bind_group_layouts,
                                       &vec![
                                           vec![
                                                &buffers.get(&"fmm_params".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"fmm_cells".to_string()).unwrap().as_entire_binding(),
-                                               &histogram.get_histogram_buffer().as_entire_binding(), // create a histogram for fmm.
-                                               &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
-                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding()
+                                               &histogram_fmm.get_histogram_buffer().as_entire_binding(),
+                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
@@ -624,14 +630,17 @@ impl Application for Fmm {
             render_bind_groups_vvvvnnnn: render_bind_groups_vvvvnnnn,
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
-            compute_object: compute_object,
-            compute_bind_groups: compute_bind_groups,
+            compute_object_char: compute_object_char,
+            compute_bind_groups_char: compute_bind_groups_char,
             compute_object_arrow: compute_object_arrow, 
             compute_bind_groups_arrow: compute_bind_groups_arrow,
+            compute_object_fmm: compute_object_fmm, 
+            compute_bind_groups_fmm: compute_bind_groups_fmm,
             // _textures: textures,
             buffers: buffers,
             camera: camera,
-            histogram: histogram,
+            histogram_draw_counts: histogram_draw_counts,
+            histogram_fmm: histogram_fmm,
             draw_count_points: 0,
             draw_count_triangles: 0,
             visualization_params: params,
@@ -655,83 +664,76 @@ impl Application for Fmm {
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut items_available: i32 = 1; 
-        let dispatch_x = 1;
-        let mut clear = true;
-        let mut i = dispatch_x * 64;
+        // Execute fmm.
+        let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
 
-        while items_available > 0 {
+        self.compute_object_fmm.dispatch(
+            &self.compute_bind_groups_fmm,
+            &mut encoder_command,
+            1, 1, 1, Some("fmm dispatch")
+        );
 
-            let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
+        // Submit compute.
+        queue.submit(Some(encoder_command.finish()));
 
-            // Take 128 * 64 = 8192 items.
-            self.compute_object.dispatch(
-                &self.compute_bind_groups,
-                &mut encoder_command,
-                dispatch_x, 1, 1, Some("font visualizer dispatch")
-            );
+        let fmm_counter = self.histogram_fmm.get_values(device, queue);
+        let number_of_chars = fmm_counter[0];
+        let number_of_arrows = fmm_counter[1];
+        // let number_of_aabbs = fmm_counter[2];
+        println!("number_of_arrows == {}", number_of_arrows);
 
+        // Update Visualization params for arrows.
+        self.visualization_params.iterator_start_index = 0;
+        self.visualization_params.iterator_end_index = number_of_arrows;
 
-            // Submit compute.
-            queue.submit(Some(encoder_command.finish()));
+        queue.write_buffer(
+            &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.visualization_params])
+        );
 
-            let counter = self.histogram.get_values(device, queue);
-            self.draw_count_points = counter[0];
-            
-            let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
+        // Execute arrow_aabb.
+        let arrow_dispatch = udiv_up_safe32(number_of_arrows, 64); 
+        println!("arrow_dispatch == {}", arrow_dispatch);
 
-            self.compute_object_arrow.dispatch(
-                &self.compute_bind_groups_arrow,
-                &mut encoder_command,
-                dispatch_x, 1, 1, Some("font visualizer dispatch")
-            );
+        let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
 
-            queue.submit(Some(encoder_command.finish()));
+        self.compute_object_arrow.dispatch(
+            &self.compute_bind_groups_arrow,
+            &mut encoder_arrow_aabb,
+            arrow_dispatch, 1, 1, Some("arrow dispatch")
+        );
 
-            let counter2 = self.histogram.get_values(device, queue);
-            self.draw_count_triangles = counter2[0];
+        queue.submit(Some(encoder_arrow_aabb.finish()));
 
-            //println!("self.draw_count  == {}", self.draw_count); 
+        let counter = self.histogram_draw_counts.get_values(device, queue);
+        self.draw_count_triangles = counter[0];
+        println!("self.draw_count_triangles == {}", self.draw_count_triangles);
 
-            let mut encoder_render = device.create_command_encoder(
-                &wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-            });
+        let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
 
-            items_available = items_available - dispatch_x as i32 * 64; 
+        draw(&mut encoder_arrow_rendering,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_bind_groups_vvvvnnnn,
+             &self.render_object_vvvvnnnn.pipeline,
+             &self.buffers.get("output_render").unwrap(),
+             0..self.draw_count_triangles,
+             //0..self.draw_count_triangles,
+             true
+        );
 
-            // Draw the cube.
-            draw(&mut encoder_render,
-                 &view,
-                 self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_bind_groups_vvvc,
-                 &self.render_object_vvvc.pipeline,
-                 &self.buffers.get("output_render").unwrap(),
-                 0..self.draw_count_points, // TODO: Cube 
-                 clear
-            );
+        queue.submit(Some(encoder_arrow_rendering.finish()));
 
-            clear = false;
+        // self.histogram_draw_counts.set_values_cpu_version(queue, &vec![0, i]);
+        // i = i + dispatch_x*64;
 
-            draw(&mut encoder_render,
-                 &view,
-                 self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_bind_groups_vvvvnnnn,
-                 &self.render_object_vvvvnnnn.pipeline,
-                 &self.buffers.get("output_render").unwrap(),
-                 self.draw_count_points..self.draw_count_triangles, // TODO: Cube 
-                 clear
-            );
-            queue.submit(Some(encoder_render.finish()));
-            clear = items_available <= 0;
-            self.histogram.set_values_cpu_version(queue, &vec![0, i]);
-            i = i + dispatch_x*64;
-        }
-
+        // Update screen.
         self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
+        self.histogram_draw_counts.reset_all_cpu_version(queue, 0); // TODO: fix histogram_draw_counts.reset_cpu_version        
+        self.histogram_fmm.reset_all_cpu_version(queue, 0); 
     }
 
     #[allow(unused)]
