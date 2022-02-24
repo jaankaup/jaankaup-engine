@@ -206,7 +206,8 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 
 fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
                    normals:   ptr<function, array<vec4<f32>, 6>>,
-                   offset: u32) {
+                   offset: u32,
+                   stride: u32) {
 
     let index = atomicAdd(&counter[0], 36u);
 
@@ -229,14 +230,14 @@ fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
 
     loop {
         if (i == 36u) { break; }
-    	output[index+i] = temp_vertex_data[offset + STRIDE * i];
+    	output[index+i] = temp_vertex_data[offset + stride * i];
         i = i + 1u;
     }
 
     workgroupBarrier();
 } 
 
-fn create_aabb(aabb: AABB, offset: u32, color: u32) {
+fn create_aabb(aabb: AABB, offset: u32, stride: u32, color: u32) {
 
     // Global start position.
     let index = atomicAdd(&counter[0], 36u);
@@ -285,11 +286,12 @@ fn create_aabb(aabb: AABB, offset: u32, color: u32) {
 
     store_hexaedron(&positions,
                     &normals,
-                    offset
+                    offset,
+                    stride
     );
 }
 
-fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32) {
+fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, stride: u32) {
 
     var aabbs = array<AABB, 12>(
         AABB(aabb.min, vec4<f32>(aabb.max.x, aabb.min.y + t, aabb.min.z + t, 1.0)),
@@ -330,12 +332,13 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32) {
         );
         store_hexaedron(&positions,
                         &normals,
-                        offset
+                        offset,
+                        stride
         );
     }
 }
 
-fn create_arrow(arr: Arrow, offset: u32) {
+fn create_arrow(arr: Arrow, offset: u32, stride: u32) {
 
     var direction = arr.end_pos.xyz - arr.start_pos.xyz;
     let array_length = length(direction);
@@ -396,7 +399,7 @@ fn create_arrow(arr: Arrow, offset: u32) {
         vec4<f32>(n5, 0.0)
     );
 
-    store_hexaedron(&positions, &normals, offset);
+    store_hexaedron(&positions, &normals, offset, stride);
 
     let from_origo_x_top_arr = vec3<f32>(head_size, 3.0 * arr.size, 3.0 * arr.size);
     //let from_origo_x_top_arr = vec3<f32>(1.0, 3.0 * arr.size, 3.0 * arr.size);
@@ -471,7 +474,7 @@ fn create_arrow(arr: Arrow, offset: u32) {
     );
 
     // workgroupBarrier();
-    store_hexaedron(&positions_head, &normals_head, offset);
+    store_hexaedron(&positions_head, &normals_head, offset, stride);
 }
 
 @stage(compute)
@@ -481,10 +484,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    let actual_global_id = local_id.x + 64u * work_group_id.x; 
+    // struct VisualizationParams{
+    //     max_number_of_vertices: u32;
+    //     iterator_start_index: u32;
+    //     iterator_end_index: u32;
+    //     arrow_size: f32;
+    // };
+    let delta = visualization_params.iterator_end_index - visualization_params.iterator_start_index;
+    let actual_index = visualization_params.iterator_start_index + global_id.x;
 
-    create_arrow(arrows[actual_global_id], local_index);
-
-    // if (actual_global_id < visualization_params.max_number_of_vertices) {
-    // }
+    if (actual_index < visualization_params.iterator_end_index) {
+        create_arrow(arrows[actual_index], local_index, min(64u, delta));
+    }
 }

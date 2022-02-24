@@ -25,21 +25,29 @@ use bytemuck::{Pod, Zeroable};
 use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
-const MAX_NUMBERS_OF_ARROWS: usize = 4096; 
-const MAX_NUMBERS_OF_CHARS:  usize = 4096; 
+// TODO: add to fmm params.
+const MAX_NUMBERS_OF_ARROWS: usize = 40960;
+const MAX_NUMBERS_OF_CHARS:  usize = 40960;
 
 // FMM dimensions.
 const FMM_X: usize = 16; 
 const FMM_Y: usize = 16; 
 const FMM_Z: usize = 16; 
 
-/// The number of vertices per chunk.
-const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; 
+const MAX_NUMBER_OF_VVVVNNNN: usize = 34000; // 640 * 72; //46080;
 
-/// The size of draw buffer;
-const VERTEX_BUFFER_SIZE: usize = 16 * MAX_VERTEX_CAPACITY * size_of::<f32>(); // VVVC
+/// The size of draw buffer in bytes;
+const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
+//const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>() / 4;
 
 const THREAD_COUNT: u32 = 64;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct Vertex {
+    v: [f32; 4],
+    n: [f32; 4],
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -157,7 +165,7 @@ impl Application for Fmm {
         // keys.register_key(Key::L, 20.0);
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -90.0, 0.0);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
@@ -253,9 +261,9 @@ impl Application for Fmm {
         let histogram_fmm = Histogram::init(&configuration.device, &vec![0; 2]);
 
         let params = VisualizationParams {
-            max_number_of_vertices: 1,
+            max_number_of_vertices: VERTEX_BUFFER_SIZE as u32,
             iterator_start_index: 0,
-            iterator_end_index: 4096,
+            iterator_end_index: 0,
             //iterator_end_index: 32768,
             arrow_size: 0.3,
         };
@@ -662,6 +670,8 @@ impl Application for Fmm {
             &surface
         );
 
+        let thread_count = 64;
+
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // Execute fmm.
@@ -678,52 +688,86 @@ impl Application for Fmm {
 
         let fmm_counter = self.histogram_fmm.get_values(device, queue);
         let number_of_chars = fmm_counter[0];
-        let number_of_arrows = fmm_counter[1];
-        // let number_of_aabbs = fmm_counter[2];
-        println!("number_of_arrows == {}", number_of_arrows);
+        let total_number_of_arrows = fmm_counter[1];
+
+        let arrow_chunks = udiv_up_safe32(total_number_of_arrows * 72, MAX_NUMBER_OF_VVVVNNNN as u32); 
+        println!("arrow_chunks == {}", arrow_chunks); 
+        println!("total_number_of_arrows == {}", total_number_of_arrows); 
+        println!("total_number_of_arrows * 72 == {}", total_number_of_arrows * 72); 
+        println!("MAX_NUMBER_OF_VVVVNNNN  == {}", MAX_NUMBER_OF_VVVVNNNN); 
+
+        let vertices_per_dispatch = thread_count * 72;; 
+        let total_number_of_dispatches = udiv_up_safe32(total_number_of_arrows * 72, vertices_per_dispatch);
+        let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / vertices_per_dispatch;
+        let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
+        // let 
+        println!("total_number_of_dispatches == {}", total_number_of_dispatches);
+        println!("safe_number_of_dispatches == {}", safe_number_of_dispatches);
+        println!("number_of_loop == {}", number_of_loop);
 
         // Update Visualization params for arrows.
         self.visualization_params.iterator_start_index = 0;
-        self.visualization_params.iterator_end_index = number_of_arrows;
+        self.visualization_params.iterator_end_index = total_number_of_arrows;
 
-        queue.write_buffer(
-            &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-            0,
-            bytemuck::cast_slice(&[self.visualization_params])
-        );
+        // queue.write_buffer(
+        //     &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+        //     0,
+        //     bytemuck::cast_slice(&[self.visualization_params])
+        // );
 
-        // Execute arrow_aabb.
-        let arrow_dispatch = udiv_up_safe32(number_of_arrows, 64); 
-        println!("arrow_dispatch == {}", arrow_dispatch);
+        let mut clear = true;
 
-        let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
+        for i in 0..number_of_loop {
+            let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
+            println!("local_dispatch == {}", local_dispatch);
 
-        self.compute_object_arrow.dispatch(
-            &self.compute_bind_groups_arrow,
-            &mut encoder_arrow_aabb,
-            arrow_dispatch, 1, 1, Some("arrow dispatch")
-        );
+            // Execute arrow_aabb.
+            //let arrow_dispatch = udiv_up_safe32(total_number_of_arrows, 64); 
 
-        queue.submit(Some(encoder_arrow_aabb.finish()));
+            let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
 
-        let counter = self.histogram_draw_counts.get_values(device, queue);
-        self.draw_count_triangles = counter[0];
-        println!("self.draw_count_triangles == {}", self.draw_count_triangles);
+            self.compute_object_arrow.dispatch(
+                &self.compute_bind_groups_arrow,
+                &mut encoder_arrow_aabb,
+                local_dispatch, 1, 1, Some("arrow local dispatch")
+            );
 
-        let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
+            queue.submit(Some(encoder_arrow_aabb.finish()));
 
-        draw(&mut encoder_arrow_rendering,
-             &view,
-             self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_bind_groups_vvvvnnnn,
-             &self.render_object_vvvvnnnn.pipeline,
-             &self.buffers.get("output_render").unwrap(),
-             0..self.draw_count_triangles,
-             //0..self.draw_count_triangles,
-             true
-        );
+            let counter = self.histogram_draw_counts.get_values(device, queue);
+            self.draw_count_triangles = counter[0];
+            println!("self.draw_count_triangles == {}", self.draw_count_triangles);
 
-        queue.submit(Some(encoder_arrow_rendering.finish()));
+            let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
+
+            draw(&mut encoder_arrow_rendering,
+                 &view,
+                 self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups_vvvvnnnn,
+                 &self.render_object_vvvvnnnn.pipeline,
+                 &self.buffers.get("output_render").unwrap(),
+                 0..self.draw_count_triangles,
+                 //0..self.draw_count_triangles,
+                 clear
+            );
+           
+            if clear { clear = !clear; }
+
+            queue.submit(Some(encoder_arrow_rendering.finish()));
+            self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+            // Update Visualization params for arrows.
+            self.visualization_params.iterator_start_index = self.visualization_params.iterator_start_index + local_dispatch * 64;
+            println!("self.visualization_params.iterator_start_index == {}", self.visualization_params.iterator_start_index);
+
+            queue.write_buffer(
+                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.visualization_params])
+            );
+        }
+
+
 
         // self.histogram_draw_counts.set_values_cpu_version(queue, &vec![0, i]);
         // i = i + dispatch_x*64;
@@ -732,7 +776,6 @@ impl Application for Fmm {
         self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.histogram_draw_counts.reset_all_cpu_version(queue, 0); // TODO: fix histogram_draw_counts.reset_cpu_version        
         self.histogram_fmm.reset_all_cpu_version(queue, 0); 
     }
 

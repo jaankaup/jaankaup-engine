@@ -121,17 +121,17 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
     workgroupBarrier();
     
-    for (var i: i32 = 0; i < 10 ; i = i + 1) {
+    for (var i: i32 = 0; i < 100 ; i = i + 1) {
         output_arrow[local_index + 64u * u32(i)] =  
               Arrow (
-                  vec4<f32>(f32(i * 64 + i32(local_index)) + 0.5, 4.0 * f32(local_index), 0.0, 1.0),
-                  vec4<f32>(f32(i * 64 + i32(local_index)), 8.0 * f32(local_index+1u), 5.0 + f32(i), 1.0),
+                  vec4<f32>(f32(i * 64 + i32(local_index)) * 0.2 + 0.5, 4.0 * f32(local_index), 0.0, 1.0),
+                  vec4<f32>(f32(i * 64 + i32(local_index)) * 0.2, 8.0 * f32(local_index+1u), 5.0 + f32(i), 1.0),
                   rgba_u32(255u, 0u, 0u, 255u),
                   0.5
               );
     }
 
     if (local_index == 0u) {
-        update_workgroup_counters(10u * 64u);
+        update_workgroup_counters(100u * 64u);
     }
 }
