@@ -167,7 +167,7 @@ impl Application for Fmm {
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.02);
+        camera.set_movement_sensitivity(0.2);
 
         // vvvvnnnn
         let render_object_vvvvnnnn =
@@ -696,8 +696,8 @@ impl Application for Fmm {
         println!("total_number_of_arrows * 72 == {}", total_number_of_arrows * 72); 
         println!("MAX_NUMBER_OF_VVVVNNNN  == {}", MAX_NUMBER_OF_VVVVNNNN); 
 
-        let vertices_per_dispatch = thread_count * 72;; 
-        let total_number_of_dispatches = udiv_up_safe32(total_number_of_arrows * 72, vertices_per_dispatch);
+        let vertices_per_dispatch = thread_count * 72;
+        let total_number_of_dispatches = udiv_up_safe32(total_number_of_arrows, thread_count);
         let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / vertices_per_dispatch;
         let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
         // let 
@@ -735,7 +735,7 @@ impl Application for Fmm {
             queue.submit(Some(encoder_arrow_aabb.finish()));
 
             let counter = self.histogram_draw_counts.get_values(device, queue);
-            self.draw_count_triangles = counter[0];
+            self.draw_count_triangles = counter[0] * 3;
             println!("self.draw_count_triangles == {}", self.draw_count_triangles);
 
             let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
