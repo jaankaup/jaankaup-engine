@@ -330,53 +330,76 @@ fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32) {
     //                 stride
     // );
 }
-//++ 
-//++ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, stride: u32) {
-//++ 
-//++     var aabbs = array<AABB, 12>(
-//++         AABB(aabb.min, vec4<f32>(aabb.max.x, aabb.min.y + t, aabb.min.z + t, 1.0)),
-//++         AABB(aabb.min, vec4<f32>(aabb.min.x + t, aabb.min.y + t, aabb.max.z, 1.0)),
-//++         AABB(vec4<f32>(aabb.max.x - t, aabb.min.y, aabb.min.z, 1.0), vec4<f32>(aabb.max.x, aabb.min.y + t,  aabb.max.z, 1.0)),
-//++         AABB(vec4<f32>(aabb.min.x, aabb.min.y, aabb.max.z - t, 1.0), vec4<f32>(aabb.max.x, aabb.min.y + t,  aabb.max.z, 1.0)),
-//++         AABB(vec4<f32>(aabb.min.x, aabb.max.y - t, aabb.min.z, 1.0),  vec4<f32>(aabb.max.x, aabb.max.y,     aabb.min.z + t, 1.0)),
-//++         AABB(vec4<f32>(aabb.min.x, aabb.max.y - t, aabb.min.z, 1.0),  vec4<f32>(aabb.min.x + t, aabb.max.y, aabb.max.z, 1.0)),
-//++         AABB(vec4<f32>(aabb.max.x - t, aabb.max.y - t, aabb.min.z, 1.0),  vec4<f32>(aabb.max.x, aabb.max.y, aabb.max.z, 1.0)),
-//++         AABB(vec4<f32>(aabb.min.x, aabb.max.y - t, aabb.max.z - t, 1.0),  vec4<f32>(aabb.max.x, aabb.max.y, aabb.max.z, 1.0)),
-//++         AABB(vec4<f32>(aabb.min.x, aabb.min.y, aabb.min.z, 1.0), vec4<f32>(aabb.min.x + t, aabb.max.y, aabb.min.z + t, 1.0)),
-//++         AABB(vec4<f32>(aabb.max.x - t, aabb.min.y, aabb.min.z, 1.0),  vec4<f32>(aabb.max.x    , aabb.max.y, aabb.min.z + t, 1.0)),
-//++         AABB(vec4<f32>(aabb.min.x,  aabb.min.y, aabb.max.z - t, 1.0), vec4<f32>(aabb.min.x + t, aabb.max.y, aabb.max.z, 1.0)),
-//++         AABB(vec4<f32>(aabb.max.x - t, aabb.min.y, aabb.max.z - t, 1.0),  vec4<f32>(aabb.max.x    , aabb.max.y, aabb.max.z, 1.0))
-//++     );
-//++ 
-//++     var normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
-//++         vec4<f32>(0.0, 0.0, -1.0, 0.0),
-//++         vec4<f32>(0.0, 0.0, 1.0, 0.0),
-//++         vec4<f32>(1.0, 0.0, 0.0, 0.0),
-//++         vec4<f32>(-1.0, 0.0, 0.0, 0.0),
-//++         vec4<f32>(0.0, 1.0, 0.0, 0.0),
-//++         vec4<f32>(0.0, -1.0, 0.0, 0.0)
-//++     );
-//++ 
-//++     for (var i: i32 = 0; i<12 ; i = i + 1) {
-//++         
-//++         let delta = aabbs[i].max - aabbs[i].min;
-//++         var positions = array<vec4<f32>, 8>(
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)),
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
-//++         	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
-//++         );
-//++         store_hexaedron(&positions,
-//++                         &normals,
-//++                         offset,
-//++                         stride
-//++         );
-//++     }
-//++ }
+ 
+fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32) {
+
+    var aabbs = array<AABB, 12>(
+        AABB(aabb.min, vec4<f32>(aabb.max.x, aabb.min.y + t, aabb.min.z + t, 1.0)),
+        AABB(aabb.min, vec4<f32>(aabb.min.x + t, aabb.min.y + t, aabb.max.z, 1.0)),
+        AABB(vec4<f32>(aabb.max.x - t, aabb.min.y, aabb.min.z, 1.0), vec4<f32>(aabb.max.x, aabb.min.y + t,  aabb.max.z, 1.0)),
+        AABB(vec4<f32>(aabb.min.x, aabb.min.y, aabb.max.z - t, 1.0), vec4<f32>(aabb.max.x, aabb.min.y + t,  aabb.max.z, 1.0)),
+        AABB(vec4<f32>(aabb.min.x, aabb.max.y - t, aabb.min.z, 1.0),  vec4<f32>(aabb.max.x, aabb.max.y,     aabb.min.z + t, 1.0)),
+        AABB(vec4<f32>(aabb.min.x, aabb.max.y - t, aabb.min.z, 1.0),  vec4<f32>(aabb.min.x + t, aabb.max.y, aabb.max.z, 1.0)),
+        AABB(vec4<f32>(aabb.max.x - t, aabb.max.y - t, aabb.min.z, 1.0),  vec4<f32>(aabb.max.x, aabb.max.y, aabb.max.z, 1.0)),
+        AABB(vec4<f32>(aabb.min.x, aabb.max.y - t, aabb.max.z - t, 1.0),  vec4<f32>(aabb.max.x, aabb.max.y, aabb.max.z, 1.0)),
+        AABB(vec4<f32>(aabb.min.x, aabb.min.y, aabb.min.z, 1.0), vec4<f32>(aabb.min.x + t, aabb.max.y, aabb.min.z + t, 1.0)),
+        AABB(vec4<f32>(aabb.max.x - t, aabb.min.y, aabb.min.z, 1.0),  vec4<f32>(aabb.max.x    , aabb.max.y, aabb.min.z + t, 1.0)),
+        AABB(vec4<f32>(aabb.min.x,  aabb.min.y, aabb.max.z - t, 1.0), vec4<f32>(aabb.min.x + t, aabb.max.y, aabb.max.z, 1.0)),
+        AABB(vec4<f32>(aabb.max.x - t, aabb.min.y, aabb.max.z - t, 1.0),  vec4<f32>(aabb.max.x    , aabb.max.y, aabb.max.z, 1.0))
+    );
+
+    var normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
+        vec4<f32>(0.0, 0.0, -1.0, 0.0),
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(-1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, -1.0, 0.0, 0.0)
+    );
+
+    for (var i: i32 = 0; i<12 ; i = i + 1) {
+        
+        let delta = aabbs[i].max - aabbs[i].min;
+        var positions = array<vec4<f32>, 8>(
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)),
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, f32(col)) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+        );
+
+    	var j: u32 = 0u;
+
+    	loop {
+    	    if (j == 12u) { break; }
+    	    output[thread_group_counter + j * offset + local_index]  = 
+    	        Triangle(
+    	        	Vertex(
+    	        	    positions[vertex_positions[j*3u]],
+    	        	    normals[(j*3u)/6u]
+    	        	),
+    	        	Vertex(
+    	        	    positions[vertex_positions[j*3u+1u]],
+    	        	    normals[(j*3u)/6u]
+    	        	),
+    	        	Vertex(
+    	        	    positions[vertex_positions[j*3u+2u]],
+    	        	    normals[(j*3u)/6u]
+    	        	)
+    	    );
+
+    	    j = j + 1u;
+    	}
+        // store_hexaedron(&positions,
+        //                 &normals,
+        //                 offset,
+        //                 stride
+        // );
+    }
+}
 
 fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
 
@@ -661,6 +684,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         else if (arrow_aabb_params.element_type == 1u) {
     	    thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
         }
+        else if (arrow_aabb_params.element_type == 2u) {
+    	    thread_group_counter = atomicAdd(&counter[0], 144u * u32(delta));
+        }
     }
 
     workgroupBarrier();
@@ -674,5 +700,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     else if (arrow_aabb_params.element_type == 1u) {
         let aabb = aabbs[actual_index];
         create_aabb(aabb, u32(delta), local_index, u32(aabb.min.w));
+    }
+    else if (arrow_aabb_params.element_type == 2u) {
+        let aabb = aabb_wires[actual_index];
+        create_aabb_wire(aabb, aabb.max.w, u32(aabb.min.w), u32(delta), local_index);
     }
 }

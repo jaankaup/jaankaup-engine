@@ -36,7 +36,7 @@ const FMM_X: usize = 16;
 const FMM_Y: usize = 16; 
 const FMM_Z: usize = 16; 
 
-const MAX_NUMBER_OF_VVVVNNNN: usize = 34000;
+const MAX_NUMBER_OF_VVVVNNNN: usize = 340000;
 
 /// The size of draw buffer in bytes;
 const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
@@ -776,75 +776,30 @@ impl Application for Fmm {
         let number_of_chars = fmm_counter[0];
         let total_number_of_arrows = fmm_counter[1];
         let total_number_of_aabbs = fmm_counter[2];
-
-        //// DRAW ARRAYS ////
-
-        // let arrow_chunks = udiv_up_safe32(total_number_of_arrows * 72, MAX_NUMBER_OF_VVVVNNNN as u32); 
-        // println!("arrow_chunks == {}", arrow_chunks); 
-        // println!("total_number_of_arrows == {}", total_number_of_arrows); 
-        // println!("total_number_of_arrows * 72 == {}", total_number_of_arrows * 72); 
-        // println!("MAX_NUMBER_OF_VVVVNNNN  == {}", MAX_NUMBER_OF_VVVVNNNN); 
+        let total_number_of_aabb_wires = fmm_counter[3];
 
         let vertices_per_dispatch = thread_count * 72;
-        let total_number_of_dispatches = udiv_up_safe32(total_number_of_arrows, thread_count);
-        let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / vertices_per_dispatch;
-        let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
-        // println!("total_number_of_dispatches == {}", total_number_of_dispatches);
-        // println!("safe_number_of_dispatches == {}", safe_number_of_dispatches);
-        // println!("number_of_loop == {}", number_of_loop);
+        let vertices_per_dispatch_aabb_wire = thread_count * 432;
 
-        // Update Visualization params for arrows.
-        self.arrow_aabb_params.iterator_start_index = 0;
-        self.arrow_aabb_params.iterator_end_index = total_number_of_arrows;
-        self.arrow_aabb_params.element_type = 0;
+        //// DRAW ARROWS, AABBS AND AABB_WIRES.
 
-        queue.write_buffer(
-            &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-            0,
-            bytemuck::cast_slice(&[self.arrow_aabb_params])
-        );
+        // [(element_type, number_of_elements)]
+        let draw_params = [(0, fmm_counter[1], vertices_per_dispatch),
+                           (1, fmm_counter[2], vertices_per_dispatch),
+                           (2, fmm_counter[3], vertices_per_dispatch_aabb_wire)]; 
 
         let mut clear = true;
 
-        for i in 0..number_of_loop {
-            let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
-            // println!("local_dispatch == {}", local_dispatch);
+        for (e_type, e_size, v_per_dispatch) in draw_params.iter() {
 
-            let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
-
-            self.compute_object_arrow.dispatch(
-                &self.compute_bind_groups_arrow,
-                &mut encoder_arrow_aabb,
-                local_dispatch, 1, 1, Some("arrow local dispatch")
-            );
-
-            queue.submit(Some(encoder_arrow_aabb.finish()));
-
-            let counter = self.histogram_draw_counts.get_values(device, queue);
-            self.draw_count_triangles = counter[0] * 3;
-            // println!("self.draw_count_triangles == {}", self.draw_count_triangles * 3);
-
-            let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
-
-            draw(&mut encoder_arrow_rendering,
-                 &view,
-                 self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_bind_groups_vvvvnnnn,
-                 &self.render_object_vvvvnnnn.pipeline,
-                 &self.buffers.get("output_render").unwrap(),
-                 0..self.draw_count_triangles,
-                 //0..self.draw_count_triangles,
-                 clear
-            );
-           
-            if clear { clear = false; }
-
-            queue.submit(Some(encoder_arrow_rendering.finish()));
-            self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+            let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / v_per_dispatch;
+            let total_number_of_dispatches = udiv_up_safe32(*e_size, thread_count);
+            let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
 
             // Update Visualization params for arrows.
-            self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_start_index + local_dispatch * thread_count;
-            // println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
+            self.arrow_aabb_params.iterator_start_index = 0;
+            self.arrow_aabb_params.iterator_end_index = *e_size;
+            self.arrow_aabb_params.element_type = *e_type;
 
             queue.write_buffer(
                 &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
@@ -852,76 +807,51 @@ impl Application for Fmm {
                 bytemuck::cast_slice(&[self.arrow_aabb_params])
             );
 
-        }
 
-        //// DRAW AABBS ////
+            for i in 0..number_of_loop {
+                let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
 
-        // let vertices_per_dispatch = thread_count * 32;
-        let total_number_of_dispatches = udiv_up_safe32(total_number_of_aabbs, thread_count);
-        // let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / vertices_per_dispatch;
-        let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
-        // println!("total_number_of_dispatches == {}", total_number_of_dispatches);
-        // println!("safe_number_of_dispatches == {}", safe_number_of_dispatches);
-        // println!("number_of_loop == {}", number_of_loop);
+                let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
 
-        // Update Visualization params for arrows.
-        self.arrow_aabb_params.iterator_start_index = 0;
-        self.arrow_aabb_params.iterator_end_index = total_number_of_arrows;
-        self.arrow_aabb_params.element_type = 1;
+                self.compute_object_arrow.dispatch(
+                    &self.compute_bind_groups_arrow,
+                    &mut encoder_arrow_aabb,
+                    local_dispatch, 1, 1, Some("arrow local dispatch")
+                );
 
-        queue.write_buffer(
-            &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-            0,
-            bytemuck::cast_slice(&[self.arrow_aabb_params])
-        );
+                queue.submit(Some(encoder_arrow_aabb.finish()));
 
-        // let mut clear = true;
+                let counter = self.histogram_draw_counts.get_values(device, queue);
 
-        for i in 0..number_of_loop {
-            let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
-            // println!("local_dispatch == {}", local_dispatch);
+                // self?
+                self.draw_count_triangles = counter[0] * 3;
 
-            let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
+                let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
 
-            self.compute_object_arrow.dispatch(
-                &self.compute_bind_groups_arrow,
-                &mut encoder_arrow_aabb,
-                local_dispatch, 1, 1, Some("arrow local dispatch")
-            );
+                draw(&mut encoder_arrow_rendering,
+                     &view,
+                     self.screen.depth_texture.as_ref().unwrap(),
+                     &self.render_bind_groups_vvvvnnnn,
+                     &self.render_object_vvvvnnnn.pipeline,
+                     &self.buffers.get("output_render").unwrap(),
+                     0..self.draw_count_triangles,
+                     clear
+                );
+               
+                if clear { clear = false; }
 
-            queue.submit(Some(encoder_arrow_aabb.finish()));
+                queue.submit(Some(encoder_arrow_rendering.finish()));
+                self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
 
-            let counter = self.histogram_draw_counts.get_values(device, queue);
-            self.draw_count_triangles = counter[0] * 3;
-            // println!("self.draw_count_triangles == {}", self.draw_count_triangles * 3);
+                // Update Visualization params for arrows.
+                self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_start_index + local_dispatch * thread_count;
 
-            let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
-
-            draw(&mut encoder_arrow_rendering,
-                 &view,
-                 self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_bind_groups_vvvvnnnn,
-                 &self.render_object_vvvvnnnn.pipeline,
-                 &self.buffers.get("output_render").unwrap(),
-                 0..self.draw_count_triangles,
-                 //0..self.draw_count_triangles,
-                 clear
-            );
-           
-            if clear { clear = false; }
-
-            queue.submit(Some(encoder_arrow_rendering.finish()));
-            self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
-
-            // Update Visualization params for arrows.
-            self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_start_index + local_dispatch * thread_count;
-            // println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
-
-            queue.write_buffer(
-                &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-                0,
-                bytemuck::cast_slice(&[self.arrow_aabb_params])
-            );
+                queue.write_buffer(
+                    &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                    0,
+                    bytemuck::cast_slice(&[self.arrow_aabb_params])
+                );
+            } // for number_of_loop
         }
 
         // Update screen.
