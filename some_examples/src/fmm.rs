@@ -26,15 +26,17 @@ use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
 // TODO: add to fmm params.
-const MAX_NUMBERS_OF_ARROWS: usize = 40960;
-const MAX_NUMBERS_OF_CHARS:  usize = 40960;
+const MAX_NUMBERS_OF_ARROWS:     usize = 40960;
+const MAX_NUMBERS_OF_AABBS:      usize = 40960;
+const MAX_NUMBERS_OF_AABB_WIRES: usize = 40960;
+const MAX_NUMBERS_OF_CHARS:      usize = 40960;
 
 // FMM dimensions.
 const FMM_X: usize = 16; 
 const FMM_Y: usize = 16; 
 const FMM_Z: usize = 16; 
 
-const MAX_NUMBER_OF_VVVVNNNN: usize = 34000; // 640 * 72; //46080;
+const MAX_NUMBER_OF_VVVVNNNN: usize = 34000;
 
 /// The size of draw buffer in bytes;
 const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
@@ -47,6 +49,13 @@ const THREAD_COUNT: u32 = 64;
 struct Vertex {
     v: [f32; 4],
     n: [f32; 4],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct AABB {
+    min: [f32; 4],
+    max: [f32; 4],
 }
 
 #[repr(C)]
@@ -70,13 +79,22 @@ struct Char {
     z_offset: f32,
 }
 
+// #[repr(C)]
+// #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+// struct VisualizationParams{
+//     max_number_of_vertices: u32,
+//     iterator_start_index: u32,
+//     iterator_end_index: u32,
+//     arrow_size: f32, // 0 :: array, 1 :: aabb, 2 :: aabb wire
+// }
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct VisualizationParams{
+struct ArrowAabbParams{
     max_number_of_vertices: u32,
     iterator_start_index: u32,
     iterator_end_index: u32,
-    arrow_size: f32,
+    element_type: u32, // 0 :: array, 1 :: aabb, 2 :: aabb wire
 }
 
 #[repr(C)]
@@ -96,6 +114,7 @@ impl_convert!{Arrow}
 impl_convert!{Char}
 impl_convert!{FmmCell}
 impl_convert!{FmmParams}
+impl_convert!{ArrowAabbParams}
 
 struct FmmFeatures {}
 
@@ -133,8 +152,7 @@ struct Fmm {
     pub histogram_fmm: Histogram,
     pub draw_count_points: u32,
     pub draw_count_triangles: u32,
-    pub visualization_params: VisualizationParams,
-    pub temp_visualization_params: VisualizationParams,
+    pub arrow_aabb_params: ArrowAabbParams,
     pub keys: KeyboardManager,
     pub block64mode: bool,
 }
@@ -258,21 +276,13 @@ impl Application for Fmm {
         println!("Creating compute object.");
 
         let histogram_draw_counts = Histogram::init(&configuration.device, &vec![0; 2]);
-        let histogram_fmm = Histogram::init(&configuration.device, &vec![0; 2]);
+        let histogram_fmm = Histogram::init(&configuration.device, &vec![0; 4]);
 
-        let params = VisualizationParams {
+        let arrow_aabb_params = ArrowAabbParams {
             max_number_of_vertices: VERTEX_BUFFER_SIZE as u32,
             iterator_start_index: 0,
             iterator_end_index: 0,
-            //iterator_end_index: 32768,
-            arrow_size: 0.3,
-        };
-
-        let temp_params = VisualizationParams {
-            max_number_of_vertices: 1,
-            iterator_start_index: 0,
-            iterator_end_index: THREAD_COUNT,
-            arrow_size: 0.3,
+            element_type: 0,
         };
         
         ////////////////////////////////////////////////////
@@ -321,6 +331,28 @@ impl Application for Fmm {
         );
 
         buffers.insert(
+            "output_aabbs".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_aabbs"),
+                size: (MAX_NUMBERS_OF_AABBS * std::mem::size_of::<AABB>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+
+        buffers.insert(
+            "output_aabb_wires".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_aabbs"),
+                size: (MAX_NUMBERS_OF_AABB_WIRES * std::mem::size_of::<AABB>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+
+        buffers.insert(
             "output_render".to_string(),
             configuration.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("draw buffer"),
@@ -331,10 +363,10 @@ impl Application for Fmm {
         );
 
         buffers.insert(
-            "visualization_params".to_string(),
-            buffer_from_data::<VisualizationParams>(
+            "arrow_aabb_params".to_string(),
+            buffer_from_data::<ArrowAabbParams>(
             &configuration.device,
-            &vec![params],
+            &vec![arrow_aabb_params],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -370,7 +402,7 @@ impl Application for Fmm {
                             },
                             // @group(0)
                             // @binding(1)
-                            // var<uniform> visualization_params: VisualizationParams;
+                            // var<uniform> arrow_aabb_params: VisualizationParams;
                             wgpu::BindGroupLayoutEntry {
                                 binding: 1,
                                 visibility: wgpu::ShaderStages::COMPUTE,
@@ -435,7 +467,7 @@ impl Application for Fmm {
                                       &vec![
                                           vec![
                                                &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
-                                               &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
                                                &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
@@ -461,7 +493,7 @@ impl Application for Fmm {
                         vec![
                             // @group(0)
                             // @binding(0)
-                            // var<uniform> visualization_params: VisualizationParams;
+                            // var<uniform> arrow_aabb_params: VisualizationParams;
                             wgpu::BindGroupLayoutEntry {
                                 binding: 0,
                                 visibility: wgpu::ShaderStages::COMPUTE,
@@ -500,9 +532,35 @@ impl Application for Fmm {
                             },
                             // @group(0)
                             // @binding(3)
-                            // var<storage,read_write> output: array<VertexBuffer>;
+                            // var<storage, read_write> aabbs: array<AABB>;
                             wgpu::BindGroupLayoutEntry {
                                 binding: 3,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(4)
+                            // var<storage, read_write> aabb_wires: array<AABB>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 4,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(5)
+                            // var<storage,read_write> output: array<Triangle>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 5,
                                 visibility: wgpu::ShaderStages::COMPUTE,
                                 ty: wgpu::BindingType::Buffer {
                                     ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -521,9 +579,11 @@ impl Application for Fmm {
                                       &compute_object_arrow.bind_group_layouts,
                                       &vec![
                                           vec![
-                                               &buffers.get(&"visualization_params".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
                                                &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_aabbs".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_aabb_wires".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
@@ -610,6 +670,32 @@ impl Application for Fmm {
                                 },
                                 count: None,
                             },
+                            // @group(0)
+                            // @binding(5)
+                            // var<storage,read_write> output_aabb: array<AABB>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 5,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(6)
+                            // var<storage,read_write> output_aabb_wire: array<AABB>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 6,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
                         ],
                     ]
         );
@@ -624,7 +710,9 @@ impl Application for Fmm {
                                                &buffers.get(&"fmm_cells".to_string()).unwrap().as_entire_binding(),
                                                &histogram_fmm.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
-                                               &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding()
+                                               &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_aabbs".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"output_aabb_wires".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
@@ -651,8 +739,7 @@ impl Application for Fmm {
             histogram_fmm: histogram_fmm,
             draw_count_points: 0,
             draw_count_triangles: 0,
-            visualization_params: params,
-            temp_visualization_params: temp_params,
+            arrow_aabb_params: arrow_aabb_params,
             keys: keys,
             block64mode: false,
         }
@@ -674,7 +761,7 @@ impl Application for Fmm {
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Execute fmm.
+        //// EXECUTE FMM ////
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
 
         self.compute_object_fmm.dispatch(
@@ -683,46 +770,45 @@ impl Application for Fmm {
             1, 1, 1, Some("fmm dispatch")
         );
 
-        // Submit compute.
         queue.submit(Some(encoder_command.finish()));
 
         let fmm_counter = self.histogram_fmm.get_values(device, queue);
         let number_of_chars = fmm_counter[0];
         let total_number_of_arrows = fmm_counter[1];
+        let total_number_of_aabbs = fmm_counter[2];
 
-        let arrow_chunks = udiv_up_safe32(total_number_of_arrows * 72, MAX_NUMBER_OF_VVVVNNNN as u32); 
-        println!("arrow_chunks == {}", arrow_chunks); 
-        println!("total_number_of_arrows == {}", total_number_of_arrows); 
-        println!("total_number_of_arrows * 72 == {}", total_number_of_arrows * 72); 
-        println!("MAX_NUMBER_OF_VVVVNNNN  == {}", MAX_NUMBER_OF_VVVVNNNN); 
+        //// DRAW ARRAYS ////
+
+        // let arrow_chunks = udiv_up_safe32(total_number_of_arrows * 72, MAX_NUMBER_OF_VVVVNNNN as u32); 
+        // println!("arrow_chunks == {}", arrow_chunks); 
+        // println!("total_number_of_arrows == {}", total_number_of_arrows); 
+        // println!("total_number_of_arrows * 72 == {}", total_number_of_arrows * 72); 
+        // println!("MAX_NUMBER_OF_VVVVNNNN  == {}", MAX_NUMBER_OF_VVVVNNNN); 
 
         let vertices_per_dispatch = thread_count * 72;
         let total_number_of_dispatches = udiv_up_safe32(total_number_of_arrows, thread_count);
         let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / vertices_per_dispatch;
         let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
-        // let 
-        println!("total_number_of_dispatches == {}", total_number_of_dispatches);
-        println!("safe_number_of_dispatches == {}", safe_number_of_dispatches);
-        println!("number_of_loop == {}", number_of_loop);
+        // println!("total_number_of_dispatches == {}", total_number_of_dispatches);
+        // println!("safe_number_of_dispatches == {}", safe_number_of_dispatches);
+        // println!("number_of_loop == {}", number_of_loop);
 
         // Update Visualization params for arrows.
-        self.visualization_params.iterator_start_index = 0;
-        self.visualization_params.iterator_end_index = total_number_of_arrows;
+        self.arrow_aabb_params.iterator_start_index = 0;
+        self.arrow_aabb_params.iterator_end_index = total_number_of_arrows;
+        self.arrow_aabb_params.element_type = 0;
 
-        // queue.write_buffer(
-        //     &self.buffers.get(&"visualization_params".to_string()).unwrap(),
-        //     0,
-        //     bytemuck::cast_slice(&[self.visualization_params])
-        // );
+        queue.write_buffer(
+            &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.arrow_aabb_params])
+        );
 
         let mut clear = true;
 
         for i in 0..number_of_loop {
             let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
-            println!("local_dispatch == {}", local_dispatch);
-
-            // Execute arrow_aabb.
-            //let arrow_dispatch = udiv_up_safe32(total_number_of_arrows, 64); 
+            // println!("local_dispatch == {}", local_dispatch);
 
             let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
 
@@ -736,7 +822,7 @@ impl Application for Fmm {
 
             let counter = self.histogram_draw_counts.get_values(device, queue);
             self.draw_count_triangles = counter[0] * 3;
-            println!("self.draw_count_triangles == {}", self.draw_count_triangles);
+            // println!("self.draw_count_triangles == {}", self.draw_count_triangles * 3);
 
             let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
 
@@ -751,32 +837,98 @@ impl Application for Fmm {
                  clear
             );
            
-            if clear { clear = !clear; }
+            if clear { clear = false; }
 
             queue.submit(Some(encoder_arrow_rendering.finish()));
             self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
 
             // Update Visualization params for arrows.
-            self.visualization_params.iterator_start_index = self.visualization_params.iterator_start_index + local_dispatch * 64;
-            println!("self.visualization_params.iterator_start_index == {}", self.visualization_params.iterator_start_index);
+            self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_start_index + local_dispatch * thread_count;
+            // println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
 
             queue.write_buffer(
-                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+                &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
                 0,
-                bytemuck::cast_slice(&[self.visualization_params])
+                bytemuck::cast_slice(&[self.arrow_aabb_params])
             );
+
         }
 
+        //// DRAW AABBS ////
 
+        // let vertices_per_dispatch = thread_count * 32;
+        let total_number_of_dispatches = udiv_up_safe32(total_number_of_aabbs, thread_count);
+        // let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / vertices_per_dispatch;
+        let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
+        // println!("total_number_of_dispatches == {}", total_number_of_dispatches);
+        // println!("safe_number_of_dispatches == {}", safe_number_of_dispatches);
+        // println!("number_of_loop == {}", number_of_loop);
 
-        // self.histogram_draw_counts.set_values_cpu_version(queue, &vec![0, i]);
-        // i = i + dispatch_x*64;
+        // Update Visualization params for arrows.
+        self.arrow_aabb_params.iterator_start_index = 0;
+        self.arrow_aabb_params.iterator_end_index = total_number_of_arrows;
+        self.arrow_aabb_params.element_type = 1;
+
+        queue.write_buffer(
+            &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.arrow_aabb_params])
+        );
+
+        // let mut clear = true;
+
+        for i in 0..number_of_loop {
+            let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
+            // println!("local_dispatch == {}", local_dispatch);
+
+            let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
+
+            self.compute_object_arrow.dispatch(
+                &self.compute_bind_groups_arrow,
+                &mut encoder_arrow_aabb,
+                local_dispatch, 1, 1, Some("arrow local dispatch")
+            );
+
+            queue.submit(Some(encoder_arrow_aabb.finish()));
+
+            let counter = self.histogram_draw_counts.get_values(device, queue);
+            self.draw_count_triangles = counter[0] * 3;
+            // println!("self.draw_count_triangles == {}", self.draw_count_triangles * 3);
+
+            let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
+
+            draw(&mut encoder_arrow_rendering,
+                 &view,
+                 self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups_vvvvnnnn,
+                 &self.render_object_vvvvnnnn.pipeline,
+                 &self.buffers.get("output_render").unwrap(),
+                 0..self.draw_count_triangles,
+                 //0..self.draw_count_triangles,
+                 clear
+            );
+           
+            if clear { clear = false; }
+
+            queue.submit(Some(encoder_arrow_rendering.finish()));
+            self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+            // Update Visualization params for arrows.
+            self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_start_index + local_dispatch * thread_count;
+            // println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
+
+            queue.write_buffer(
+                &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.arrow_aabb_params])
+            );
+        }
 
         // Update screen.
         self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.histogram_fmm.reset_all_cpu_version(queue, 0); 
+        self.histogram_fmm.reset_all_cpu_version(queue, 0);
     }
 
     #[allow(unused)]
@@ -793,28 +945,28 @@ impl Application for Fmm {
         self.camera.update_from_input(&queue, &input);
 
         // if self.keys.test_key(&Key::L, input) { 
-        //     self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        //     self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
+        //     self.arrow_aabb_params.arrow_size = self.arrow_aabb_params.arrow_size + 0.005;  
+        //     self.temp_arrow_aabb_params.arrow_size = self.arrow_aabb_params.arrow_size + 0.005;  
         // }
         // if self.keys.test_key(&Key::K, input) { 
-        //     self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);  
-        //     self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);  
+        //     self.arrow_aabb_params.arrow_size = (self.arrow_aabb_params.arrow_size - 0.005).max(0.01);  
+        //     self.temp_arrow_aabb_params.arrow_size = (self.temp_arrow_aabb_params.arrow_size - 0.005).max(0.01);  
         // }
         // if self.keys.test_key(&Key::Key1, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 1;  
-        //     self.temp_visualization_params.max_local_vertex_capacity = 1;  
+        //     self.arrow_aabb_params.max_local_vertex_capacity = 1;  
+        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 1;  
         // }
         // if self.keys.test_key(&Key::Key2, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 2;
-        //     self.temp_visualization_params.max_local_vertex_capacity = 2;  
+        //     self.arrow_aabb_params.max_local_vertex_capacity = 2;
+        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 2;  
         // }
         // if self.keys.test_key(&Key::Key3, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 3;  
-        //     self.temp_visualization_params.max_local_vertex_capacity = 3;  
+        //     self.arrow_aabb_params.max_local_vertex_capacity = 3;  
+        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 3;  
         // }
         // if self.keys.test_key(&Key::Key4, input) { 
-        //     self.visualization_params.max_local_vertex_capacity = 4;  
-        //     self.temp_visualization_params.max_local_vertex_capacity = 4;  
+        //     self.arrow_aabb_params.max_local_vertex_capacity = 4;  
+        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 4;  
         // }
         // if self.keys.test_key(&Key::Key9, input) { 
         //     self.block64mode = true;  
@@ -824,32 +976,32 @@ impl Application for Fmm {
         // }
         // if self.keys.test_key(&Key::NumpadSubtract, input) { 
         // //if self.keys.test_key(&Key::T, input) { 
-        //     let si = self.temp_visualization_params.iterator_start_index as i32;
+        //     let si = self.temp_arrow_aabb_params.iterator_start_index as i32;
         //     if si >= THREAD_COUNT as i32 {
-        //         self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
-        //         self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
+        //         self.temp_arrow_aabb_params.iterator_start_index = self.temp_arrow_aabb_params.iterator_start_index - THREAD_COUNT;
+        //         self.temp_arrow_aabb_params.iterator_end_index = self.temp_arrow_aabb_params.iterator_end_index - THREAD_COUNT;
         //     }
         // }
         // if self.keys.test_key(&Key::NumpadAdd, input) { 
-        //     let ei = self.temp_visualization_params.iterator_end_index;
+        //     let ei = self.temp_arrow_aabb_params.iterator_end_index;
         //     if ei <= 4096 - THREAD_COUNT {
-        //         self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
-        //         self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
+        //         self.temp_arrow_aabb_params.iterator_start_index = self.temp_arrow_aabb_params.iterator_start_index + THREAD_COUNT;
+        //         self.temp_arrow_aabb_params.iterator_end_index = self.temp_arrow_aabb_params.iterator_end_index + THREAD_COUNT;
         //     }
         // }
 
         // if self.block64mode {
         //     queue.write_buffer(
-        //         &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+        //         &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
         //         0,
-        //         bytemuck::cast_slice(&[self.temp_visualization_params])
+        //         bytemuck::cast_slice(&[self.temp_arrow_aabb_params])
         //     );
         // }
         // else {
         //     queue.write_buffer(
-        //         &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+        //         &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
         //         0,
-        //         bytemuck::cast_slice(&[self.visualization_params])
+        //         bytemuck::cast_slice(&[self.arrow_aabb_params])
         //     );
         // }
     }

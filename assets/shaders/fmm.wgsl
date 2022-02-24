@@ -56,6 +56,14 @@ var<storage,read_write> output_char: array<Char>;
 @binding(4)
 var<storage,read_write> output_arrow: array<Arrow>;
 
+@group(0)
+@binding(5)
+var<storage,read_write> output_aabb: array<AABB>;
+
+@group(0)
+@binding(6)
+var<storage,read_write> output_aabb_wire: array<AABB>;
+
 var<workgroup> wg_arrow_count: atomic<u32>;
 
 //////// ModF ////////
@@ -106,8 +114,9 @@ fn reset_workgroup_counters() {
     wg_arrow_count = 0u;
 }
 
-fn update_workgroup_counters(wg_arr_count: u32) {
+fn update_workgroup_counters(wg_arr_count: u32, wg_aabb_count: u32) {
     atomicAdd(&counter[1], wg_arr_count);
+    atomicAdd(&counter[2], wg_arr_count);
 }
 
 @stage(compute)
@@ -137,7 +146,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
               );
     }
 
+    for (var i: i32 = 0; i < 100 ; i = i + 1) {
+        output_aabb[local_index + 64u * u32(i)] =  
+              AABB (
+                  vec4<f32>(f32(i * 64 + i32(local_index)) * 0.2 + 0.5,
+                            15.0,
+                            4.0 * f32(local_index+1u),
+                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(f32(i * 64 + i32(local_index)) * 0.2,
+                            16.0,
+                            4.0 * f32(local_index),
+                            1.0)
+              );
+    }
+
     if (local_index == 0u) {
-        update_workgroup_counters(100u * 64u);
+        update_workgroup_counters(100u * 64u, 100u * 64u);
     }
 }

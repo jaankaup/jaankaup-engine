@@ -10,11 +10,11 @@ struct Quaternion {
     z: f32;
 };
 
-struct VisualizationParams{
+struct ArrowAabbParams{
     max_number_of_vertices: u32;
     iterator_start_index: u32;
     iterator_end_index: u32;
-    arrow_size: f32;
+    element_type: u32; // 0 :: arrow, 1 :: aabb, 2 :: aabb wire
 };
 
 struct Vertex {
@@ -45,7 +45,7 @@ struct Errors {
 
 @group(0)
 @binding(0)
-var<uniform> visualization_params: VisualizationParams;
+var<uniform> arrow_aabb_params: ArrowAabbParams;
 
 @group(0)
 @binding(1)
@@ -57,8 +57,15 @@ var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
 @binding(3)
+var<storage, read_write> aabbs: array<AABB>;
+
+@group(0)
+@binding(4)
+var<storage, read_write> aabb_wires: array<AABB>;
+
+@group(0)
+@binding(5)
 var<storage,read_write> output: array<Triangle>;
-//var<storage,read_write> output: array<Vertex>;
 
 var<workgroup> thread_group_counter: u32 = 0; 
 
@@ -85,7 +92,7 @@ var<private> aabb_normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
     vec4<f32>(0.0, -1.0, 0.0, 0.0)
 );
     
-var<workgroup> temp_vertex_data: array<Vertex, 2304>; // 36 * 256 
+// var<workgroup> temp_vertex_data: array<Vertex, 2304>; // 36 * 256 
 // Map index to 3d coordinate (hexahedron). The x and y dimensions are chosen. The curve goes from left to right, row by row.
 // The z direction is "unlimited".
 fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
@@ -247,59 +254,82 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 //++     workgroupBarrier();
 //++ } 
 
-//++ fn create_aabb(aabb: AABB, offset: u32, stride: u32, color: u32) {
-//++ 
-//++     // Global start position.
-//++     let index = atomicAdd(&counter[0], 36u);
-//++ 
-//++     //          p3
-//++     //          +-----------------+p2
-//++     //         /|                /|
-//++     //        / |               / |
-//++     //       /  |           p6 /  |
-//++     //   p7 +-----------------+   |
-//++     //      |   |             |   |
-//++     //      |   |p0           |   |p1
-//++     //      |   +-------------|---+  
-//++     //      |  /              |  /
-//++     //      | /               | /
-//++     //      |/                |/
-//++     //      +-----------------+
-//++     //      p4                p5
-//++     //
-//++ 
-//++     // Decode color information to the fourth component.
-//++ 
-//++     let c = f32(color);
-//++ 
-//++     let delta = aabb.max - aabb.min;
-//++ 
-//++     var positions = array<vec4<f32>, 8>(
-//++     	vec4<f32>(aabb.min.xyz, c),
-//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
-//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
-//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
-//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
-//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
-//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
-//++     	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
-//++     );
-//++ 
-//++     var normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
-//++         vec4<f32>(0.0, 0.0, -1.0, 0.0),
-//++         vec4<f32>(0.0, 0.0, 1.0, 0.0),
-//++         vec4<f32>(1.0, 0.0, 0.0, 0.0),
-//++         vec4<f32>(-1.0, 0.0, 0.0, 0.0),
-//++         vec4<f32>(0.0, 1.0, 0.0, 0.0),
-//++         vec4<f32>(0.0, -1.0, 0.0, 0.0)
-//++     );
-//++ 
-//++     store_hexaedron(&positions,
-//++                     &normals,
-//++                     offset,
-//++                     stride
-//++     );
-//++ }
+fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32) {
+
+    // Global start position.
+    //let index = atomicAdd(&counter[0], 36u);
+
+    //          p3
+    //          +-----------------+p2
+    //         /|                /|
+    //        / |               / |
+    //       /  |           p6 /  |
+    //   p7 +-----------------+   |
+    //      |   |             |   |
+    //      |   |p0           |   |p1
+    //      |   +-------------|---+  
+    //      |  /              |  /
+    //      | /               | /
+    //      |/                |/
+    //      +-----------------+
+    //      p4                p5
+    //
+
+    // Encode color information to the fourth component.
+
+    let c = f32(color);
+
+    let delta = aabb.max - aabb.min;
+
+    var positions = array<vec4<f32>, 8>(
+    	vec4<f32>(aabb.min.xyz, c),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
+    	vec4<f32>(aabb.min.xyz, c) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+    );
+
+    var normals: array<vec4<f32>, 6> = array<vec4<f32>, 6>(
+        vec4<f32>(0.0, 0.0, -1.0, 0.0),
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(-1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, -1.0, 0.0, 0.0)
+    );
+
+    var i: u32 = 0u;
+
+    loop {
+        if (i == 12u) { break; }
+        output[thread_group_counter + i * offset + local_index]  = 
+            Triangle(
+            	Vertex(
+            	    positions[vertex_positions[i*3u]],
+            	    normals[(i*3u)/6u]
+            	),
+            	Vertex(
+            	    positions[vertex_positions[i*3u+1u]],
+            	    normals[(i*3u)/6u]
+            	),
+            	Vertex(
+            	    positions[vertex_positions[i*3u+2u]],
+            	    normals[(i*3u)/6u]
+            	)
+        );
+
+        i = i + 1u;
+    }
+
+    // store_hexaedron(&positions,
+    //                 &normals,
+    //                 offset,
+    //                 stride
+    // );
+}
 //++ 
 //++ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, stride: u32) {
 //++ 
@@ -529,67 +559,6 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
     }
 }
 
-//++ fn create_arrow(arr: Arrow, offset: u32, stride: u32) {
-
-    //++ var direction = arr.end_pos.xyz - arr.start_pos.xyz;
-    //++ let array_length = length(direction);
-    //++ direction = normalize(direction);
-
-    //++ let head_size = min(0.5 * array_length, 2.0 * arr.size);
-
-    //++ //          array_length
-    //++ //    +----------------------+
-    //++ // s  |                      | ------> x
-    //++ //    +-----------+----------+
-    //++ //              x = 0
-
-    //++ let from_origo_x = vec3<f32>(vec3<f32>(array_length, arr.size, arr.size)) - vec3<f32>(head_size, 0.0, 0.0);
-
-    //++ let aabb = AABB(
-    //++                vec4<f32>((-0.5) * from_origo_x, 0.0),
-    //++                vec4<f32>(0.5    * from_origo_x, 0.0)
-    //++ );
-
-    //++ var delta = aabb.max - aabb.min;
-
-    //++ let q = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
-    //++ let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length;
-
-    //++ let c = f32(arr.color);
-
-    //++ var positions = array<vec4<f32>, 8>(
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz), c),
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , 0.0)), c),
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , 0.0)), c),
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , 0.0)), c),
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , 0.0     , delta.z)), c),
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , 0.0     , delta.z)), c),
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(delta.x , delta.y , delta.z)), c),
-    //++     vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz + vec3<f32>(0.0     , delta.y , delta.z)), c)
-    //++ );
-
-    //++ var n0 = normalize(cross(positions[5u].xyz - positions[6u].xyz,
-    //++                          positions[4u].xyz - positions[6u].xyz));
-    //++ var n1 = normalize(cross(positions[1u].xyz - positions[2u].xyz,
-    //++                          positions[5u].xyz - positions[2u].xyz));
-    //++ var n2 = normalize(cross(positions[0u].xyz - positions[3u].xyz,
-    //++                          positions[1u].xyz - positions[3u].xyz));
-    //++ var n3 = normalize(cross(positions[4u].xyz - positions[7u].xyz,
-    //++                          positions[0u].xyz - positions[7u].xyz));
-    //++ var n4 = normalize(cross(positions[3u].xyz - positions[7u].xyz,
-    //++                          positions[6u].xyz - positions[7u].xyz));
-    //++ var n5 = normalize(cross(positions[0u].xyz - positions[5u].xyz,
-    //++                          positions[4u].xyz - positions[5u].xyz));
-
-    //++ var normals = array<vec4<f32>, 6> (
-    //++     vec4<f32>(n0, 0.0),
-    //++     vec4<f32>(n1, 0.0),
-    //++     vec4<f32>(n2, 0.0),
-    //++     vec4<f32>(n3, 0.0),
-    //++     vec4<f32>(n4, 0.0),
-    //++     vec4<f32>(n5, 0.0)
-    //++ );
-
     //++ store_hexaedron(&positions, &normals, offset, stride);
 
     //++ let from_origo_x_top_arr = vec3<f32>(head_size, 3.0 * arr.size, 3.0 * arr.size);
@@ -675,33 +644,35 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    // struct VisualizationParams{
-    //     max_number_of_vertices: u32;
-    //     iterator_start_index: u32;
-    //     iterator_end_index: u32;
-    //     arrow_size: f32;
-    // };
-
-    let actual_index = visualization_params.iterator_start_index + global_id.x;
-    if (actual_index >= visualization_params.iterator_end_index) { return; } 
-
-    // let delta = visualization_params.iterator_end_index - visualization_params.iterator_start_index;
 
     // Check!
     var delta = //abs(
                     min(
-                        // i32(visualization_params.iterator_end_index - actual_index), i32(THREAD_COUNT)
-                        i32(visualization_params.iterator_end_index - visualization_params.iterator_start_index + THREAD_COUNT * work_group_id.x), i32(THREAD_COUNT)
+                        i32(arrow_aabb_params.iterator_end_index - arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x), i32(THREAD_COUNT)
                     )
     ;
 
     // Allocate memory for thread group.
     if (local_index == 0u) {
-    	thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
+  
+        if (arrow_aabb_params.element_type == 0u) { 
+    	    thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
+        }
+        else if (arrow_aabb_params.element_type == 1u) {
+    	    thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
+        }
     }
+
     workgroupBarrier();
 
-    if (actual_index < visualization_params.iterator_end_index) {
+    let actual_index = arrow_aabb_params.iterator_start_index + global_id.x;
+    if (actual_index >= arrow_aabb_params.iterator_end_index) { return; } 
+
+    if (arrow_aabb_params.element_type == 0u) { 
         create_arrow(arrows[actual_index], u32(delta), local_index);
+    }
+    else if (arrow_aabb_params.element_type == 1u) {
+        let aabb = aabbs[actual_index];
+        create_aabb(aabb, u32(delta), local_index, u32(aabb.min.w));
     }
 }
