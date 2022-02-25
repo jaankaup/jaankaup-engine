@@ -54,6 +54,14 @@ struct Vertex {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct Triangle {
+    a: Vertex,
+    b: Vertex,
+    c: Vertex,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct AABB {
     min: [f32; 4],
     max: [f32; 4],
@@ -146,6 +154,8 @@ struct Fmm {
     pub compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
     pub compute_object_fmm: ComputeObject, 
     pub compute_bind_groups_fmm: Vec<wgpu::BindGroup>,
+    pub compute_object_fmm_triangle: ComputeObject, 
+    pub compute_bind_groups_fmm_triangle: Vec<wgpu::BindGroup>,
     // pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
@@ -289,6 +299,18 @@ impl Application for Fmm {
         ////////////////////////////////////////////////////
         ////                 BUFFERS                    ////
         ////////////////////////////////////////////////////
+
+        buffers.insert(
+            "triangle_mesh".to_string(),
+            buffer_from_data::<Triangle>(
+            &configuration.device,
+            &vec![Triangle { a: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
+                             b: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
+                             c: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
+                           }],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
 
         buffers.insert(
             "fmm_params".to_string(),
@@ -718,6 +740,149 @@ impl Application for Fmm {
                                       ]
         );
 
+        ////////////////////////////////////////////////////
+        ////               Compute fmm_triangle         ////
+        ////////////////////////////////////////////////////
+
+        let compute_object_fmm_triangle =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("triangle_mest_to_interface.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/triangle_mesh_to_interface.wgsl"))),
+                    
+                    }),
+                    Some("FMM Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0)
+                            // @binding(0)
+                            // var<uniform> fmm_params: FmmParams;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(1)
+                            // var<storage, read_write> fmm_data: array<FmmCell>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(2)
+                            // var<storage, read_write> triangle_mesh_in: array<Triangle>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 2,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(3)
+                            // var<storage, read_write> counter: array<atomic<u32>>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 3,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(4)
+                            // var<storage,read_write> output_char: array<Char>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 4,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(5)
+                            // var<storage,read_write> output_arrow: array<Arrow>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 5,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(6)
+                            // var<storage,read_write> output_aabb: array<AABB>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 6,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(7)
+                            // var<storage,read_write> output_aabb_wire: array<AABB>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 7,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                        ],
+                    ]
+        );
+
+        let compute_bind_groups_fmm_triangle =
+            create_bind_groups(
+                &configuration.device,
+                &compute_object_fmm.bind_group_layout_entries,
+                &compute_object_fmm.bind_group_layouts,
+                &vec![
+                    vec![
+                         &buffers.get(&"fmm_params".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"fmm_cells".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"triangle_mesh".to_string()).unwrap().as_entire_binding(),
+                         &histogram_fmm.get_histogram_buffer().as_entire_binding(),
+                         &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"output_aabbs".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"output_aabb_wires".to_string()).unwrap().as_entire_binding()
+                    ]
+                ]
+        );
+
 
         println!("Creating render bind groups.");
  
@@ -733,6 +898,8 @@ impl Application for Fmm {
             compute_bind_groups_arrow: compute_bind_groups_arrow,
             compute_object_fmm: compute_object_fmm, 
             compute_bind_groups_fmm: compute_bind_groups_fmm,
+            compute_object_fmm_triangle: compute_object_fmm_triangle, 
+            compute_bind_groups_fmm_triangle: compute_bind_groups_fmm_triangle,
             // _textures: textures,
             buffers: buffers,
             camera: camera,

@@ -33,9 +33,6 @@ struct FmmParams {
     blah: f32;
 };
 
-// var<workgroup> workgroup_params: WorkGroupParams; 
-// var<private> private_params: PirateParams; 
-
 @group(0)
 @binding(0)
 var<uniform> fmm_params: FmmParams;
