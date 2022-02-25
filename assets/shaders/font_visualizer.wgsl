@@ -716,6 +716,7 @@ fn log_u32_b2(n: u32, bit_count: u32, thread_index: u32, base_pos: ptr<function,
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
+        @builtin(workgroup_id) work_group_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
     let actual_index = global_id.x + counter[1]; 

@@ -114,7 +114,11 @@ fn reset_workgroup_counters() {
     wg_arrow_count = 0u;
 }
 
-fn update_workgroup_counters(wg_arr_count: u32, wg_aabb_count: u32, wg_aabb_wire_count: u32) {
+fn update_workgroup_counters(wg_arr_count: u32,
+                             wg_aabb_count: u32,
+                             wg_aabb_wire_count: u32,
+                             wg_char_count: u32) {
+    atomicAdd(&counter[0], wg_char_count);
     atomicAdd(&counter[1], wg_arr_count);
     atomicAdd(&counter[2], wg_aabb_count);
     atomicAdd(&counter[3], wg_aabb_wire_count);
@@ -175,7 +179,50 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
               );
     }
 
+    for (var i: i32 = 0; i < 100 ; i = i + 1) {
+        var vec_dimension = 1u;
+
+        if (i % 4 == 0) {
+            vec_dimension = 4u; 
+        }
+        if (i % 3 == 0) {
+            vec_dimension = 3u; 
+        }
+        if (i % 2 == 0) {
+            vec_dimension = 1u; 
+        }
+        if (i % 1 == 0) {
+            vec_dimension = 1u; 
+        }
+
+        output_char[local_index + 64u * u32(i)] =  
+
+              // struct Char {
+              //     start_pos: vec4<f32>;
+              //     value: vec4<f32>;
+              //     font_size: f32;
+              //     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+              //     color: u32;
+              //     z_offset: f32;
+              // };
+
+
+              Char (
+                  vec4<f32>(f32(i * 64 + i32(local_index)) * 0.2 + 0.5,
+                            65.0,
+                            40.0 + 4.0 * f32(local_index+1u),
+                            2.0
+                  ),
+                  // vec4<f32>(1.0, 1.0, 1.0, 0.0),
+                  vec4<f32>(f32(i), f32(i+5*i), f32(-i), 0.0),
+                  0.5,
+                  vec_dimension,
+                  rgba_u32(255u, 0u, 2550u, 255u),
+                  0.1
+              );
+    }
+
     if (local_index == 0u) {
-        update_workgroup_counters(100u * 64u, 100u * 64u, 100u * 64u);
+        update_workgroup_counters(100u * 64u, 100u * 64u, 100u * 64u, 100u * 64u);
     }
 }

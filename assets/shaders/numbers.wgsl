@@ -20,11 +20,11 @@ struct Quaternion {
     z: f32;
 };
 
-struct VisualizationParams{
-    max_vertex_capacity: u32;
+struct ArrowAabbParams {
+    max_number_of_vertices: u32;
     iterator_start_index: u32;
     iterator_end_index: u32;
-    arrow_size: f32;
+    element_type: u32;
 };
 
 struct Vertex {
@@ -40,6 +40,7 @@ struct VVVC {
 struct WorkGroupParams {
     start_index: u32; // Start position of the output buffer.
     last_index: u32;  // Last legal position.
+    stop: bool;
 };
 
 struct PirateParams {
@@ -51,15 +52,13 @@ var<workgroup> workgroup_params: WorkGroupParams;
 var<private> private_params: PirateParams; 
 
 struct Char {
-    start_pos: vec4<f32>;
+    start_pos: vec4<f32>; // encode start.pos.w the decimal_count. TODO: something better.
     value: vec4<f32>;
     font_size: f32;
     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32;
     z_offset: f32;
 };
-
-type Hexaedra = array<Vertex , 8>;
 
 // A struct for errors.
 // vertex_overflow: 0 :: OK, n :: amount of overflow.
@@ -73,7 +72,7 @@ var<uniform> camera: Camera;
 
 @group(0)
 @binding(1)
-var<uniform> visualization_params: VisualizationParams;
+var<uniform> params: ArrowAabbParams;
 
 @group(0)
 @binding(2)
@@ -500,21 +499,45 @@ fn create_char(char_index: u32,
         let bi = bez_table[bez_index];
 
         // Number of points for this bezier curve. At least one vertex per bezier.
-        let count = u32(max(1.0, f32(num_points) * bi.w));
+        // Or zero if the draw buffer is running out of capacity.
+        var count = u32(max(1.0, f32(num_points) * bi.w));
 
 	// Allocate memory from output buffer.
         if (local_index == 0u) {
 
-            // The start position for storing the vertices.
-            let start_index: u32 = atomicAdd(&counter[0], count);
+                // The start position for storing the vertices.
+                let start_index: u32 = atomicAdd(&counter[0], count);
 
-            // Update the thread group params.
-            workgroup_params = WorkGroupParams (
-                start_index,
-                start_index + u32(count), // the end index. do we need this?
-            );
+                // Update the thread group params.
+                workgroup_params = WorkGroupParams (
+                    start_index,
+                    start_index + u32(count), // the end index. do we need this?
+                    false
+                );
+
+            //++ var stop = false;
+
+            //++ // Buffer overflow. Zero.
+            //++ if (counter[0] + count >= params.max_number_of_vertices) {
+            //++     workgroup_params.stop = true;
+            //++ }
+            //++ else {
+            //++ 
+            //++     // The start position for storing the vertices.
+            //++     let start_index: u32 = atomicAdd(&counter[0], count);
+
+            //++     // Update the thread group params.
+            //++     workgroup_params = WorkGroupParams (
+            //++         start_index,
+            //++         start_index + u32(count), // the end index. do we need this?
+            //++         false
+            //++     );
+            //++ }
         }
         workgroupBarrier();
+
+        //++ // This doesn't work.
+        //++ if (workgroup_params.stop) { return; }
 
         // Create per thead workload (how many vertices to create and store).
         let chunks_per_thread = i32(udiv_up_32(count, 64u));
@@ -712,7 +735,156 @@ fn log_u32_b2(n: u32, bit_count: u32, thread_index: u32, base_pos: ptr<function,
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
+        @builtin(workgroup_id) work_group_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
+    
+   ////////////////////// log_vec3_f32 test ////////////////////////////
+   
+   // var col = rgba_u32(255u, 0u, 222u, 255u);    
+   // var base_pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+   
+   // log_vec3_f32(
+   //     vec3<f32>(-9999.0,-1232.0093, 5.0),      
+   //     4u,                                  
+   //     local_index,                             
+   //     &base_pos,                          
+   //     800u,                              
+   //     col,
+   //     0.5,                                   
+   // );
 
+   // ////////////////////// log_vec4_f32 test ////////////////////////////
+   // 
+   // col = rgba_u32(0u, 0u, 252u, 255u);    
+   // base_pos = vec4<f32>(0.0, 2.0, 0.0, 1.0);
+   // 
+   // log_vec4_f32(
+   //     vec4<f32>(89.893, -9999.0,-1232.0093, 5.0),      
+   //     4u,                                  
+   //     local_index,                             
+   //     &base_pos,                          
+   //     800u,                              
+   //     col,
+   //     1.0,                                   
+   // );
+
+   let max_vertex_count = 5000u; // From uniform
+
+   // One number object (f32, vec3<f32>, vec4<f32>) per dispatch.
+   let actual_index = work_group_id.x;
+   var the_char = input[actual_index];
+
+   // Check the distance between camera and number object.
+   let dist = min(max(1.0, distance(camera.pos.xyz, the_char.start_pos.xyz)), 255.0);
+
+   let total_vertex_count = min(u32(f32(max_vertex_count) / f32(dist)), max_vertex_count);
+
+// struct Char {
+//     start_pos: vec4<f32>; // encode start.pos.w the decimal_count. TODO: something better.
+//     value: vec4<f32>;
+//     font_size: f32;
+//     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+//     color: u32;
+//     z_offset: f32;
+// };
+    var the_start_position = the_char.start_pos;
+
+    // log_float(the_char.value.x,
+    //           u32(the_start_position.w),
+    //           local_index,
+    //           &the_start_position,
+    //           total_vertex_count,
+    //           the_char.color,
+    //           the_char.font_size);
+
+    // Log f32.
+    if (the_char.vec_dim_count == 1u) {
+        log_float(the_char.value.x,
+                  u32(the_start_position.w),
+                  local_index,
+                  &the_start_position,
+                  total_vertex_count,
+                  the_char.color,
+                  the_char.font_size);
+    }
+    // Log vec3<f32>.
+    else if (the_char.vec_dim_count == 3u) {
+        log_vec3_f32(the_char.value.xyz,
+                     u32(the_start_position.w),
+                     local_index,
+                     &the_start_position,
+                     total_vertex_count,
+                     the_char.color,
+                     the_char.font_size);
+    }
+    // Log vec4<f32>.
+    else if (the_char.vec_dim_count == 4u) {
+        log_vec4_f32(the_char.value,
+                     u32(the_start_position.w),
+                     local_index,
+                     &the_start_position,
+                     total_vertex_count,
+                     the_char.color,
+                     the_char.font_size);
+    }
+
+    // let vertex_approximation = total_vertex_count * the_char.vec_dim_count * 15;   
+
+    // The draw buffer is almoust full.
+    // if (abs(i32(params.max_number_of_vertices - counter[0])) < i32(max_vertex_count)) { return; }
+
+    // if (local_index == 0u) {
+    //     counter[1] =  
+    // }
+
+    //++ workgroupBarrier();
+
+    // Index out of bounds.
+    // if (actual_index >= params.iterator_end_index) { return; } 
+
+    //++ let offset = udiv_up_32(max_vertex_count, 64u);
+    //++ let col = rgba_u32(255u, 0u, 0u, 255u);
+    //++ let start_position = vec3<f32>(0.1, 0.1, 0.1);
+
+    //++ let dist = min(max(1.0, distance(camera.pos.xyz, start_position)), 255.0);
+    //++ let total_vertex_count = u32(f32(max_vertex_count) / f32(dist));
+    
+    //++ // Allocate memory for thread group.
+    //++ if (local_index == 0u) {
+  
+    //++     if (arrow_aabb_params.element_type == 0u) { 
+    //++ 	    thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
+    //++     }
+    //++     else if (arrow_aabb_params.element_type == 1u) {
+    //++ 	    thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
+    //++     }
+    //++     else if (arrow_aabb_params.element_type == 2u) {
+    //++ 	    thread_group_counter = atomicAdd(&counter[0], 144u * u32(delta));
+    //++     }
+    //++ }
+
+    //++ workgroupBarrier();
+
+    //++ if (arrow_aabb_params.element_type == 0u) { 
+    //++     create_arrow(arrows[actual_index], u32(delta), local_index);
+    //++ }
+    //++ else if (arrow_aabb_params.element_type == 1u) {
+    //++     let aabb = aabbs[actual_index];
+    //++     create_aabb(aabb, u32(delta), local_index, u32(aabb.min.w));
+    //++ }
+    //++ else if (arrow_aabb_params.element_type == 2u) {
+    //++     let aabb = aabb_wires[actual_index];
+    //++     create_aabb_wire(aabb, aabb.max.w, u32(aabb.min.w), u32(delta), local_index);
+    //++ }
+
+
+// struct Char {
+//     start_pos: vec4<f32>;
+//     value: vec4<f32>;
+//     font_size: f32;
+//     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+//     color: u32;
+//     z_offset: f32;
+// };
     // TODO: render all Chars.
 }
