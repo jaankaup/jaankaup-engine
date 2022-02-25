@@ -36,8 +36,8 @@ const FMM_X: usize = 16;
 const FMM_Y: usize = 16; 
 const FMM_Z: usize = 16; 
 
-const MAX_NUMBER_OF_VVVVNNNN: usize = 340000 * 8;
-const MAX_NUMBER_OF_VVVC: usize = 340000 * 2;
+const MAX_NUMBER_OF_VVVVNNNN: usize = 1000000;
+const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
 
 /// The size of draw buffer in bytes;
 const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
@@ -863,9 +863,11 @@ impl Application for Fmm {
           
         // let number_of_chars = fmm_counter[0];
         self.arrow_aabb_params.iterator_start_index = 0;
-        self.arrow_aabb_params.iterator_end_index = 0;
+        self.arrow_aabb_params.iterator_end_index = number_of_chars;
         self.arrow_aabb_params.element_type = 0;
-        self.arrow_aabb_params.max_number_of_vertices = MAX_NUMBER_OF_VVVC as u32;
+        // TODO: a better heurestic.
+        self.arrow_aabb_params.max_number_of_vertices = std::cmp::max(MAX_NUMBER_OF_VVVC as i32 - 500000, 0) as u32;
+        //self.arrow_aabb_params.max_number_of_vertices = MAX_NUMBER_OF_VVVC as u32;
 
         queue.write_buffer(
             &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
@@ -873,38 +875,65 @@ impl Application for Fmm {
             bytemuck::cast_slice(&[self.arrow_aabb_params])
         );
 
-        let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
-
-        self.compute_object_char.dispatch(
-            &self.compute_bind_groups_char,
-            &mut encoder_char,
-            // 1, 1, 1, Some("numbers dispatch")
-            number_of_chars, 1, 1, Some("numbers dispatch")
-        );
-
-        queue.submit(Some(encoder_char.finish()));
-
-        let counter = self.histogram_draw_counts.get_values(device, queue);
-        self.draw_count_triangles = counter[0];
-
-        // self?
-        // self.draw_count_triangles = std::cmp::min(counter[0], 300000);
-        //println!("numbers draw_count == {}", self.draw_count_triangles);
-
-        let mut encoder_char_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
-
-        draw(&mut encoder_char_rendering,
-             &view,
-             self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_bind_groups_vvvc,
-             &self.render_object_vvvc.pipeline,
-             &self.buffers.get("output_render").unwrap(),
-             0..self.draw_count_triangles,
-             clear
-        );
-        queue.submit(Some(encoder_char_rendering.finish()));
-
         self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+        let mut current_char_index = 0;
+
+        let mut ccc = -1;
+        while true { 
+            ccc = ccc + 1;
+            println!("{}",ccc);
+
+            let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+
+            self.compute_object_char.dispatch(
+                &self.compute_bind_groups_char,
+                &mut encoder_char,
+                // 1, 1, 1, Some("numbers dispatch")
+                number_of_chars, 1, 1, Some("numbers dispatch")
+            );
+
+            queue.submit(Some(encoder_char.finish()));
+
+            let counter = self.histogram_draw_counts.get_values(device, queue);
+            self.draw_count_triangles = counter[0];
+
+            current_char_index = counter[1];
+
+            println!("numbers draw_count == {}", self.draw_count_triangles);
+            println!("current_char == {}", current_char_index);
+
+            let mut encoder_char_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+
+            draw(&mut encoder_char_rendering,
+                 &view,
+                 self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups_vvvc,
+                 &self.render_object_vvvc.pipeline,
+                 &self.buffers.get("output_render").unwrap(),
+                 0..self.draw_count_triangles.min(MAX_NUMBER_OF_VVVC as u32),
+                 clear
+            );
+            queue.submit(Some(encoder_char_rendering.finish()));
+
+            self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+            // There are still chars left.
+            if current_char_index != 0 && current_char_index != self.arrow_aabb_params.iterator_end_index - 1 {
+                self.arrow_aabb_params.iterator_start_index = current_char_index;
+                self.arrow_aabb_params.iterator_end_index = number_of_chars;
+                self.arrow_aabb_params.element_type = 0;
+                self.arrow_aabb_params.max_number_of_vertices = std::cmp::max(MAX_NUMBER_OF_VVVC as i32 - 500000, 0) as u32; //MAX_NUMBER_OF_VVVC as u32;
+
+                queue.write_buffer(
+                    &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                    0,
+                    bytemuck::cast_slice(&[self.arrow_aabb_params])
+                );
+
+            }
+            else { break; }
+        }
 
         // Update screen.
         self.screen.prepare_for_rendering();

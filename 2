@@ -45,7 +45,8 @@ struct WorkGroupParams {
 };
 
 struct PirateParams {
-    this_id: u32;
+    this_offset: u32;      // This thread offset in the current work group.
+    number_of_writes: u32; // Number of points to calculate/store.
 };
 
 var<workgroup> workgroup_params: WorkGroupParams; 
@@ -506,9 +507,9 @@ fn create_char(char_index: u32,
             let start_index: u32 = atomicAdd(&counter[0], count);
 
             if (start_index + count >= params.max_number_of_vertices) {
-                atomicMax(&counter[1], private_params.this_id); //workgroup_params.stop = true;
+                workgroup_params.stop = true;
             }
-            //else {
+            else {
                 // Update the thread group params.
                 workgroup_params = WorkGroupParams (
                     start_index,
@@ -516,11 +517,12 @@ fn create_char(char_index: u32,
                     false,
                     // workgroup_params  
                 );
-            //}
+            }
+
         }
         workgroupBarrier();
 
-        // if (workgroup_params.stop) { return; }
+        if (workgroup_params.stop) { return; }
 
         // Create per thead workload (how many vertices to create and store).
         let chunks_per_thread = i32(udiv_up_32(count, 64u));
@@ -723,30 +725,26 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     
    let max_vertex_count = 5000u; // From uniform
 
-   private_params.this_id = work_group_id.x + params.iterator_start_index;
-
    if (local_index == 0u) {
-        let st = select(false, true, (counter[1] > 0u));
         workgroup_params = 
             WorkGroupParams (
                 0u,
                 0u,
-                st,
+                false,
             );
    }
    workgroupBarrier();
 
-   if (workgroup_params.stop) { return; }
-
-   var the_char = input[private_params.this_id];
+   var the_char = input[work_group_id.x];
 
    // Check if the execution should end. 
-   //if (local_index == 0u && atomicAdd(&counter[1], 0u) > 0u) {
-   //   workgroup_params.stop = true; 
-   //}
-   //workgroupBarrier();
+   if (local_index == 0u) {
+      atomicAdd(&counter[1], 0u); 
+   }
+   workgroupBarrier();
 
-   //if (workgroup_params.stop) { return; }
+   // && workgroup_params.stop
+   // if (workgroup_params.stop) { break; }
 
    // Check the distance between camera and number object.
    let dist = min(max(1.0, distance(camera.pos.xyz, the_char.start_pos.xyz)), 255.0);
@@ -785,6 +783,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     the_char.color,
                     the_char.font_size);
    }
+   
 
    // for (var i: i32 = i32(params.iterator_start_index) ; i < i32(params.iterator_end_index) ; i = i + 1) {
 
