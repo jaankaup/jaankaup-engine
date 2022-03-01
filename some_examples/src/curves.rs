@@ -26,15 +26,15 @@ use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
 /// The number of vertices per chunk.
-const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
+const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex.
 
 /// The size of draw buffer;
 const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
 const THREAD_COUNT: u32 = 64;
 
-// 
-//  Arrow  
+//
+//  Arrow
 //
 //  +----------------+
 //  | start: [3;f32] |
@@ -82,17 +82,63 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
     fn required_limits() -> wgpu::Limits {
         let mut limits = wgpu::Limits::default();
         limits.max_storage_buffers_per_shader_stage = 8;
-        limits.max_compute_workgroup_size_x = 512;
+        limits.max_compute_workgroup_size_x = 1024;
         limits
     }
 }
 
+// struct KeyboardManager {
+//     keys: HashMap<Key, (f64, f64)>,
+// }
+//
+// impl KeyboardManager {
+//     pub fn init() -> Self {
+//         Self {
+//             keys: HashMap::<Key, (f64, f64)>::new(),
+//         }
+//     }
+//
+//     pub fn register_key(&mut self, key: Key, threshold: f64) {
+//         self.keys.insert(key, (0.0, threshold));
+//     }
+//
+//     pub fn test_key(&mut self, key: &Key, input: &InputCache) -> bool {
+//
+//         let state_key = input.key_state(key);
+//         let mut result = false;
+//
+//         if let Some(v) = self.keys.get_mut(key) {
+//
+//             match state_key {
+//                 Some(InputState::Pressed(_)) => {
+//                     let delta = (input.get_time_delta() / 1000000) as f64;
+//                     v.0 = delta;
+//                 }
+//                 Some(InputState::Down(_, _)) => {
+//                     let delta = (input.get_time_delta() / 1000000) as f64;
+//                     v.0 = v.0 + delta;
+//                     if v.0 > v.1 {
+//                         v.0 = v.0 - v.1;
+//                         result = true;
+//                     }
+//                 },
+//                 Some(InputState::Released(_, _)) => {
+//                     v.0 = 0.0;
+//                 }
+//                 _ => { }
+//             }
+//         }
+//
+//         return result;
+//     }
+// }
+
 // State for this application.
 struct DebugVisualizator {
-    pub screen: ScreenTexture, 
-    pub render_object: RenderObject, 
+    pub screen: ScreenTexture,
+    pub render_object: RenderObject,
     pub render_bind_groups: Vec<wgpu::BindGroup>,
-    pub compute_object: ComputeObject, 
+    pub compute_object: ComputeObject,
     pub compute_bind_groups: Vec<wgpu::BindGroup>,
     // pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
@@ -116,28 +162,29 @@ impl Application for DebugVisualizator {
 
         log::info!("Adapter limits are: ");
 
-        // let adapter_limits = configuration.adapter.limits(); 
+        let adapter_limits = configuration.adapter.limits();
 
-        // log::info!("max_compute_workgroup_storage_size: {:?}", adapter_limits.max_compute_workgroup_storage_size);
-        // log::info!("max_compute_invocations_per_workgroup: {:?}", adapter_limits.max_compute_invocations_per_workgroup);
-        // log::info!("max_compute_workgroup_size_x: {:?}", adapter_limits.max_compute_workgroup_size_x);
-        // log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
-        // log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
-        // log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
+        log::info!("\n");
+        log::info!("max_compute_workgroup_storage_size: {:?}", adapter_limits.max_compute_workgroup_storage_size);
+        log::info!("max_compute_invocations_per_workgroup: {:?}", adapter_limits.max_compute_invocations_per_workgroup);
+        log::info!("max_compute_workgroup_size_x: {:?}", adapter_limits.max_compute_workgroup_size_x);
+        log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
+        log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
+        log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-        // let mut keys = KeyboardManager::init();
-        // keys.register_key(Key::L, 20.0);
-        // keys.register_key(Key::K, 20.0);
-        // keys.register_key(Key::Key1, 10.0);
-        // keys.register_key(Key::Key2, 10.0);
-        // keys.register_key(Key::Key3, 10.0);
-        // keys.register_key(Key::Key4, 10.0);
-        // keys.register_key(Key::Key9, 10.0);
-        // keys.register_key(Key::Key0, 10.0);
-        // keys.register_key(Key::NumpadSubtract, 50.0);
-        // keys.register_key(Key::NumpadAdd, 50.0);
+        let mut keys = KeyboardManager::init();
+        keys.register_key(Key::L, 20.0);
+        keys.register_key(Key::K, 20.0);
+        keys.register_key(Key::Key1, 10.0);
+        keys.register_key(Key::Key2, 10.0);
+        keys.register_key(Key::Key3, 10.0);
+        keys.register_key(Key::Key4, 10.0);
+        keys.register_key(Key::Key9, 10.0);
+        keys.register_key(Key::Key0, 10.0);
+        keys.register_key(Key::NumpadSubtract, 50.0);
+        keys.register_key(Key::NumpadAdd, 50.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (40.0,40.0,120.0), -90.0, 0.0);
@@ -152,7 +199,7 @@ impl Application for DebugVisualizator {
                         label: Some("renderer_v4n4_debug_visualizator_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
-                    
+
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
                     &vec![
@@ -241,7 +288,7 @@ impl Application for DebugVisualizator {
             "output".to_string(),
             configuration.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("draw buffer"),
-                size: VERTEX_BUFFER_SIZE as u64, 
+                size: VERTEX_BUFFER_SIZE as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             })
@@ -255,7 +302,7 @@ impl Application for DebugVisualizator {
                         label: Some("compute_visuzlizer_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/curves.wgsl"))),
-                    
+
                     }),
                     Some("Visualizer Compute object"),
                     &vec![
@@ -335,7 +382,7 @@ impl Application for DebugVisualizator {
         );
 
         println!("Creating render bind groups.");
- 
+
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
@@ -371,8 +418,8 @@ impl Application for DebugVisualizator {
         // @workgroup_size(512,1,1)
         let thread_count: u32 = 256;
 
-        // let mut items_available: i32 = 32768; 
-        let mut items_available: i32 = // self.visualization_params.iterator_end_index as i32; //4096; 
+        // let mut items_available: i32 = 32768;
+        let mut items_available: i32 = // self.visualization_params.iterator_end_index as i32; //4096;
             if !self.block64mode { self.visualization_params.iterator_end_index as i32 }
             else { THREAD_COUNT as i32 };
         let dispatch_x: u32 = if !self.block64mode { items_available as u32 / thread_count }
@@ -418,7 +465,7 @@ impl Application for DebugVisualizator {
                  &self.render_bind_groups,
                  &self.render_object.pipeline,
                  &self.buffers.get("output").unwrap(),
-                 0..self.draw_count, 
+                 0..self.draw_count,
                  clear
             );
             queue.submit(Some(encoder_render.finish()));
@@ -430,7 +477,7 @@ impl Application for DebugVisualizator {
         self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version        
+        self.histogram.reset_all_cpu_version(queue, 0); // TODO: fix histogram.reset_cpu_version
     }
 
     #[allow(unused)]
@@ -446,15 +493,71 @@ impl Application for DebugVisualizator {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
 
-        // if self.keys.test_key(&Key::L, input) { 
-        //     self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        //     self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;  
-        // }
+        if self.keys.test_key(&Key::L, input) {
+            self.visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;
+            self.temp_visualization_params.arrow_size = self.visualization_params.arrow_size + 0.005;
+        }
+        if self.keys.test_key(&Key::K, input) {
+            self.visualization_params.arrow_size = (self.visualization_params.arrow_size - 0.005).max(0.01);
+            self.temp_visualization_params.arrow_size = (self.temp_visualization_params.arrow_size - 0.005).max(0.01);
+        }
+        if self.keys.test_key(&Key::Key1, input) {
+            self.visualization_params.curve_number = 1;
+            self.temp_visualization_params.curve_number = 1;
+        }
+        if self.keys.test_key(&Key::Key2, input) {
+            self.visualization_params.curve_number = 2;
+            self.temp_visualization_params.curve_number = 2;
+        }
+        if self.keys.test_key(&Key::Key3, input) {
+            self.visualization_params.curve_number = 3;
+            self.temp_visualization_params.curve_number = 3;
+        }
+        if self.keys.test_key(&Key::Key4, input) {
+            self.visualization_params.curve_number = 4;
+            self.temp_visualization_params.curve_number = 4;
+        }
+        if self.keys.test_key(&Key::Key9, input) {
+            self.block64mode = true;
+        }
+        if self.keys.test_key(&Key::Key0, input) {
+            self.block64mode = false;
+        }
+        if self.keys.test_key(&Key::NumpadSubtract, input) {
+        //if self.keys.test_key(&Key::T, input) {
+            let si = self.temp_visualization_params.iterator_start_index as i32;
+            if si >= THREAD_COUNT as i32 {
+                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index - THREAD_COUNT;
+                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index - THREAD_COUNT;
+            }
+        }
+        if self.keys.test_key(&Key::NumpadAdd, input) {
+            let ei = self.temp_visualization_params.iterator_end_index;
+            if ei <= 4096 - THREAD_COUNT {
+                self.temp_visualization_params.iterator_start_index = self.temp_visualization_params.iterator_start_index + THREAD_COUNT;
+                self.temp_visualization_params.iterator_end_index = self.temp_visualization_params.iterator_end_index + THREAD_COUNT;
+            }
+        }
+
+        if self.block64mode {
+            queue.write_buffer(
+                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.temp_visualization_params])
+            );
+        }
+        else {
+            queue.write_buffer(
+                &self.buffers.get(&"visualization_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.visualization_params])
+            );
+        }
     }
 }
 
 fn main() {
-    
-    jaankaup_core::template::run_loop::<DebugVisualizator, BasicLoop, DebugVisualizatorFeatures>(); 
+
+    jaankaup_core::template::run_loop::<DebugVisualizator, BasicLoop, DebugVisualizatorFeatures>();
     println!("Finished...");
 }

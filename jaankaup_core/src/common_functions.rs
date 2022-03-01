@@ -1,11 +1,5 @@
 use std::cmp;
 
-// trait S {
-//     fn sizeOfMember();
-//     fn alignOfMember();
-//     fn alignOfMember();
-// }
-
 pub fn encode_rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   (r << 24) | (g << 16) | (b  << 8) | a
 }

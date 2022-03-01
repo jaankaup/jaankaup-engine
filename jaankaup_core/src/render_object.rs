@@ -15,13 +15,11 @@ impl ComputeObject {
             ) -> Self {
 
 
-        println!("1");
         let bind_group_layouts = create_bind_group_layouts(device, bind_group_layout_entries);
 
         // TODO: create labeling.
         // let pipeline_layout_label = format!("{} {}", label.push_str(" pipeline_layout");
 
-        println!("2");
         // Create pipeline layout.
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: label,
@@ -29,7 +27,6 @@ impl ComputeObject {
             push_constant_ranges: &[],
         });
 
-        println!("3");
         // Create the pipeline.
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: label,
@@ -37,7 +34,6 @@ impl ComputeObject {
             module: &wgsl_module,
             entry_point: "main",
         });
-        println!("4");
 
         Self {
             bind_group_layouts: bind_group_layouts,

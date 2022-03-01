@@ -9,6 +9,7 @@ use jaankaup_core::template::{
 };
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
+use jaankaup_core::model_loader::*;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::buffer::{buffer_from_data};
 use jaankaup_core::wgpu;
@@ -36,7 +37,7 @@ const FMM_X: usize = 16;
 const FMM_Y: usize = 16; 
 const FMM_Z: usize = 16; 
 
-const MAX_NUMBER_OF_VVVVNNNN: usize = 1000000;
+const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
 
 /// The size of draw buffer in bytes;
@@ -196,7 +197,7 @@ impl Application for Fmm {
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.2);
+        camera.set_movement_sensitivity(0.02);
 
         // vvvvnnnn
         let render_object_vvvvnnnn =
@@ -753,7 +754,7 @@ impl Application for Fmm {
                             Cow::Borrowed(include_str!("../../assets/shaders/triangle_mesh_to_interface.wgsl"))),
                     
                     }),
-                    Some("FMM Compute object"),
+                    Some("FMM triangle Compute object"),
                     &vec![
                         vec![
                             // @group(0)
@@ -867,8 +868,8 @@ impl Application for Fmm {
         let compute_bind_groups_fmm_triangle =
             create_bind_groups(
                 &configuration.device,
-                &compute_object_fmm.bind_group_layout_entries,
-                &compute_object_fmm.bind_group_layouts,
+                &compute_object_fmm_triangle.bind_group_layout_entries,
+                &compute_object_fmm_triangle.bind_group_layouts,
                 &vec![
                     vec![
                          &buffers.get(&"fmm_params".to_string()).unwrap().as_entire_binding(),
@@ -934,10 +935,15 @@ impl Application for Fmm {
         //// EXECUTE FMM ////
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
 
-        self.compute_object_fmm.dispatch(
-            &self.compute_bind_groups_fmm,
+        //self.compute_object_fmm.dispatch(
+        //    &self.compute_bind_groups_fmm,
+        //    &mut encoder_command,
+        //    1, 1, 1, Some("fmm dispatch")
+        //);
+        self.compute_object_fmm_triangle.dispatch(
+            &self.compute_bind_groups_fmm_triangle,
             &mut encoder_command,
-            1, 1, 1, Some("fmm dispatch")
+            64, 1, 1, Some("fmm triangle dispatch")
         );
 
         queue.submit(Some(encoder_command.finish()));
@@ -947,6 +953,8 @@ impl Application for Fmm {
         let total_number_of_arrows = fmm_counter[1];
         let total_number_of_aabbs = fmm_counter[2];
         let total_number_of_aabb_wires = fmm_counter[3];
+
+        println!("total_number_of_aabbs == {}", total_number_of_aabbs);
 
         let vertices_per_dispatch = thread_count * 72;
         let vertices_per_dispatch_aabb_wire = thread_count * 432;

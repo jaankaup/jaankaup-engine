@@ -204,6 +204,7 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
         .with_level(LevelFilter::Off)
         .with_module_level("jaankaup_core", LevelFilter::Info)
         .with_module_level("basic", LevelFilter::Info)
+        .with_module_level("curves", LevelFilter::Info)
         //.with_target_levels(HashMap::from([("basic.rs".to_string(), LevelFilter::Info)]))
         //.with_module_level("wgpu", LevelFilter::Info)
         .with_utc_timestamps()

@@ -1,3 +1,5 @@
+/// Apply triangle mesh to fmm data. The interface creation.
+
 struct AABB {
     min: vec4<f32>; 
     max: vec4<f32>; 
@@ -165,6 +167,47 @@ fn closest_point_to_triangle(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f
     return u * a + v * b + w * c;
 }
 
+///////////////////////////
+////// MORTON CODE   //////
+///////////////////////////
+
+fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
+    var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
+        x_temp = (x_temp | (x_temp <<  8u)) & 0x0300F00Fu;
+        x_temp = (x_temp | (x_temp <<  4u)) & 0x030C30C3u;
+        x_temp = (x_temp | (x_temp <<  2u)) & 0x09249249u;
+
+    var y_temp = (y      | (y      << 16u)) & 0x030000FFu;
+        y_temp = (y_temp | (y_temp <<  8u)) & 0x0300F00Fu;
+        y_temp = (y_temp | (y_temp <<  4u)) & 0x030C30C3u;
+        y_temp = (y_temp | (y_temp <<  2u)) & 0x09249249u;
+
+    var z_temp = (z      | (z      << 16u)) & 0x030000FFu;
+        z_temp = (z_temp | (z_temp <<  8u)) & 0x0300F00Fu;
+        z_temp = (z_temp | (z_temp <<  4u)) & 0x030C30C3u;
+        z_temp = (z_temp | (z_temp <<  2u)) & 0x09249249u;
+
+    return x_temp | (y_temp << 1u) | (z_temp << 2u);
+}
+
+fn get_third_bits32(m: u32) -> u32 {
+    var x = m & 0x9249249u;
+    x = (x ^ (x >> 2u))  & 0x30c30c3u;
+    x = (x ^ (x >> 4u))  & 0x0300f00fu;
+    x = (x ^ (x >> 8u))  & 0x30000ffu;
+    x = (x ^ (x >> 16u)) & 0x000003ffu;
+
+    return x;
+}
+
+fn decode3Dmorton32(m: u32) -> vec3<u32> {
+    return vec3<u32>(
+        get_third_bits32(m),
+        get_third_bits32(m >> 1u),
+        get_third_bits32(m >> 2u)
+   );
+}
+
 @stage(compute)
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -172,4 +215,39 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
+
+
+//++    // Initialize fmm values.
+//++    let color = f32(rgba_u32(222u, 0u, 150u, 255u));
+//++    let coordinate = decode3Dmorton32(global_id.x) * 3u;
+//++    let coordinate2 = decode3Dmorton32(global_id.x + 1u) * 3u;
+//++    let min_coord = vec4<f32>(vec3<f32>(coordinate) - vec3<f32>(0.3), color); 
+//++    let max_coord = vec4<f32>(vec3<f32>(coordinate) + vec3<f32>(0.3), 1.0); 
+//++
+//++    output_arrow[global_id.x] =
+//++        Arrow (
+//++            vec4<f32>(vec3<f32>(coordinate), 1.0), 
+//++            vec4<f32>(vec3<f32>(coordinate2), 1.0), 
+//++            rgba_u32(0u, 0u, 255u, 255u),
+//++            0.1
+//++        );
+//++    atomicAdd(&counter[1], 1u);
+//++    
+//++    output_aabb[global_id.x] =  
+//++          AABB (
+//++              min_coord,
+//++              max_coord
+//++          );
+//++    atomicAdd(&counter[2], 1u);
+//++
+//++    output_char[global_id.x] =  
+//++          Char (
+//++              vec4<f32>(vec3<f32>(coordinate) + vec3<f32>(-0.3, 0.0, 0.31), 1.5), 
+//++              vec4<f32>(f32(global_id.x), 0.0, 0.0, 0.0),
+//++              0.1,
+//++              1u,
+//++              rgba_u32(0u, 0u, 2550u, 255u),
+//++              0.1
+//++          );
+//++    atomicAdd(&counter[0], 1u);
 }

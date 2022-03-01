@@ -20,6 +20,7 @@ bytemuck = { version = "1.4", features = ["derive"] }
 png = "0.16"
 instant = {version = "0.1.12", features = ["wasm-bindgen"]}
 log = "0.4"
+wavefront_obj = "10.0.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 pollster = "0.2"
