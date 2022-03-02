@@ -375,7 +375,7 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32)
 
     	loop {
     	    if (j == 12u) { break; }
-    	    output[thread_group_counter + j * offset + local_index]  = 
+    	    output[thread_group_counter + j * offset + u32(i) * offset * 12u + local_index]  = 
     	        Triangle(
     	        	Vertex(
     	        	    positions[vertex_positions[j*3u]],
@@ -669,11 +669,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 
     // Check!
-    var delta = //abs(
-                    min(
-                        i32(arrow_aabb_params.iterator_end_index - arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x), i32(THREAD_COUNT)
+    var delta = min(
+                    abs(
+                        i32(arrow_aabb_params.iterator_end_index) - (i32(THREAD_COUNT * work_group_id.x))), i32(THREAD_COUNT)
                     )
     ;
+    // var delta = min(
+    //                 abs(
+    //                     i32(arrow_aabb_params.iterator_end_index) - (i32(arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x))), i32(THREAD_COUNT)
+    //                 )
+    // ;
 
     // Allocate memory for thread group.
     if (local_index == 0u) {

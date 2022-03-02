@@ -21,7 +21,7 @@ pub fn load_triangles_from_obj(file_name: &'static str,
 
     let mut aabb = BBox { min: Vector3::<f32>::new(0.0, 0.0, 0.0), max: Vector3::<f32>::new(0.0, 0.0, 0.0), };
     let mut result: Vec<Triangle> = Vec::new();
-    let mut result_vvvvnnnn: Vec<Triangle_vvvvnnnn> = Vec::new();
+    let mut result_vvvvnnnn: Vec<Triangle_vvvvnnnn> = Vec::with_capacity(50000); // Vec::new(); // with capacity from file?
 
     if objects.len() == 1 {
         for shape in &objects[0].geometry[0].shapes {
@@ -97,8 +97,8 @@ pub fn load_triangles_from_obj(file_name: &'static str,
         }
     }
     match take {
-        // TODO: check bounds!
-        Some(amount) => Some((result, (&result_vvvvnnnn[0..amount as usize]).to_vec(), aabb)), 
+        // TODO: check bounds! Test!
+        Some(amount) => Some((result, (&result_vvvvnnnn[0..std::cmp::min(amount as usize, result_vvvvnnnn.len())]).to_vec(), aabb)), 
         None => Some((result, result_vvvvnnnn, aabb)) 
     }
     // Some((result, result_vvvvnnnn, aabb))

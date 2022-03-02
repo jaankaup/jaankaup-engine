@@ -31,7 +31,7 @@ const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 vert
 /// The size of draw buffer;
 const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
-const THREAD_COUNT: u32 = 64;
+const THREAD_COUNT: u32 = 256;
 
 //
 //  Arrow

@@ -1,5 +1,7 @@
 /// Apply triangle mesh to fmm data. The interface creation.
 
+let THREAD_COUNT: u32 = 64u;
+
 struct AABB {
     min: vec4<f32>; 
     max: vec4<f32>; 
@@ -43,7 +45,8 @@ struct FmmCell {
 };
 
 struct FmmParams {
-    blah: f32;
+    fmm_global_dimension: vec3<u32>; 
+    padding: u32;
 };
 
 @group(0)
@@ -167,6 +170,7 @@ fn closest_point_to_triangle(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f
     return u * a + v * b + w * c;
 }
 
+
 ///////////////////////////
 ////// MORTON CODE   //////
 ///////////////////////////
@@ -215,7 +219,44 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
+    // Print the global aabb.
+    let color = f32(rgba_u32(222u, 0u, 150u, 255u));
+    if (global_id.x == 0u) {
+        output_aabb_wire[global_id.x] =  
+              AABB (
+                  vec4<f32>(0.0, 0.0, 0.0, color),
+                  vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
+              );
+        atomicAdd(&counter[3], 1u);
+    }
 
+    // if (global_id.x < 66u) {
+    //     output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+    //           AABB (
+    //               // vec4<f32>(0.0, 0.0, 0.0, color),
+    //               // vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.2)
+    //               vec4<f32>(f32(global_id.x) * 4.0, 0.0, 0.0, color),
+    //               vec4<f32>(f32(global_id.x) * 4.0 + 2.0, 5.0, 5.0, 0.3)
+    //           );
+
+    //     output_aabb[atomicAdd(&counter[2], 1u)] =  
+    //           AABB (
+    //               vec4<f32>(f32(global_id.x) * 4.0, 5.0, 0.0, color),
+    //               vec4<f32>(f32(global_id.x) * 4.0 + 2.0, 10.0, 5.0, 0.0)
+    //           );
+
+    //     output_char[atomicAdd(&counter[0], 1u)] =  
+
+
+    //           Char (
+    //               vec4<f32>(f32(global_id.x) * 4.0, 0.0, 5.0, 2.0),
+    //               vec4<f32>(f32(global_id.x), 0.0, 0.0, 0.0),
+    //               0.5,
+    //               1u,
+    //               rgba_u32(255u, 0u, 2550u, 255u),
+    //               0.1
+    //           );
+    // }
 
 //++    // Initialize fmm values.
 //++    let color = f32(rgba_u32(222u, 0u, 150u, 255u));

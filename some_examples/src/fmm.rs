@@ -10,6 +10,7 @@ use jaankaup_core::template::{
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
 use jaankaup_core::model_loader::*;
+use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::buffer::{buffer_from_data};
 use jaankaup_core::wgpu;
@@ -22,6 +23,8 @@ use jaankaup_core::impl_convert;
 use jaankaup_core::common_functions::{encode_rgba_u32, udiv_up_safe32};
 use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
+use jaankaup_core::cgmath::Vector4 as Vec4;
+// use cgmath::{prelude::*, Vector3, Vector4};
 
 use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
@@ -117,7 +120,8 @@ struct FmmCell {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct FmmParams {
-    blah: f32,
+    fmm_global_dimension: [u32; 3],
+    padding: u32,
 }
 
 impl_convert!{Arrow}
@@ -166,7 +170,8 @@ struct Fmm {
     pub draw_count_triangles: u32,
     pub arrow_aabb_params: ArrowAabbParams,
     pub keys: KeyboardManager,
-    pub block64mode: bool,
+    pub block64mode: bool, // TODO: remove
+    pub triangle_mesh_draw_count: u32,
 }
 
 impl Fmm {
@@ -301,23 +306,52 @@ impl Application for Fmm {
         ////                 BUFFERS                    ////
         ////////////////////////////////////////////////////
 
+
+        // Load model. Tower.
+        let (_, mut triangle_mesh_wood, _) = load_triangles_from_obj(
+            "assets/models/wood.obj",
+            2.0,
+            [2.0, 0.0, 2.0],
+            None)
+            .unwrap(); // -> Option<(Vec<Triangle>, Vec<Triangle_vvvvnnnn>, BBox)> {
+        let triangle_mesh_draw_count = triangle_mesh_wood.len() as u32; 
+
+        let color = encode_rgba_u32(255, 0, 0, 255) as f32;
+
+        // Apply color information to the fourth component (triangle position).
+        for tr in triangle_mesh_wood.iter_mut() {
+            tr.a.w = color;
+            tr.b.w = color;
+            tr.c.w = color;
+        }
+
         buffers.insert(
             "triangle_mesh".to_string(),
-            buffer_from_data::<Triangle>(
+            buffer_from_data::<Triangle_vvvvnnnn>(
             &configuration.device,
-            &vec![Triangle { a: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
-                             b: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
-                             c: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
-                           }],
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &triangle_mesh_wood,
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
+            //wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
+
+        // buffers.insert(
+        //     "triangle_mesh".to_string(),
+        //     buffer_from_data::<Triangle>(
+        //     &configuration.device,
+        //     &vec![Triangle { a: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
+        //                      b: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
+        //                      c: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
+        //                    }],
+        //     wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //     None)
+        // );
 
         buffers.insert(
             "fmm_params".to_string(),
             buffer_from_data::<FmmParams>(
             &configuration.device,
-            &vec![FmmParams { blah: 234.0, }],
+            &vec![FmmParams { fmm_global_dimension: [16, 16, 16], padding: 123,}],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -911,6 +945,7 @@ impl Application for Fmm {
             arrow_aabb_params: arrow_aabb_params,
             keys: keys,
             block64mode: false,
+            triangle_mesh_draw_count: triangle_mesh_draw_count, 
         }
     }
 
@@ -979,12 +1014,13 @@ impl Application for Fmm {
             self.arrow_aabb_params.iterator_end_index = *e_size;
             self.arrow_aabb_params.element_type = *e_type;
 
+            if number_of_loop == 0 { continue; }  
+
             queue.write_buffer(
                 &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
                 0,
                 bytemuck::cast_slice(&[self.arrow_aabb_params])
             );
-
 
             for i in 0..number_of_loop {
                 let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
@@ -1002,7 +1038,8 @@ impl Application for Fmm {
                 let counter = self.histogram_draw_counts.get_values(device, queue);
 
                 // self?
-                self.draw_count_triangles = counter[0] * 3;
+                let draw_count = counter[0] * 3;
+                println!("self.draw_count_triangles = {:?}", self.draw_count_triangles);
 
                 let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
 
@@ -1012,7 +1049,7 @@ impl Application for Fmm {
                      &self.render_bind_groups_vvvvnnnn,
                      &self.render_object_vvvvnnnn.pipeline,
                      &self.buffers.get("output_render").unwrap(),
-                     0..self.draw_count_triangles,
+                     0..draw_count,
                      clear
                 );
                
@@ -1036,7 +1073,6 @@ impl Application for Fmm {
 
         // Update Visualization params for arrows.
           
-        // let number_of_chars = fmm_counter[0];
         self.arrow_aabb_params.iterator_start_index = 0;
         self.arrow_aabb_params.iterator_end_index = number_of_chars;
         self.arrow_aabb_params.element_type = 0;
@@ -1057,7 +1093,6 @@ impl Application for Fmm {
         let mut ccc = -1;
         while true { 
             ccc = ccc + 1;
-            println!("{}",ccc);
 
             let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
 
@@ -1074,9 +1109,6 @@ impl Application for Fmm {
             self.draw_count_triangles = counter[0];
 
             current_char_index = counter[1];
-
-            println!("numbers draw_count == {}", self.draw_count_triangles);
-            println!("current_char == {}", current_char_index);
 
             let mut encoder_char_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
 
@@ -1109,6 +1141,19 @@ impl Application for Fmm {
             }
             else { break; }
         }
+
+        let mut model_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("model encoder") });
+
+        draw(&mut model_encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_bind_groups_vvvvnnnn,
+             &self.render_object_vvvvnnnn.pipeline,
+             &self.buffers.get("triangle_mesh").unwrap(),
+             0..self.triangle_mesh_draw_count * 3,
+             clear
+        );
+        queue.submit(Some(model_encoder.finish()));
 
         // Update screen.
         self.screen.prepare_for_rendering();

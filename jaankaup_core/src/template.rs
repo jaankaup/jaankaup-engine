@@ -71,10 +71,11 @@ pub trait WGPUFeatures: Sized + 'static {
         wgpu::Features::empty()
     }
     fn required_limits() -> wgpu::Limits {
-        wgpu::Limits::downlevel_webgl2_defaults() // These downlevel limits will allow the code to run on all possible hardware
+        // wgpu::Limits::downlevel_webgl2_defaults() // These downlevel limits will allow the code to run on all possible hardware
+        let limits = wgpu::Limits::default();
         //let mut limits = wgpu::Limits::default();
         //limits.max_storage_buffers_per_pipeline_layout = 8; // TODO: add this to example projects.
-        //limits
+        limits
     }
     fn required_downlevel_capabilities() -> wgpu::DownlevelCapabilities {
         wgpu::DownlevelCapabilities {
