@@ -326,7 +326,7 @@ fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32, start_inde
     }
 }
  
-fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32) {
+fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32, start_index: u32) {
 
     var aabbs = array<AABB, 12>(
         AABB(aabb.min, vec4<f32>(aabb.max.x, aabb.min.y + t, aabb.min.z + t, 1.0)),
@@ -370,7 +370,7 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32)
 
     	loop {
     	    if (j == 12u) { break; }
-    	    output[thread_group_counter + j * offset + u32(i) * offset * 12u + local_index]  = 
+    	    output[start_index + j * offset + u32(i) * offset * 12u + local_index]  = 
     	        Triangle(
     	        	Vertex(
     	        	    positions[vertex_positions[j*3u]],
@@ -391,7 +391,7 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32)
     }
 }
 
-fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
+fn create_arrow(arr: Arrow, offset: u32, local_index: u32, start_index: u32) {
 
     var direction = arr.end_pos.xyz - arr.start_pos.xyz;
     let array_length = length(direction);
@@ -456,7 +456,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
 
     loop {
         if (i == 12u) { break; }
-        output[thread_group_counter + i * offset + local_index]  = 
+        output[start_index + i * offset + local_index]  = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[i*3u]],
@@ -552,7 +552,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
 
     loop {
         if (j == 12u) { break; }
-        output[thread_group_counter + offset * 12u + j * offset + local_index]  = 
+        output[start_index + offset * 12u + j * offset + local_index]  = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[j*3u]],
@@ -593,27 +593,27 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // ;
 
     // Allocate memory for thread group.
-    if (local_index == 0u) {
+    // if (local_index == 0u) {
   
-        if (arrow_aabb_params.element_type == 0u) { 
-    	    thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
-        }
-        // else if (arrow_aabb_params.element_type == 1u) {
-    	//     thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
-        // }
-        else if (arrow_aabb_params.element_type == 2u) {
-    	    thread_group_counter = atomicAdd(&counter[0], 144u * u32(delta));
-        }
-    }
+    //     if (arrow_aabb_params.element_type == 0u) { 
+    // 	    thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
+    //     }
+    //     // else if (arrow_aabb_params.element_type == 1u) {
+    // 	//     thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
+    //     // }
+    //     // else if (arrow_aabb_params.element_type == 2u) {
+    // 	//     thread_group_counter = atomicAdd(&counter[0], 144u * u32(delta));
+    //     // }
+    // }
 
-    workgroupBarrier();
+    // workgroupBarrier();
 
     let actual_index = arrow_aabb_params.iterator_start_index + global_id.x;
     // if (actual_index >= arrow_aabb_params.iterator_end_index) { return; } 
     if (local_index >= delta) { return; } 
 
     if (arrow_aabb_params.element_type == 0u) { 
-        create_arrow(arrows[actual_index], u32(delta), local_index);
+        create_arrow(arrows[actual_index], u32(delta), local_index, THREAD_COUNT * work_group_id.x * 24u);
     }
     else if (arrow_aabb_params.element_type == 1u) {
         let aabb = aabbs[actual_index];
@@ -621,6 +621,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
     else if (arrow_aabb_params.element_type == 2u) {
         let aabb = aabb_wires[actual_index];
-        create_aabb_wire(aabb, aabb.max.w, u32(aabb.min.w), u32(delta), local_index);
+        create_aabb_wire(aabb, aabb.max.w, u32(aabb.min.w), u32(delta), local_index, THREAD_COUNT * work_group_id.x * 144u);
     }
 }

@@ -243,8 +243,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     output_aabb[atomicAdd(&counter[2], 1u)] = 
           AABB (
-              vec4<f32>(global_coordinate + local_coordinate - vec3<f32>(0.02), color),
-              vec4<f32>(global_coordinate + local_coordinate + vec3<f32>(0.02), 0.0),
+              vec4<f32>(global_coordinate + local_coordinate - vec3<f32>(0.008), color),
+              vec4<f32>(global_coordinate + local_coordinate + vec3<f32>(0.008), 0.0),
           );
     //atomicAdd(&counter[2], 1u);
     // let global_coordinate = fmm_params.fmm_global_dimension *  

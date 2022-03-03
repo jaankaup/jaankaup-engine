@@ -1003,22 +1003,26 @@ impl Application for Fmm {
         let total_number_of_arrows = fmm_counter[1];
         let total_number_of_aabbs = fmm_counter[2];
         let total_number_of_aabb_wires = fmm_counter[3];
+        
+        let vertices_per_element_arrow = 72;
+        let vertices_per_element_aabb = 36;
+        let vertices_per_element_aabb_wire = 432;
 
         // The number of vertices created with one dispatch.
-        let vertices_per_dispatch_arrow = thread_count * 72;
-        let vertices_per_dispatch_aabb = thread_count * 36;
-        let vertices_per_dispatch_aabb_wire = thread_count * 432;
+        let vertices_per_dispatch_arrow = thread_count * vertices_per_element_arrow;
+        let vertices_per_dispatch_aabb = thread_count * vertices_per_element_aabb;
+        let vertices_per_dispatch_aabb_wire = thread_count * vertices_per_element_aabb_wire;
 
-        // [(element_type, total number of elements, number of vercies per dispatch)]
-        let draw_params = [(0, total_number_of_arrows,     vertices_per_dispatch_arrow),
-                           (1, total_number_of_aabbs,      vertices_per_dispatch_aabb), // !!!
-                           (2, total_number_of_aabb_wires, vertices_per_dispatch_aabb_wire)]; 
+        // [(element_type, total number of elements, number of vercies per dispatch, vertices_per_element)]
+        let draw_params = [(0, total_number_of_arrows,     vertices_per_dispatch_arrow, vertices_per_element_arrow),
+                           (1, total_number_of_aabbs,      vertices_per_dispatch_aabb, vertices_per_element_aabb), // !!!
+                           (2, total_number_of_aabb_wires, vertices_per_dispatch_aabb_wire, vertices_per_element_aabb_wire)]; 
 
         // Clear the previous screen.
         let mut clear = true;
 
         // For each element type, create triangle meshes and render with respect of draw buffer size.
-        for (e_type, e_size, v_per_dispatch) in draw_params.iter() {
+        for (e_type, e_size, v_per_dispatch, vertices_per_elem) in draw_params.iter() {
             println!("*****************");
 
             // The number of safe dispathes. This ensures the draw buffer doesn't over flow.
@@ -1062,8 +1066,8 @@ impl Application for Fmm {
 
                 self.arrow_aabb_params.iterator_end_index = self.arrow_aabb_params.iterator_start_index + std::cmp::min(number_of_elements, safe_number_of_dispatches * v_per_dispatch);
 
-                println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
-                println!("self.arrow_aabb_params.iterator_end_index == {}", self.arrow_aabb_params.iterator_end_index);
+                // println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
+                // println!("self.arrow_aabb_params.iterator_end_index == {}", self.arrow_aabb_params.iterator_end_index);
 
                 queue.write_buffer(
                     &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
@@ -1083,7 +1087,7 @@ impl Application for Fmm {
 
                 // self?
                 // let draw_count = counter[0] * 3;
-                let draw_count = number_of_elements * 36;
+                let draw_count = number_of_elements * vertices_per_elem;
 
                 println!("local_dispatch == {}", local_dispatch);
                 println!("draw_count == {}", draw_count);
