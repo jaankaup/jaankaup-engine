@@ -1009,7 +1009,8 @@ impl Application for Fmm {
         self.compute_object_fmm_triangle.dispatch(
             &self.compute_bind_groups_fmm_triangle,
             &mut encoder_command,
-            udiv_up_safe32(2036, thread_count), 1, 1,
+            udiv_up_safe32(1, thread_count), 1, 1,
+            //udiv_up_safe32(2036, thread_count), 1, 1,
             // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
             Some("fmm triangle dispatch")
         );

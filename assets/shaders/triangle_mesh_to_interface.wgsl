@@ -286,7 +286,7 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
     for (var i: i32 = 0 ; i < i32(number_of_cubes) ; i = i + 1) {
 
         // The global index for cube.
-        let base_coordinate = (index_to_uvec3(u32(i), dim_x, dim_y) + aabb.min); // * 4u;
+        let base_coordinate = (index_to_uvec3(u32(i), dim_x, dim_y) + aabb.min) * 4u; // * 4u;
         let base_index = encode3Dmorton32(base_coordinate.x, base_coordinate.y, base_coordinate.z);
         let actual_index = base_index + thread_index; 
         let actual_coordinate = decode3Dmorton32(actual_index);
@@ -294,16 +294,24 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
         let cp = closest_point_to_triangle(vec3<f32>(actual_coordinate), tr.a.v.xyz, tr.b.v.xyz, tr.c.v.xyz);
         let dist = distance(cp, vec3<f32>(actual_coordinate));
 
-    	let color = f32(rgba_u32(222u, 0u, 150u, 255u));
+    	let color = f32(rgba_u32(222u, 200u, 150u, 255u));
 
-    	output_aabb_wire[atomicAdd(&counter[3], 1u)] = 
-    	    AABB (
-    	        vec4<f32>(vec3<f32>(base_coordinate) - vec3<f32>(0.25), color),
-    	        vec4<f32>(vec3<f32>(base_coordinate) + vec3<f32>(0.25), 0.01)
-    	    );
+        if (thread_index == 0u) {
+    	    output_aabb_wire[atomicAdd(&counter[3], 1u)] = 
+    	        AABB (
+    	            vec4<f32>(vec3<f32>(base_coordinate) * 0.25, color),
+    	            vec4<f32>(vec3<f32>(base_coordinate) * 0.25 + vec3<f32>(1.0), 0.01)
+    	        );
+        }
         
         // Load the fmm cell.
         let cell = fmm_data[actual_index];
+
+    	output_aabb[atomicAdd(&counter[2], 1u)] = 
+    	    AABB (
+    	        vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 - vec3<f32>(0.01), color),
+    	        vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 + vec3<f32>(0.01), 0.0)
+    	    );
         if (dist < 1.0 && dist < cell.value) {
 
            // Is this safe. Do we need atomic operations?
@@ -324,11 +332,23 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     if (fmm_params.visualize == 0u) {
 
-        if (global_id.x >= fmm_params.triangle_count) { return; } 
+        // if (global_id.x >= fmm_params.triangle_count) { return; } 
 
-        let tr = triangle_mesh_in[global_id.x];
-        let tr_aabb =  triangle_to_aabb(tr);
+        // One triangle per dispatch.
+        let tr = triangle_mesh_in[work_group_id.x];
+
+        let tr_aabb = triangle_to_aabb(tr);
+
         update_fmm_interface(tr_aabb, tr, local_index);
+
+        if (global_id.x == 0u) {
+            output_aabb_wire[global_id.x] =  
+                  AABB (
+                      vec4<f32>(0.0, 0.0, 0.0, color),
+                      vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
+                  );
+            atomicAdd(&counter[3], 1u);
+        }
     }
 
     else if (fmm_params.visualize == 1u) {
