@@ -221,39 +221,6 @@ fn u32_rgba(c: u32) -> vec4<f32> {
   return vec4<f32>(r,g,b,a);
 }
 
-//++ fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
-//++                    normals:   ptr<function, array<vec4<f32>, 6>>,
-//++                    offset: u32,
-//++                    stride: u32) {
-//++ 
-//++     let index = atomicAdd(&counter[0], 36u);
-//++ 
-//++     var i: u32 = 0u;
-//++ 
-//++     loop {
-//++         if (i == 36u) { break; }
-//++         temp_vertex_data[offset + STRIDE * i]  =
-//++             Vertex(
-//++                 (*positions)[vertex_positions[i]],
-//++                 (*normals)[i/6u]
-//++             );
-//++ 
-//++         i = i + 1u;
-//++     }
-//++ 
-//++     workgroupBarrier();
-//++ 
-//++     var i: u32 = 0u;
-//++ 
-//++     loop {
-//++         if (i == 36u) { break; }
-//++     	output[index+i] = temp_vertex_data[offset + stride * i];
-//++         i = i + 1u;
-//++     }
-//++ 
-//++     workgroupBarrier();
-//++ } 
-
 fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32, start_index: u32) {
 
     // Global start position.
@@ -580,36 +547,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
 
-    // Check!
-    // var delta = min(
-    //                 abs(
-    //                     i32(arrow_aabb_params.iterator_end_index) - (i32(THREAD_COUNT * work_group_id.x))), i32(THREAD_COUNT)
-    //                 )
-    // ;
     var delta = min(arrow_aabb_params.iterator_end_index - arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x, THREAD_COUNT); 
-    //                 abs(
-    //                     i32(arrow_aabb_params.iterator_end_index) - (i32(arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x))), i32(THREAD_COUNT)
-    //                 )
-    // ;
-
-    // Allocate memory for thread group.
-    // if (local_index == 0u) {
-  
-    //     if (arrow_aabb_params.element_type == 0u) { 
-    // 	    thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
-    //     }
-    //     // else if (arrow_aabb_params.element_type == 1u) {
-    // 	//     thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
-    //     // }
-    //     // else if (arrow_aabb_params.element_type == 2u) {
-    // 	//     thread_group_counter = atomicAdd(&counter[0], 144u * u32(delta));
-    //     // }
-    // }
-
-    // workgroupBarrier();
 
     let actual_index = arrow_aabb_params.iterator_start_index + global_id.x;
-    // if (actual_index >= arrow_aabb_params.iterator_end_index) { return; } 
+
     if (local_index >= delta) { return; } 
 
     if (arrow_aabb_params.element_type == 0u) { 
