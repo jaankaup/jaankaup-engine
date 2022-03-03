@@ -335,9 +335,11 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32,
 
     	var j: u32 = 0u;
 
+        //output[start_index + i * offset + local_index] = 
+
     	loop {
     	    if (j == 12u) { break; }
-    	    output[start_index + j * offset + u32(i) * offset * 12u + local_index]  = 
+    	    output[start_index + j * offset + local_index + u32(i) * offset * 12u ]  = 
     	        Triangle(
     	        	Vertex(
     	        	    positions[vertex_positions[j*3u]],
@@ -546,8 +548,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-
-    var delta = min(arrow_aabb_params.iterator_end_index - arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x, THREAD_COUNT); 
+    var delta = min(arrow_aabb_params.iterator_end_index - (arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x), THREAD_COUNT); 
 
     let actual_index = arrow_aabb_params.iterator_start_index + global_id.x;
 

@@ -126,9 +126,9 @@ struct FmmCell {
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct FmmParams {
     fmm_global_dimension: [u32; 3],
-    padding: u32,
+    visualize: u32,
     fmm_inner_dimension: [u32; 3],
-    padding2: u32,
+    triangle_count: u32,
 }
 
 impl_convert!{Arrow}
@@ -318,10 +318,11 @@ impl Application for Fmm {
         let (_, mut triangle_mesh_wood, _) = load_triangles_from_obj(
             "assets/models/wood.obj",
             2.0,
-            [2.0, 0.0, 2.0],
+            [5.0, -2.0, 5.0],
             None)
             .unwrap(); // -> Option<(Vec<Triangle>, Vec<Triangle_vvvvnnnn>, BBox)> {
         let triangle_mesh_draw_count = triangle_mesh_wood.len() as u32; 
+        println!("triangle_mesh_draw_count == {}", triangle_mesh_draw_count);
 
         let color = encode_rgba_u32(255, 0, 0, 255) as f32;
 
@@ -360,22 +361,27 @@ impl Application for Fmm {
             &configuration.device,
             &vec![FmmParams {
                      fmm_global_dimension: [16, 16, 16],
-                     padding: 123,
+                     visualize: 0,
                      fmm_inner_dimension: [4, 4, 4],
-                     padding2: 123,
+                     triangle_count: triangle_mesh_draw_count,
             }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
 
         buffers.insert(
-            "fmm_cells".to_string(),
-            configuration.device.create_buffer(&wgpu::BufferDescriptor{
-                label: Some("output_arrays buffer"),
-                size: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z * std::mem::size_of::<FmmCell>()) as u64,
-                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-                }
+            "fmm_data".to_string(),
+            buffer_from_data::<FmmCell>(
+            &configuration.device,
+            &vec![FmmCell { tag: 0, value: 1000000.0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            Some("fmm data buffer.")
+            //configuration.device.create_buffer(&wgpu::BufferDescriptor{
+            //    label: Some("output_arrays buffer"),
+            //    size: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z * std::mem::size_of::<FmmCell>()) as u64,
+            //    usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            //    mapped_at_creation: false,
+            //    }
             )
         );
 
@@ -777,7 +783,7 @@ impl Application for Fmm {
                                       &vec![
                                           vec![
                                                &buffers.get(&"fmm_params".to_string()).unwrap().as_entire_binding(),
-                                               &buffers.get(&"fmm_cells".to_string()).unwrap().as_entire_binding(),
+                                               &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
                                                &histogram_fmm.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
@@ -919,7 +925,7 @@ impl Application for Fmm {
                 &vec![
                     vec![
                          &buffers.get(&"fmm_params".to_string()).unwrap().as_entire_binding(),
-                         &buffers.get(&"fmm_cells".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"triangle_mesh".to_string()).unwrap().as_entire_binding(),
                          &histogram_fmm.get_histogram_buffer().as_entire_binding(),
                          &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
@@ -982,19 +988,64 @@ impl Application for Fmm {
         //// EXECUTE FMM ////
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
 
+        queue.write_buffer(
+            &self.buffers.get(&"fmm_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[FmmParams {
+                                      fmm_global_dimension: [16, 16, 16],
+                                      visualize: 0,
+                                      fmm_inner_dimension: [4, 4, 4],
+                                      triangle_count: 1 }
+                                      //triangle_count: 2036 }
+            ]));
+
         //self.compute_object_fmm.dispatch(
         //    &self.compute_bind_groups_fmm,
         //    &mut encoder_command,
         //    1, 1, 1, Some("fmm dispatch")
         //);
+
+        // Compute interface.
         self.compute_object_fmm_triangle.dispatch(
             &self.compute_bind_groups_fmm_triangle,
             &mut encoder_command,
-            (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+            udiv_up_safe32(2036, thread_count), 1, 1,
+            // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
             Some("fmm triangle dispatch")
         );
 
         queue.submit(Some(encoder_command.finish()));
+
+       //  let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
+
+       //  queue.write_buffer(
+       //      &self.buffers.get(&"fmm_params".to_string()).unwrap(),
+       //      0,
+       //      bytemuck::cast_slice(&[FmmParams {
+       //                                fmm_global_dimension: [16, 16, 16],
+       //                                visualize: 1,
+       //                                fmm_inner_dimension: [4, 4, 4],
+       //                                triangle_count: 2036 }
+       //      ]));
+
+       //  //     buffer_from_data::<FmmParams>(
+       //  //     &configuration.device,
+       //  //     &vec![FmmParams {
+       //  //              fmm_global_dimension: [16, 16, 16],
+       //  //              visualize: 0,
+       //  //              fmm_inner_dimension: [4, 4, 4],
+       //  //              padding2: 123,
+       //  //     }],
+
+       //  // Visualize.
+       //  self.compute_object_fmm_triangle.dispatch(
+       //      &self.compute_bind_groups_fmm_triangle,
+       //      &mut encoder_command,
+       //      (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+       //      Some("fmm triangle dispatch")
+       //  );
+
+       //  queue.submit(Some(encoder_command.finish()));
 
         let fmm_counter = self.histogram_fmm.get_values(device, queue);
 
@@ -1202,7 +1253,8 @@ impl Application for Fmm {
              &self.render_bind_groups_vvvvnnnn,
              &self.render_object_vvvvnnnn.pipeline,
              &self.buffers.get("triangle_mesh").unwrap(),
-             0..self.triangle_mesh_draw_count * 3,
+             0..3,
+             //0..self.triangle_mesh_draw_count * 3,
              clear
         );
         queue.submit(Some(model_encoder.finish()));
