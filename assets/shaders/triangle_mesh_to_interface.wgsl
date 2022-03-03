@@ -47,6 +47,8 @@ struct FmmCell {
 struct FmmParams {
     fmm_global_dimension: vec3<u32>; 
     padding: u32;
+    fmm_inner_dimension: vec3<u32>; 
+    padding2: u32;
 };
 
 @group(0)
@@ -125,6 +127,8 @@ fn u32_rgba(c: u32) -> vec4<f32> {
   return vec4<f32>(r,g,b,a);
 }
 
+
+
 //// Intersection things. ////
 
 // struct Triangle ?
@@ -169,6 +173,10 @@ fn closest_point_to_triangle(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f
     let w = 1.0 - u - v;
     return u * a + v * b + w * c;
 }
+
+fn triangle_to_aabb(tr: Triangle, global_dimension: vec3<u32>, inner_dimension: vec3<u32>) {
+    
+} 
 
 
 ///////////////////////////
@@ -229,6 +237,20 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
               );
         atomicAdd(&counter[3], 1u);
     }
+
+    let global_coordinate = vec3<f32>(decode3Dmorton32(work_group_id.x));
+    let local_coordinate  = vec3<f32>(decode3Dmorton32(local_index)) * 0.25;
+
+    output_aabb[atomicAdd(&counter[2], 1u)] = 
+          AABB (
+              vec4<f32>(global_coordinate + local_coordinate - vec3<f32>(0.02), color),
+              vec4<f32>(global_coordinate + local_coordinate + vec3<f32>(0.02), 0.0),
+          );
+    //atomicAdd(&counter[2], 1u);
+    // let global_coordinate = fmm_params.fmm_global_dimension *  
+    //                         fmm_params.fmm_inner_dimension; 
+
+    
 
     // if (global_id.x < 66u) {
     //     output_aabb_wire[atomicAdd(&counter[3], 1u)] =  

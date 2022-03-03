@@ -31,14 +31,19 @@ pub use ev::VirtualKeyCode as Key;
 
 // TODO: add to fmm params.
 const MAX_NUMBERS_OF_ARROWS:     usize = 40960;
-const MAX_NUMBERS_OF_AABBS:      usize = 40960;
+const MAX_NUMBERS_OF_AABBS:      usize = 262144;
 const MAX_NUMBERS_OF_AABB_WIRES: usize = 40960;
 const MAX_NUMBERS_OF_CHARS:      usize = 40960;
 
-// FMM dimensions.
-const FMM_X: usize = 16; 
-const FMM_Y: usize = 16; 
-const FMM_Z: usize = 16; 
+// FMM global dimensions.
+const FMM_GLOBAL_X: usize = 16; 
+const FMM_GLOBAL_Y: usize = 16; 
+const FMM_GLOBAL_Z: usize = 16; 
+
+// FMM inner dimensions.
+const FMM_INNER_X: usize = 4; 
+const FMM_INNER_Y: usize = 4; 
+const FMM_INNER_Z: usize = 4; 
 
 const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
@@ -122,6 +127,8 @@ struct FmmCell {
 struct FmmParams {
     fmm_global_dimension: [u32; 3],
     padding: u32,
+    fmm_inner_dimension: [u32; 3],
+    padding2: u32,
 }
 
 impl_convert!{Arrow}
@@ -351,7 +358,12 @@ impl Application for Fmm {
             "fmm_params".to_string(),
             buffer_from_data::<FmmParams>(
             &configuration.device,
-            &vec![FmmParams { fmm_global_dimension: [16, 16, 16], padding: 123,}],
+            &vec![FmmParams {
+                     fmm_global_dimension: [16, 16, 16],
+                     padding: 123,
+                     fmm_inner_dimension: [4, 4, 4],
+                     padding2: 123,
+            }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -360,7 +372,7 @@ impl Application for Fmm {
             "fmm_cells".to_string(),
             configuration.device.create_buffer(&wgpu::BufferDescriptor{
                 label: Some("output_arrays buffer"),
-                size: (FMM_X * FMM_Y * FMM_Z * std::mem::size_of::<FmmCell>()) as u64,
+                size: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z * std::mem::size_of::<FmmCell>()) as u64,
                 usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
                 }
@@ -978,43 +990,54 @@ impl Application for Fmm {
         self.compute_object_fmm_triangle.dispatch(
             &self.compute_bind_groups_fmm_triangle,
             &mut encoder_command,
-            64, 1, 1, Some("fmm triangle dispatch")
+            (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+            Some("fmm triangle dispatch")
         );
 
         queue.submit(Some(encoder_command.finish()));
 
         let fmm_counter = self.histogram_fmm.get_values(device, queue);
+
+        // Get the total number of elements.
         let number_of_chars = fmm_counter[0];
         let total_number_of_arrows = fmm_counter[1];
         let total_number_of_aabbs = fmm_counter[2];
         let total_number_of_aabb_wires = fmm_counter[3];
 
-        println!("total_number_of_aabbs == {}", total_number_of_aabbs);
-
-        let vertices_per_dispatch = thread_count * 72;
+        // The number of vertices created with one dispatch.
+        let vertices_per_dispatch_arrow = thread_count * 72;
+        let vertices_per_dispatch_aabb = thread_count * 36;
         let vertices_per_dispatch_aabb_wire = thread_count * 432;
 
-        //// DRAW ARROWS, AABBS AND AABB_WIRES.
+        // [(element_type, total number of elements, number of vercies per dispatch)]
+        let draw_params = [(0, total_number_of_arrows,     vertices_per_dispatch_arrow),
+                           (1, total_number_of_aabbs,      vertices_per_dispatch_aabb), // !!!
+                           (2, total_number_of_aabb_wires, vertices_per_dispatch_aabb_wire)]; 
 
-        // [(element_type, number_of_elements)]
-        let draw_params = [(0, fmm_counter[1], vertices_per_dispatch),
-                           (1, fmm_counter[2], vertices_per_dispatch),
-                           (2, fmm_counter[3], vertices_per_dispatch_aabb_wire)]; 
-
+        // Clear the previous screen.
         let mut clear = true;
 
+        // For each element type, create triangle meshes and render with respect of draw buffer size.
         for (e_type, e_size, v_per_dispatch) in draw_params.iter() {
+            println!("*****************");
 
+            // The number of safe dispathes. This ensures the draw buffer doesn't over flow.
             let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / v_per_dispatch;
-            let total_number_of_dispatches = udiv_up_safe32(*e_size, thread_count);
-            let number_of_loop = udiv_up_safe32(total_number_of_dispatches, safe_number_of_dispatches);
 
-            // Update Visualization params for arrows.
+            // // The number of remaining dispatches to complete the triangle mesh creation and
+            // // rendering.
+            // let mut total_number_of_dispatches = udiv_up_safe32(*e_size, thread_count);
+
+            // The number of items to create and draw.
+            let mut items_to_process = *e_size;
+
+            // Nothing to process.
+            if *e_size == 0 { continue; }
+
+            // Create the initial params.
             self.arrow_aabb_params.iterator_start_index = 0;
-            self.arrow_aabb_params.iterator_end_index = *e_size;
+            self.arrow_aabb_params.iterator_end_index = std::cmp::min(*e_size, safe_number_of_dispatches * v_per_dispatch);
             self.arrow_aabb_params.element_type = *e_type;
-
-            if number_of_loop == 0 { continue; }  
 
             queue.write_buffer(
                 &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
@@ -1022,10 +1045,31 @@ impl Application for Fmm {
                 bytemuck::cast_slice(&[self.arrow_aabb_params])
             );
 
-            for i in 0..number_of_loop {
-                let local_dispatch = std::cmp::min(safe_number_of_dispatches, total_number_of_dispatches - safe_number_of_dispatches * i);
+            // Continue process until all element are rendered.
+            while items_to_process > 0 {
+
+                // The number of remaining dispatches to complete the triangle mesh creation and
+                // rendering.
+                let total_number_of_dispatches = udiv_up_safe32(items_to_process, thread_count);
+
+                // Calculate the number of dispatches for this run. 
+                let local_dispatch = std::cmp::min(total_number_of_dispatches, safe_number_of_dispatches);
+
+                // Then number of elements that are going to be rendered. 
+                let number_of_elements = std::cmp::min(local_dispatch * thread_count, items_to_process);
 
                 let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
+
+                self.arrow_aabb_params.iterator_end_index = self.arrow_aabb_params.iterator_start_index + std::cmp::min(number_of_elements, safe_number_of_dispatches * v_per_dispatch);
+
+                println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
+                println!("self.arrow_aabb_params.iterator_end_index == {}", self.arrow_aabb_params.iterator_end_index);
+
+                queue.write_buffer(
+                    &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                    0,
+                    bytemuck::cast_slice(&[self.arrow_aabb_params])
+                );
 
                 self.compute_object_arrow.dispatch(
                     &self.compute_bind_groups_arrow,
@@ -1038,8 +1082,11 @@ impl Application for Fmm {
                 let counter = self.histogram_draw_counts.get_values(device, queue);
 
                 // self?
-                let draw_count = counter[0] * 3;
-                println!("self.draw_count_triangles = {:?}", self.draw_count_triangles);
+                // let draw_count = counter[0] * 3;
+                let draw_count = number_of_elements * 36;
+
+                println!("local_dispatch == {}", local_dispatch);
+                println!("draw_count == {}", draw_count);
 
                 let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
 
@@ -1055,17 +1102,18 @@ impl Application for Fmm {
                
                 if clear { clear = false; }
 
+                // Decrease the total count of elements.
+                items_to_process = items_to_process - number_of_elements; 
+
                 queue.submit(Some(encoder_arrow_rendering.finish()));
                 self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
 
-                // Update Visualization params for arrows.
-                self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_start_index + local_dispatch * thread_count;
-
-                queue.write_buffer(
-                    &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-                    0,
-                    bytemuck::cast_slice(&[self.arrow_aabb_params])
-                );
+                self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_end_index; // + items_to_process;
+                //++ queue.write_buffer(
+                //++     &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                //++     0,
+                //++     bytemuck::cast_slice(&[self.arrow_aabb_params])
+                //++ );
             } // for number_of_loop
         }
 
@@ -1076,7 +1124,7 @@ impl Application for Fmm {
         self.arrow_aabb_params.iterator_start_index = 0;
         self.arrow_aabb_params.iterator_end_index = number_of_chars;
         self.arrow_aabb_params.element_type = 0;
-        // TODO: a better heurestic.
+        // TODO: a better heurestic. This doesn't work as expected.
         self.arrow_aabb_params.max_number_of_vertices = std::cmp::max(MAX_NUMBER_OF_VVVC as i32 - 500000, 0) as u32;
         //self.arrow_aabb_params.max_number_of_vertices = MAX_NUMBER_OF_VVVC as u32;
 

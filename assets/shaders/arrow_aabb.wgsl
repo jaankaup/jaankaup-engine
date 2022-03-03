@@ -254,7 +254,7 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 //++     workgroupBarrier();
 //++ } 
 
-fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32) {
+fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32, start_index: u32) {
 
     // Global start position.
     //let index = atomicAdd(&counter[0], 36u);
@@ -305,7 +305,8 @@ fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32) {
 
     loop {
         if (i == 12u) { break; }
-        output[thread_group_counter + i * offset + local_index]  = 
+        // output[thread_group_counter + i * offset + local_index] = 
+        output[start_index + i * offset + local_index] = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[i*3u]],
@@ -323,12 +324,6 @@ fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: u32) {
 
         i = i + 1u;
     }
-
-    // store_hexaedron(&positions,
-    //                 &normals,
-    //                 offset,
-    //                 stride
-    // );
 }
  
 fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32) {
@@ -393,11 +388,6 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32)
 
     	    j = j + 1u;
     	}
-        // store_hexaedron(&positions,
-        //                 &normals,
-        //                 offset,
-        //                 stride
-        // );
     }
 }
 
@@ -582,84 +572,6 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
     }
 }
 
-    //++ store_hexaedron(&positions, &normals, offset, stride);
-
-    //++ let from_origo_x_top_arr = vec3<f32>(head_size, 3.0 * arr.size, 3.0 * arr.size);
-    //++ //let from_origo_x_top_arr = vec3<f32>(1.0, 3.0 * arr.size, 3.0 * arr.size);
-
-    //++ let aabb_top = AABB(
-    //++     vec4<f32>((-0.5) * from_origo_x_top_arr, 0.0),
-    //++     vec4<f32>(0.5    * from_origo_x_top_arr, 0.0)
-    //++ );
-
-    //++ let delta_head = aabb_top.max - aabb_top.min;
-    //++ 
-    //++ //          p3
-    //++ //          +-----------------+p2
-    //++ //         /|                /|
-    //++ //        / |               / |
-    //++ //       /  |           p6 /  |
-    //++ //   p7 +-----------------+   |
-    //++ //      |   |             |   |
-    //++ //      |   |p0           |   |p1
-    //++ //      |   +-------------|---+  
-    //++ //      |  /              |  /
-    //++ //      | /               | /
-    //++ //      |/                |/
-    //++ //      +-----------------+
-    //++ //      p4                p5
-    //++ //
-
-    //++ let hf = 0.45;
-
-    //++ let p0 = aabb_top.min.xyz;
-    //++ let p1 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * hf , delta_head.z * hf);
-    //++ let p2 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * (1.0 - hf) , delta_head.z * hf);
-    //++ let p3 = aabb_top.min.xyz + vec3<f32>(0.0     , delta_head.y , 0.0);
-    //++ let p4 = aabb_top.min.xyz + vec3<f32>(0.0     , 0.0     , delta_head.z);
-    //++ let p5 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * hf , delta_head.z * (1.0 - hf));
-    //++ let p6 = aabb_top.min.xyz + vec3<f32>(delta_head.x , delta_head.y * (1.0 - hf) , delta_head.z * (1.0 - hf));
-    //++ let p7 = aabb_top.min.xyz + vec3<f32>(0.0     , delta_head.y , delta_head.z);
-
-    //++ let the_pos_head = arr.start_pos.xyz;
-
-    //++ var positions_head = array<vec4<f32>, 8>(
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p0) - direction * 0.5 * head_size, c),
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p1) - direction * 0.5 * head_size, c),
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p2) - direction * 0.5 * head_size, c),
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p3) - direction * 0.5 * head_size, c),
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p4) - direction * 0.5 * head_size, c),
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p5) - direction * 0.5 * head_size, c),
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p6) - direction * 0.5 * head_size, c),
-    //++     vec4<f32>(arr.end_pos.xyz + rotate_vector(q, p7) - direction * 0.5 * head_size, c)
-    //++ );
-
-    //++ n0 = normalize(cross(positions_head[5u].xyz - positions_head[6u].xyz,
-    //++                      positions_head[4u].xyz - positions_head[6u].xyz));
-    //++ n1 = normalize(cross(positions_head[1u].xyz - positions_head[2u].xyz,
-    //++                      positions_head[5u].xyz - positions_head[2u].xyz));
-    //++ n2 = normalize(cross(positions_head[0u].xyz - positions_head[3u].xyz,
-    //++                      positions_head[1u].xyz - positions_head[3u].xyz));
-    //++ n3 = normalize(cross(positions_head[4u].xyz - positions_head[7u].xyz,
-    //++                      positions_head[0u].xyz - positions_head[7u].xyz));
-    //++ n4 = normalize(cross(positions_head[3u].xyz - positions_head[7u].xyz,
-    //++                      positions_head[6u].xyz - positions_head[7u].xyz));
-    //++ n5 = normalize(cross(positions_head[0u].xyz - positions_head[5u].xyz,
-    //++                      positions_head[4u].xyz - positions_head[5u].xyz));
-
-    //++ var normals_head = array<vec4<f32>, 6> (
-    //++ 	vec4<f32>(n0, 0.0),
-    //++ 	vec4<f32>(n1,  0.0),
-    //++ 	vec4<f32>(n2,  0.0),
-    //++ 	vec4<f32>(n3, 0.0),
-    //++ 	vec4<f32>(n4,  0.0),
-    //++ 	vec4<f32>(n5, 0.0)
-    //++ );
-
-    //++ // workgroupBarrier();
-    //++ store_hexaedron(&positions_head, &normals_head, offset, stride);
-//++ }
-
 @stage(compute)
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -669,12 +581,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 
     // Check!
-    var delta = min(
-                    abs(
-                        i32(arrow_aabb_params.iterator_end_index) - (i32(THREAD_COUNT * work_group_id.x))), i32(THREAD_COUNT)
-                    )
-    ;
     // var delta = min(
+    //                 abs(
+    //                     i32(arrow_aabb_params.iterator_end_index) - (i32(THREAD_COUNT * work_group_id.x))), i32(THREAD_COUNT)
+    //                 )
+    // ;
+    var delta = min(arrow_aabb_params.iterator_end_index - arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x, THREAD_COUNT); 
     //                 abs(
     //                     i32(arrow_aabb_params.iterator_end_index) - (i32(arrow_aabb_params.iterator_start_index + THREAD_COUNT * work_group_id.x))), i32(THREAD_COUNT)
     //                 )
@@ -686,9 +598,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         if (arrow_aabb_params.element_type == 0u) { 
     	    thread_group_counter = atomicAdd(&counter[0], 24u * u32(delta));
         }
-        else if (arrow_aabb_params.element_type == 1u) {
-    	    thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
-        }
+        // else if (arrow_aabb_params.element_type == 1u) {
+    	//     thread_group_counter = atomicAdd(&counter[0], 12u * u32(delta));
+        // }
         else if (arrow_aabb_params.element_type == 2u) {
     	    thread_group_counter = atomicAdd(&counter[0], 144u * u32(delta));
         }
@@ -697,14 +609,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     workgroupBarrier();
 
     let actual_index = arrow_aabb_params.iterator_start_index + global_id.x;
-    if (actual_index >= arrow_aabb_params.iterator_end_index) { return; } 
+    // if (actual_index >= arrow_aabb_params.iterator_end_index) { return; } 
+    if (local_index >= delta) { return; } 
 
     if (arrow_aabb_params.element_type == 0u) { 
         create_arrow(arrows[actual_index], u32(delta), local_index);
     }
     else if (arrow_aabb_params.element_type == 1u) {
         let aabb = aabbs[actual_index];
-        create_aabb(aabb, u32(delta), local_index, u32(aabb.min.w));
+        create_aabb(aabb, u32(delta), local_index, u32(aabb.min.w), THREAD_COUNT * work_group_id.x * 12u);
     }
     else if (arrow_aabb_params.element_type == 2u) {
         let aabb = aabb_wires[actual_index];
