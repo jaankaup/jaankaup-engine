@@ -179,6 +179,7 @@ struct Fmm {
     pub keys: KeyboardManager,
     pub block64mode: bool, // TODO: remove
     pub triangle_mesh_draw_count: u32,
+    pub draw_triangle_mesh: bool,
 }
 
 impl Fmm {
@@ -204,7 +205,7 @@ impl Application for Fmm {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         let mut keys = KeyboardManager::init();
-        // keys.register_key(Key::L, 20.0);
+        keys.register_key(Key::P, 200.0);
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
@@ -964,6 +965,7 @@ impl Application for Fmm {
             keys: keys,
             block64mode: false,
             triangle_mesh_draw_count: triangle_mesh_draw_count, 
+            draw_triangle_mesh: true,
         }
     }
 
@@ -995,8 +997,8 @@ impl Application for Fmm {
                                       fmm_global_dimension: [16, 16, 16],
                                       visualize: 0,
                                       fmm_inner_dimension: [4, 4, 4],
-                                      triangle_count: 1 }
-                                      //triangle_count: 2036 }
+                                      //triangle_count: 1 }
+                                      triangle_count: 2036 }
             ]));
 
         //self.compute_object_fmm.dispatch(
@@ -1009,7 +1011,8 @@ impl Application for Fmm {
         self.compute_object_fmm_triangle.dispatch(
             &self.compute_bind_groups_fmm_triangle,
             &mut encoder_command,
-            udiv_up_safe32(1, thread_count), 1, 1,
+            2036, 1, 1,
+            //udiv_up_safe32(1, thread_count), 1, 1,
             //udiv_up_safe32(2036, thread_count), 1, 1,
             // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
             Some("fmm triangle dispatch")
@@ -1017,36 +1020,28 @@ impl Application for Fmm {
 
         queue.submit(Some(encoder_command.finish()));
 
-       //  let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
+       let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
 
-       //  queue.write_buffer(
-       //      &self.buffers.get(&"fmm_params".to_string()).unwrap(),
-       //      0,
-       //      bytemuck::cast_slice(&[FmmParams {
-       //                                fmm_global_dimension: [16, 16, 16],
-       //                                visualize: 1,
-       //                                fmm_inner_dimension: [4, 4, 4],
-       //                                triangle_count: 2036 }
-       //      ]));
+       queue.write_buffer(
+           &self.buffers.get(&"fmm_params".to_string()).unwrap(),
+           0,
+           bytemuck::cast_slice(&[FmmParams {
+                                     fmm_global_dimension: [16, 16, 16],
+                                     visualize: 1,
+                                     fmm_inner_dimension: [4, 4, 4],
+                                     triangle_count: 2036 }
+           ]));
 
-       //  //     buffer_from_data::<FmmParams>(
-       //  //     &configuration.device,
-       //  //     &vec![FmmParams {
-       //  //              fmm_global_dimension: [16, 16, 16],
-       //  //              visualize: 0,
-       //  //              fmm_inner_dimension: [4, 4, 4],
-       //  //              padding2: 123,
-       //  //     }],
 
-       //  // Visualize.
-       //  self.compute_object_fmm_triangle.dispatch(
-       //      &self.compute_bind_groups_fmm_triangle,
-       //      &mut encoder_command,
-       //      (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-       //      Some("fmm triangle dispatch")
-       //  );
+       // Visualize.
+       self.compute_object_fmm_triangle.dispatch(
+           &self.compute_bind_groups_fmm_triangle,
+           &mut encoder_command,
+           (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+           Some("fmm triangle dispatch")
+       );
 
-       //  queue.submit(Some(encoder_command.finish()));
+       queue.submit(Some(encoder_command.finish()));
 
         let fmm_counter = self.histogram_fmm.get_values(device, queue);
 
@@ -1246,25 +1241,29 @@ impl Application for Fmm {
             else { break; }
         }
 
-        let mut model_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("model encoder") });
+        if self.draw_triangle_mesh {
 
-        draw(&mut model_encoder,
-             &view,
-             self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_bind_groups_vvvvnnnn,
-             &self.render_object_vvvvnnnn.pipeline,
-             &self.buffers.get("triangle_mesh").unwrap(),
-             0..3,
-             //0..self.triangle_mesh_draw_count * 3,
-             clear
-        );
-        queue.submit(Some(model_encoder.finish()));
+            let mut model_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("model encoder") });
+
+            draw(&mut model_encoder,
+                 &view,
+                 self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups_vvvvnnnn,
+                 &self.render_object_vvvvnnnn.pipeline,
+                 &self.buffers.get("triangle_mesh").unwrap(),
+                 0..2036 * 3,
+                 //0..self.triangle_mesh_draw_count * 3,
+                 clear
+            );
+            queue.submit(Some(model_encoder.finish()));
+        }
 
         // Update screen.
         self.screen.prepare_for_rendering();
 
         // Reset counter.
         self.histogram_fmm.reset_all_cpu_version(queue, 0);
+
     }
 
     #[allow(unused)]
@@ -1280,10 +1279,10 @@ impl Application for Fmm {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
 
-        // if self.keys.test_key(&Key::L, input) { 
-        //     self.arrow_aabb_params.arrow_size = self.arrow_aabb_params.arrow_size + 0.005;  
-        //     self.temp_arrow_aabb_params.arrow_size = self.arrow_aabb_params.arrow_size + 0.005;  
-        // }
+        if self.keys.test_key(&Key::P, input) { 
+            println!("Space pressed.");
+            self.draw_triangle_mesh = !self.draw_triangle_mesh;
+        }
         // if self.keys.test_key(&Key::K, input) { 
         //     self.arrow_aabb_params.arrow_size = (self.arrow_aabb_params.arrow_size - 0.005).max(0.01);  
         //     self.temp_arrow_aabb_params.arrow_size = (self.temp_arrow_aabb_params.arrow_size - 0.005).max(0.01);  

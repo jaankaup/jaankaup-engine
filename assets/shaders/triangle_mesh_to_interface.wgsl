@@ -265,9 +265,9 @@ fn triangle_to_aabb(tr: Triangle) -> AABB_Uvec3 {
     let min_y_expanded = u32(min(f32(fmm_params.fmm_global_dimension.y - 1u), max(0.0, floor(aabb_min_y))));
     let min_z_expanded = u32(min(f32(fmm_params.fmm_global_dimension.z - 1u), max(0.0, floor(aabb_min_z)))); 
 
-    let max_x_expanded = u32(min(f32(fmm_params.fmm_global_dimension.x - 1u), max(0.0, ceil(aabb_max_x))));
-    let max_y_expanded = u32(min(f32(fmm_params.fmm_global_dimension.y - 1u), max(0.0, ceil(aabb_max_y))));
-    let max_z_expanded = u32(min(f32(fmm_params.fmm_global_dimension.z - 1u), max(0.0, ceil(aabb_max_z))));
+    let max_x_expanded = u32(min(f32(fmm_params.fmm_global_dimension.x), max(0.0, ceil(aabb_max_x + 4.0))));
+    let max_y_expanded = u32(min(f32(fmm_params.fmm_global_dimension.y), max(0.0, ceil(aabb_max_y + 4.0))));
+    let max_z_expanded = u32(min(f32(fmm_params.fmm_global_dimension.z), max(0.0, ceil(aabb_max_z + 4.0))));
 
     return AABB_Uvec3(vec3<u32>(min_x_expanded, min_y_expanded, min_z_expanded),
                       vec3<u32>(max_x_expanded, max_y_expanded, max_z_expanded)
@@ -285,37 +285,58 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
     // Calculate the smallest distances between triangle and the cube grid points.
     for (var i: i32 = 0 ; i < i32(number_of_cubes) ; i = i + 1) {
 
+        // TODO: Filter those cubes that are close enought the triangle.
+        // Prefix sum?
+
         // The global index for cube.
         let base_coordinate = (index_to_uvec3(u32(i), dim_x, dim_y) + aabb.min) * 4u; // * 4u;
         let base_index = encode3Dmorton32(base_coordinate.x, base_coordinate.y, base_coordinate.z);
         let actual_index = base_index + thread_index; 
         let actual_coordinate = decode3Dmorton32(actual_index);
 
-        let cp = closest_point_to_triangle(vec3<f32>(actual_coordinate), tr.a.v.xyz, tr.b.v.xyz, tr.c.v.xyz);
-        let dist = distance(cp, vec3<f32>(actual_coordinate));
+        let cp = closest_point_to_triangle(vec3<f32>(actual_coordinate) * 0.25, tr.a.v.xyz, tr.b.v.xyz, tr.c.v.xyz);
+        let dist = distance(cp, vec3<f32>(actual_coordinate) * 0.25);
 
     	let color = f32(rgba_u32(222u, 200u, 150u, 255u));
 
-        if (thread_index == 0u) {
-    	    output_aabb_wire[atomicAdd(&counter[3], 1u)] = 
-    	        AABB (
-    	            vec4<f32>(vec3<f32>(base_coordinate) * 0.25, color),
-    	            vec4<f32>(vec3<f32>(base_coordinate) * 0.25 + vec3<f32>(1.0), 0.01)
-    	        );
-        }
+        //++ if (thread_index == 0u) {
+    	//++     output_aabb_wire[atomicAdd(&counter[3], 1u)] = 
+    	//++         AABB (
+    	//++             vec4<f32>(vec3<f32>(base_coordinate) * 0.25, color),
+    	//++             vec4<f32>(vec3<f32>(base_coordinate) * 0.25 + vec3<f32>(1.0), 0.01)
+    	//++         );
+        //++ }
         
         // Load the fmm cell.
         let cell = fmm_data[actual_index];
 
-    	output_aabb[atomicAdd(&counter[2], 1u)] = 
-    	    AABB (
-    	        vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 - vec3<f32>(0.01), color),
-    	        vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 + vec3<f32>(0.01), 0.0)
-    	    );
-        if (dist < 1.0 && dist < cell.value) {
+    	//++ output_aabb[atomicAdd(&counter[2], 1u)] = 
+    	//++     AABB (
+    	//++         vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 - vec3<f32>(0.01), color),
+    	//++         vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 + vec3<f32>(0.01), 0.0)
+    	//++     );
+
+        if (dist < 0.25 && dist < cell.value) {
 
            // Is this safe. Do we need atomic operations?
            fmm_data[actual_index] = FmmCell(KNOWN, dist);  
+
+    	   let col = f32(rgba_u32(255u, 255u, 255u, 255u));
+ 
+           //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+           //++       Arrow (
+           //++           vec4<f32>(vec3<f32>(actual_coordinate) * 0.25, 1.0),
+           //++           vec4<f32>(cp,
+           //++                     1.0),
+           //++           rgba_u32(255u, 0u, 0u, 255u),
+           //++           0.01
+           //++       );
+
+    	   //++ output_aabb[atomicAdd(&counter[2], 1u)] = 
+    	   //++     AABB (
+    	   //++         vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 - vec3<f32>(0.01), col),
+    	   //++         vec4<f32>(vec3<f32>(actual_coordinate) * 0.25 + vec3<f32>(0.01), 0.0)
+    	   //++     );
         }
     }
 }
@@ -365,12 +386,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         let cell = fmm_data[global_id.x];
         let position = vec3<f32>(decode3Dmorton32(global_id.x)) * 0.25;
 
-        var color = select(f32(rgba_u32(0u  , 0u, 255u, 255u)),
-                           f32(rgba_u32(255u, 0u,   0u, 255u)),
-                           cell.tag == 0u); 
-        output_aabb[atomicAdd(&counter[2], 1u)] = 
+        if (cell.tag == FAR) { return; }
+
+        var col = select(f32(rgba_u32(0u  , 255u, 0u, 255u)),
+                         f32(rgba_u32(0u, 255u,   0u, 255u)),
+                         cell.tag == KNOWN); 
+        output_aabb[atomicAdd(&counter[2], 1u)] =
               AABB (
-                  vec4<f32>(position - vec3<f32>(0.008), color),
+                  vec4<f32>(position - vec3<f32>(0.008), col),
                   vec4<f32>(position + vec3<f32>(0.008), 0.0),
               );
     }
