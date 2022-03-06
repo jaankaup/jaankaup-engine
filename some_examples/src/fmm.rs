@@ -97,15 +97,6 @@ struct Char {
     z_offset: f32,
 }
 
-// #[repr(C)]
-// #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-// struct VisualizationParams{
-//     max_number_of_vertices: u32,
-//     iterator_start_index: u32,
-//     iterator_end_index: u32,
-//     arrow_size: f32, // 0 :: array, 1 :: aabb, 2 :: aabb wire
-// }
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct ArrowAabbParams{
@@ -131,10 +122,24 @@ struct FmmParams {
     triangle_count: u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmBlock {
+    index: u32,
+    band_points_count: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmPrefixParams {
+    blaah: u32,
+}
+
 impl_convert!{Arrow}
 impl_convert!{Char}
 impl_convert!{FmmCell}
 impl_convert!{FmmParams}
+impl_convert!{FmmBlock}
 impl_convert!{ArrowAabbParams}
 
 struct FmmFeatures {}
@@ -168,7 +173,8 @@ struct Fmm {
     pub compute_bind_groups_fmm: Vec<wgpu::BindGroup>,
     pub compute_object_fmm_triangle: ComputeObject, 
     pub compute_bind_groups_fmm_triangle: Vec<wgpu::BindGroup>,
-    // pub _textures: HashMap<String, Texture>,
+    pub compute_object_fmm_prefix_scan: ComputeObject,
+    pub compute_bind_groups_fmm_prefix_scan: Vec<wgpu::BindGroup>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
     pub histogram_draw_counts: Histogram,
@@ -371,6 +377,17 @@ impl Application for Fmm {
         );
 
         buffers.insert(
+            "fmm_prefix_params".to_string(),
+            buffer_from_data::<FmmPrefixParams>(
+            &configuration.device,
+            &vec![FmmPrefixParams {
+                blaah: 123,
+            }],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
+
+        buffers.insert(
             "fmm_data".to_string(),
             buffer_from_data::<FmmCell>(
             &configuration.device,
@@ -383,6 +400,23 @@ impl Application for Fmm {
             //    usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             //    mapped_at_creation: false,
             //    }
+            )
+        );
+
+        let mut fmm_blocks: Vec<FmmBlock> = Vec::with_capacity(FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z);
+
+        // Create FMM blocks.
+        for i in 0..FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z {
+           fmm_blocks.push(FmmBlock{index: i as u32, band_points_count: 0, });
+        }
+
+        buffers.insert(
+            "fmm_blocks".to_string(),
+            buffer_from_data::<FmmBlock>(
+                &configuration.device,
+                &fmm_blocks,
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                Some("fmm blocks buffer")
             )
         );
 
@@ -937,6 +971,64 @@ impl Application for Fmm {
                 ]
         );
 
+        ////////////////////////////////////////////////////
+        ////               Prefix scan FmmBlock         ////
+        ////////////////////////////////////////////////////
+
+        let compute_object_fmm_prefix_scan =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("prefix_scan.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/prefix_scan.wgsl"))),
+                    
+                    }),
+                    Some("FMM prefix scan compute object"),
+                    &vec![
+                        vec![
+                            // @group(0)
+                            // @binding(0)
+                            // var<uniform> fmm_params: PrefixParams;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                            // @group(0)
+                            // @binding(1)
+                            // var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
+                        ],
+                    ]
+        );
+
+        let compute_bind_groups_fmm_prefix_scan =
+            create_bind_groups(
+                &configuration.device,
+                &compute_object_fmm_prefix_scan.bind_group_layout_entries,
+                &compute_object_fmm_prefix_scan.bind_group_layouts,
+                &vec![
+                    vec![
+                         &buffers.get(&"fmm_prefix_params".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
+                    ]
+                ]
+        );
 
         println!("Creating render bind groups.");
  
@@ -954,6 +1046,8 @@ impl Application for Fmm {
             compute_bind_groups_fmm: compute_bind_groups_fmm,
             compute_object_fmm_triangle: compute_object_fmm_triangle, 
             compute_bind_groups_fmm_triangle: compute_bind_groups_fmm_triangle,
+            compute_object_fmm_prefix_scan: compute_object_fmm_prefix_scan,
+            compute_bind_groups_fmm_prefix_scan: compute_bind_groups_fmm_prefix_scan,
             // _textures: textures,
             buffers: buffers,
             camera: camera,

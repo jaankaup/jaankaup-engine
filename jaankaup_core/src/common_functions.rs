@@ -172,102 +172,6 @@ pub fn from_hilber_index(h: u32, m: u32) -> [u32; 3] {
     p
 }
 
-// pub fn gcr(i: u32, mu: u32) -> u32 {
-//     let mut r = 0;
-//     for k in (0..N).rev() {
-//         if get_bit(mu, k) == 1 {
-//             r = (r << 1) | get_bit(i,k);
-//         }
-//     }
-//     r
-// }
-// 
-// pub fn gcr_inv(r: u32, mu: u32, pi: u32) -> u32 {
-//     let mut i = 0;
-//     let mut g = 0;
-//     let mut j: i32 = (get_bit(mu, 0) + get_bit(mu, 1) + get_bit(mu, 2)) as i32 - 1;
-//     for k in (0..N).rev() {
-//         if get_bit(mu, k) == 1 {
-//             i = i | (get_bit(r, j as u32) << k);
-//             g = g | (((get_bit(i, k) + get_bit(i, k+1)) % 2) << k);
-//             j = j - 1;
-//         }
-//         else {
-//             g = g | (get_bit(pi, k) << k); 
-//             i = i | (((get_bit(g, k) + get_bit(i, k+1)) % 2) << k);
-//         }
-//     }
-//     i
-// }
-// 
-// const compact_M: [u32 ; 3] = [4,2,2];
-// 
-// pub fn extract_mask(i: u32) -> u32 {
-//     let mut mu = 0;
-//     for j in (0..N).rev() {
-//         mu = mu << 1;
-//         if compact_M[j as usize] > i {
-//             mu = mu | 1;
-//         }
-//     }
-//     mu
-// }
-// 
-// /// Compute the point with compact Hilbert index h. Not working.
-// pub fn compact_hilbert_index(p: [u32 ; 3]) -> u32 {
-//     let mut h = 0;
-//     let mut ve: u32 = 0;
-//     let mut vd: u32 = 2;
-//     let m = cmp::max(cmp::max(compact_M[0], compact_M[1]), compact_M[2]);  
-//     for i in (0..m).rev() {
-//         let mut mu = extract_mask(i);
-//         let mu_norm = get_bit(mu, 0) + get_bit(mu, 1) + get_bit(mu, 2);
-//         mu = rotate_right(mu, vd+1);
-//         let mut l = get_bit(p[0], i) | (get_bit(p[1], i) << 1) | (get_bit(p[2], i) << 2);
-//         l = t(ve, vd as i32, l);
-//         let w = inverse_gc(l);
-//         let r = gcr(w, mu);
-//         ve = ve ^ rotate_left(e(w), vd+1);
-//         vd = (vd + d(w) + 1) % N;
-//         h = (h << mu_norm) | r;
-//     }
-//     h
-// }
-
-/// Not working.
-// pub fn from_compact_hilbert_index(h: u32) -> [u32; 3] {
-//     
-//     let mut ve: u32 = 0;
-//     let mut vd: u32 = 2;
-//     let mut k = 0;
-//     let mut p: [u32 ; 3] = [0, 0, 0];
-//     let m = cmp::max(cmp::max(compact_M[0], compact_M[1]), compact_M[2]);  
-//     let vM = compact_M[0] + compact_M[1] + compact_M[2];
-// 
-//     for i in (0..m).rev() {
-//         // Duplicate code.
-//         let mut mu = extract_mask(i);
-//         let mu_norm = get_bit(mu, 0) + get_bit(mu, 1) + get_bit(mu, 2);
-//         mu = rotate_right(mu, vd+1);
-//         let pi = rotate_right(ve, vd+1) & ((!mu) & ((1 << N) - 1)); // ???
-// 
-//         let mut r = 0;
-//         for j in 0..mu_norm {
-//             r = r | (get_bit(h, vM - k - (j+1)) << (mu_norm - 1 - j)); // TODO: check.
-//         }
-//         k = k + mu_norm;
-//         let w = gcr_inv(r, mu, pi);
-//         let mut l = gc(w);
-//         l = t_inv(ve, vd, l);
-//         p[0] = p[0] | (get_bit(l, 0) << i);
-//         p[1] = p[1] | (get_bit(l, 1) << i);
-//         p[2] = p[2] | (get_bit(l, 2) << i);
-//         ve = ve ^ rotate_left(e(w), vd+1);
-//         vd = (vd + d(w) + 1) % N;
-//     }
-//     p 
-// }
-
 /* Rosenberg-Strong */ 
 
 /// Rosenberg-Strong tuple to index. 
@@ -310,3 +214,36 @@ pub fn r3_reverse(z: i32) -> (i32, i32, i32) {
     let (x,y) = r2_reverse(z - m*m*m - (m - x3) * ((m + 1) * (m + 1) - m*m));
     (x as i32, y as i32, x3 as i32)
 }
+
+fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
+    let mut x_temp = (x      | (x      << 16 )) & 0x030000FF;
+            x_temp = (x_temp | (x_temp <<  8 )) & 0x0300F00F;
+            x_temp = (x_temp | (x_temp <<  4 )) & 0x030C30C3;
+            x_temp = (x_temp | (x_temp <<  2 )) & 0x09249249;
+
+    let mut y_temp = (y      | (y      << 16 )) & 0x030000FF;
+            y_temp = (y_temp | (y_temp <<  8 )) & 0x0300F00F;
+            y_temp = (y_temp | (y_temp <<  4 )) & 0x030C30C3;
+            y_temp = (y_temp | (y_temp <<  2 )) & 0x09249249;
+
+    let mut z_temp = (z      | (z      << 16 )) & 0x030000FF;
+            z_temp = (z_temp | (z_temp <<  8 )) & 0x0300F00F;
+            z_temp = (z_temp | (z_temp <<  4 )) & 0x030C30C3;
+            z_temp = (z_temp | (z_temp <<  2 )) & 0x09249249;
+
+    x_temp | (y_temp << 1) | (z_temp << 2)
+}
+
+fn get_third_bits32(m: u32) -> u32 {
+    let mut x = m & 0x9249249;
+    x = (x ^ (x >> 2))  & 0x30c30c3;
+    x = (x ^ (x >> 4))  & 0x0300f00f;
+    x = (x ^ (x >> 8))  & 0x30000ff;
+    x = (x ^ (x >> 16)) & 0x000003ff;
+    x
+}
+
+fn decode3Dmorton32(m: u32) -> [u32; 3] {
+    [get_third_bits32(m), get_third_bits32(m >> 1), get_third_bits32(m >> 2)]
+}
+

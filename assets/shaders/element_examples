@@ -1,0 +1,52 @@
+
+output_arrow[atomicAdd(&counter[1], 1u)] =  
+      Arrow (
+          vec4<f32>(...),
+          vec4<f32>(...),
+          rgba_u32(255u, 0u, 0u, 255u),
+          0.5
+);
+
+output_aabb[atomicAdd(&counter[2], 1u)] =  
+      AABB (
+          vec4<f32>(x_min,
+                    y_min,
+                    z_min,
+                    f32(rgba_u32(255u, 0u, 2550u, 255u))),
+          vec4<f32>(x_max,
+                    y_max, 
+                    z_max,
+                    what_ever)
+);
+
+output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+      AABB (
+          vec4<f32>(x_min,
+                    y_min,
+                    z_min,
+                    f32(rgba_u32(255u, 0u, 2550u, 255u))),
+          vec4<f32>(x_max,
+                    y_max, 
+                    z_max,
+                    thickness)
+);
+
+output_char[local_index + 64u * u32(i)] =  
+
+      Char (
+          vec4<f32>(start_pos_x,
+                    start_pos_y,
+                    start_pos_z,
+                    2.0 // check do we need this
+          ),
+          vec4<f32>(value),
+          font_size,
+          vec_dimension,
+          rgba_u32(255u, 0u, 2550u, 255u),
+          z_offset, // not used 
+);
+
+    if (local_index == 0u) {
+
+    }
+    workgroupBarrier();
