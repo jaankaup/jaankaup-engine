@@ -93,15 +93,28 @@ pub struct GpuDebugger {
 
 impl GpuDebugger {
 
+    pub fn get_output_chars_buffer(&self) -> &wgpu::Buffer {
+        self.buffers.get(&"output_chars".to_string()).unwrap()
+    }
+    pub fn get_output_arrows_buffer(&self) -> &wgpu::Buffer {
+        self.buffers.get(&"output_arrows".to_string()).unwrap()
+    }
+    pub fn get_output_aabbs_buffer(&self) -> &wgpu::Buffer {
+        self.buffers.get(&"output_aabbs".to_string()).unwrap()
+    }
+    pub fn get_output_aabb_wires_buffer(&self) -> &wgpu::Buffer {
+        self.buffers.get(&"output_aabb_wires".to_string()).unwrap()
+    }
+
     pub fn Init(device: &wgpu::Device,
-                camera: &mut Camera,
+                sc_desc: &wgpu::SurfaceConfiguration,
+                camera_buffer: &wgpu::Buffer,
                 max_number_of_vertices: u32,
                 max_number_of_chars: u32,
                 max_number_of_arrows: u32,
                 max_number_of_aabbs: u32,
                 max_number_of_aabb_wires: u32,
-                thread_count: u32,
-                sc_desc: &wgpu::SurfaceConfiguration
+                thread_count: u32
                 ) -> Self {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
@@ -167,10 +180,12 @@ impl GpuDebugger {
             )
         );
 
+        println!("max_number_of_vertices == {}", max_number_of_vertices);
+
         buffers.insert(
             "output_render".to_string(),
             device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("draw buffer"),
+                label: Some("gpu_debug draw buffer"),
                 size: (max_number_of_vertices * size_of::<Vertex>() as u32) as u64, 
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
@@ -216,7 +231,7 @@ impl GpuDebugger {
                                      &render_object_vvvvnnnn.bind_group_layouts,
                                      &vec![
                                           vec![
-                                              &camera.get_camera_uniform(&device).as_entire_binding(),
+                                              &camera_buffer.as_entire_binding(),
                                          ]
                                      ]
         );
@@ -248,7 +263,7 @@ impl GpuDebugger {
                                      &render_object_vvvc.bind_group_layouts,
                                      &vec![
                                           vec![
-                                              &camera.get_camera_uniform(&device).as_entire_binding(),
+                                              &camera_buffer.as_entire_binding(),
                                          ]
                                      ]
         );
@@ -294,11 +309,11 @@ impl GpuDebugger {
                                       &compute_object_char.bind_group_layouts,
                                       &vec![
                                           vec![
-                                               &camera.get_camera_uniform(&device).as_entire_binding(),
-                                               &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
-                                               &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
-                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
-                                               &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
+                                              &camera_buffer.as_entire_binding(),
+                                              &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
+                                              &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
+                                              &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
+                                              &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
@@ -391,7 +406,8 @@ impl GpuDebugger {
                   device: &wgpu::Device,
                   queue: &wgpu::Queue,
                   view: &wgpu::TextureView,
-                  depth_texture: Texture) {
+                  depth_texture: &Texture,
+                  clear: &mut bool) {
 
         // Get the total number of elements.
         let elem_counter = self.histogram_element_counter.get_values(device, queue);
@@ -414,9 +430,6 @@ impl GpuDebugger {
         let draw_params = [(0, total_number_of_arrows,     vertices_per_dispatch_arrow, vertices_per_element_arrow),
                            (1, total_number_of_aabbs,      vertices_per_dispatch_aabb, vertices_per_element_aabb), // !!!
                            (2, total_number_of_aabb_wires, vertices_per_dispatch_aabb_wire, vertices_per_element_aabb_wire)]; 
-
-        // Clear the previous screen.
-        let mut clear = true;
 
         // For each element type, create triangle meshes and render with respect of draw buffer size.
         for (e_type, e_size, v_per_dispatch, vertices_per_elem) in draw_params.iter() {
@@ -492,10 +505,10 @@ impl GpuDebugger {
                      &self.render_object_vvvvnnnn.pipeline,
                      &self.buffers.get("output_render").unwrap(),
                      0..draw_count,
-                     clear
+                     *clear
                 );
                
-                if clear { clear = false; }
+                if *clear { *clear = false; }
 
                 // Decrease the total count of elements.
                 items_to_process = items_to_process - number_of_elements; 
@@ -558,7 +571,7 @@ impl GpuDebugger {
                  &self.render_object_vvvc.pipeline,
                  &self.buffers.get("output_render").unwrap(),
                  0..draw_count_triangles.min(self.max_number_of_vertices * 2),
-                 clear
+                 *clear
             );
             queue.submit(Some(encoder_char_rendering.finish()));
 
