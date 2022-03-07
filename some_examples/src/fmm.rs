@@ -13,7 +13,7 @@ use jaankaup_core::input::*;
 use jaankaup_core::model_loader::*;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::camera::Camera;
-use jaankaup_core::buffer::{buffer_from_data};
+use jaankaup_core::buffer::{buffer_from_data,to_vec};
 use jaankaup_core::wgpu;
 use jaankaup_core::winit;
 use jaankaup_core::log;
@@ -349,7 +349,7 @@ impl Application for Fmm {
 
         // Create FMM blocks.
         for i in 0..FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z {
-           fmm_blocks.push(FmmBlock{index: i as u32, band_points_count: 0, });
+           fmm_blocks.push(FmmBlock{index: i as u32, band_points_count: if i % 13 == 0 { 2 } else {0} , });
         }
 
         buffers.insert(
@@ -505,6 +505,21 @@ impl Application for Fmm {
 
                             // @group(0) @binding(2) var<storage, read_write> temp_prefix_sum: array<u32>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE),
                         ],
                     ]
         );
@@ -519,6 +534,11 @@ impl Application for Fmm {
                          &buffers.get(&"fmm_prefix_params".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"temp_prefix_sum".to_string()).unwrap().as_entire_binding(),
+                         &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
                     ]
                 ]
         );
@@ -542,7 +562,7 @@ impl Application for Fmm {
             camera: camera,
             keys: keys,
             triangle_mesh_draw_count: triangle_mesh_draw_count, 
-            draw_triangle_mesh: true,
+            draw_triangle_mesh: false,
         }
     }
 
@@ -695,6 +715,15 @@ impl Application for Fmm {
         );
 
         queue.submit(Some(encoder_command.finish()));
+
+        //++ let result =  to_vec::<u32>(
+        //++     &device,
+        //++     &queue,
+        //++     &self.buffers.get(&"temp_prefix_sum".to_string()).unwrap(),
+        //++     0,
+        //++     (4 * 128) as wgpu::BufferAddress
+        //++ );
+        //++ println!("{:?}", result);
     }
 }
 

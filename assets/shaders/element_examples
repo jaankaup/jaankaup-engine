@@ -31,7 +31,7 @@ output_aabb_wire[atomicAdd(&counter[3], 1u)] =
                     thickness)
 );
 
-output_char[local_index + 64u * u32(i)] =  
+output_char[atomicAdd(&counter[0], 1u)] =  
 
       Char (
           vec4<f32>(start_pos_x,
