@@ -1,5 +1,5 @@
-use jaankaup_core::wgpu;
-use jaankaup_core::buffer::{buffer_from_data, to_vec};
+// use jaankaup_core::wgpu;
+use crate::buffer::{buffer_from_data, to_vec};
 
 /// Histogram struct for GPU purposes. 
 pub struct Histogram {

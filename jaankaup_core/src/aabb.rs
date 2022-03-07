@@ -202,7 +202,7 @@ impl Triangle {
         let tnom = (p-a).dot(ac);
         let tdenom = (p-c).dot(a-c);
 
-        if (snom <= 0.0 && tnom <= 0.0) {
+        if snom <= 0.0 && tnom <= 0.0 {
             let result  = a;
             // let minus = normal.dot(result.normalize());
             // if minus < 0.0 { return (result, false); }
@@ -213,14 +213,14 @@ impl Triangle {
         let unom = (p-b).dot(bc);
         let udenom = (p-c).dot(b-c);
 
-        if (sdenom <= 0.0 && unom <= 0.0) {
+        if sdenom <= 0.0 && unom <= 0.0 {
             let result = b;
             // let minus = normal.dot(result.normalize());
             // if minus < 0.0 { return (result, false); }
             // else { return (result, true); }
             return result;
         }
-        if (tdenom <= 0.0 && udenom <= 0.0) {
+        if tdenom <= 0.0 && udenom <= 0.0 {
             let result = c;
             // let minus = normal.dot(result.normalize());
             // if minus < 0.0 { return (result, false); }

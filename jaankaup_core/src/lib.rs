@@ -9,6 +9,8 @@ pub mod camera;
 pub mod buffer;
 pub mod model_loader;
 pub mod aabb;
+pub mod gpu_debugger;
+pub mod histogram;
 pub use wgpu;
 pub use winit;
 pub use log;

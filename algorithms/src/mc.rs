@@ -2,7 +2,7 @@ use jaankaup_core::wgpu;
 use bytemuck::{Zeroable, Pod};
 use jaankaup_core::buffer::buffer_from_data;
 use jaankaup_core::render_object::{ComputeObject, create_bind_groups};
-use crate::histogram::Histogram;
+use jaankaup_core::histogram::Histogram;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]

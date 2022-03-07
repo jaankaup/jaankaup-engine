@@ -19,6 +19,7 @@ use jaankaup_core::log;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
+use jaankaup_core::histogram::Histogram;
 use jaankaup_core::impl_convert;
 use jaankaup_core::common_functions::{
     encode_rgba_u32,
@@ -26,7 +27,7 @@ use jaankaup_core::common_functions::{
     create_uniform_bindgroup_layout,
     create_buffer_bindgroup_layout
 };
-use jaankaup_algorithms::histogram::Histogram;
+// use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 use jaankaup_core::cgmath::Vector4 as Vec4;
 // use cgmath::{prelude::*, Vector3, Vector4};
@@ -880,7 +881,6 @@ impl Application for Fmm {
 
         // For each element type, create triangle meshes and render with respect of draw buffer size.
         for (e_type, e_size, v_per_dispatch, vertices_per_elem) in draw_params.iter() {
-            println!("*****************");
 
             // The number of safe dispathes. This ensures the draw buffer doesn't over flow.
             let safe_number_of_dispatches = MAX_NUMBER_OF_VVVVNNNN as u32 / v_per_dispatch;
@@ -923,9 +923,6 @@ impl Application for Fmm {
 
                 self.arrow_aabb_params.iterator_end_index = self.arrow_aabb_params.iterator_start_index + std::cmp::min(number_of_elements, safe_number_of_dispatches * v_per_dispatch);
 
-                // println!("self.arrow_aabb_params.iterator_start_index == {}", self.arrow_aabb_params.iterator_start_index);
-                // println!("self.arrow_aabb_params.iterator_end_index == {}", self.arrow_aabb_params.iterator_end_index);
-
                 queue.write_buffer(
                     &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
                     0,
@@ -942,8 +939,6 @@ impl Application for Fmm {
 
                 let counter = self.histogram_draw_counts.get_values(device, queue);
 
-                // self?
-                // let draw_count = counter[0] * 3;
                 let draw_count = number_of_elements * vertices_per_elem;
 
                 println!("local_dispatch == {}", local_dispatch);
@@ -970,11 +965,6 @@ impl Application for Fmm {
                 self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
 
                 self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_end_index; // + items_to_process;
-                //++ queue.write_buffer(
-                //++     &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-                //++     0,
-                //++     bytemuck::cast_slice(&[self.arrow_aabb_params])
-                //++ );
             } // for number_of_loop
         }
 

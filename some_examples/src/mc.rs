@@ -19,7 +19,7 @@ use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
 use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_algorithms::histogram::Histogram;
+use jaankaup_core::histogram::Histogram;
 use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use bytemuck::{Pod, Zeroable};
 
