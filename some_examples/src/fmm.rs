@@ -350,18 +350,6 @@ impl Application for Fmm {
             None)
         );
 
-        // buffers.insert(
-        //     "triangle_mesh".to_string(),
-        //     buffer_from_data::<Triangle>(
-        //     &configuration.device,
-        //     &vec![Triangle { a: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
-        //                      b: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
-        //                      c: Vertex {v: [1.0, 1.0, 1.0, 1.0], n: [1.0, 1.0, 1.0, 1.0]},
-        //                    }],
-        //     wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //     None)
-        // );
-
         buffers.insert(
             "fmm_params".to_string(),
             buffer_from_data::<FmmParams>(
@@ -400,6 +388,17 @@ impl Application for Fmm {
             //    usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             //    mapped_at_creation: false,
             //    }
+            )
+        );
+
+        buffers.insert(
+            "temp_prefix_sum".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("termp_prefix_sum buffer"),
+                size: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * std::mem::size_of::<u32>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
             )
         );
 
@@ -1013,6 +1012,19 @@ impl Application for Fmm {
                                 },
                                 count: None,
                             },
+                            // @group(0)
+                            // @binding(2)
+                            // var<storage, read_write> temp_prefix_sum: array<u32>;
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 2,
+                                visibility: wgpu::ShaderStages::COMPUTE,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            },
                         ],
                     ]
         );
@@ -1026,6 +1038,7 @@ impl Application for Fmm {
                     vec![
                          &buffers.get(&"fmm_prefix_params".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"temp_prefix_sum".to_string()).unwrap().as_entire_binding(),
                     ]
                 ]
         );
@@ -1114,7 +1127,7 @@ impl Application for Fmm {
 
         queue.submit(Some(encoder_command.finish()));
 
-       let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm command encoder") });
+       let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm triangle encoder") });
 
        queue.write_buffer(
            &self.buffers.get(&"fmm_params".to_string()).unwrap(),
@@ -1377,62 +1390,33 @@ impl Application for Fmm {
             println!("Space pressed.");
             self.draw_triangle_mesh = !self.draw_triangle_mesh;
         }
-        // if self.keys.test_key(&Key::K, input) { 
-        //     self.arrow_aabb_params.arrow_size = (self.arrow_aabb_params.arrow_size - 0.005).max(0.01);  
-        //     self.temp_arrow_aabb_params.arrow_size = (self.temp_arrow_aabb_params.arrow_size - 0.005).max(0.01);  
-        // }
-        // if self.keys.test_key(&Key::Key1, input) { 
-        //     self.arrow_aabb_params.max_local_vertex_capacity = 1;  
-        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 1;  
-        // }
-        // if self.keys.test_key(&Key::Key2, input) { 
-        //     self.arrow_aabb_params.max_local_vertex_capacity = 2;
-        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 2;  
-        // }
-        // if self.keys.test_key(&Key::Key3, input) { 
-        //     self.arrow_aabb_params.max_local_vertex_capacity = 3;  
-        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 3;  
-        // }
-        // if self.keys.test_key(&Key::Key4, input) { 
-        //     self.arrow_aabb_params.max_local_vertex_capacity = 4;  
-        //     self.temp_arrow_aabb_params.max_local_vertex_capacity = 4;  
-        // }
-        // if self.keys.test_key(&Key::Key9, input) { 
-        //     self.block64mode = true;  
-        // }
-        // if self.keys.test_key(&Key::Key0, input) { 
-        //     self.block64mode = false;  
-        // }
-        // if self.keys.test_key(&Key::NumpadSubtract, input) { 
-        // //if self.keys.test_key(&Key::T, input) { 
-        //     let si = self.temp_arrow_aabb_params.iterator_start_index as i32;
-        //     if si >= THREAD_COUNT as i32 {
-        //         self.temp_arrow_aabb_params.iterator_start_index = self.temp_arrow_aabb_params.iterator_start_index - THREAD_COUNT;
-        //         self.temp_arrow_aabb_params.iterator_end_index = self.temp_arrow_aabb_params.iterator_end_index - THREAD_COUNT;
-        //     }
-        // }
-        // if self.keys.test_key(&Key::NumpadAdd, input) { 
-        //     let ei = self.temp_arrow_aabb_params.iterator_end_index;
-        //     if ei <= 4096 - THREAD_COUNT {
-        //         self.temp_arrow_aabb_params.iterator_start_index = self.temp_arrow_aabb_params.iterator_start_index + THREAD_COUNT;
-        //         self.temp_arrow_aabb_params.iterator_end_index = self.temp_arrow_aabb_params.iterator_end_index + THREAD_COUNT;
-        //     }
-        // }
 
-        // if self.block64mode {
-        //     queue.write_buffer(
-        //         &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-        //         0,
-        //         bytemuck::cast_slice(&[self.temp_arrow_aabb_params])
-        //     );
-        // }
-        // else {
-        //     queue.write_buffer(
-        //         &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-        //         0,
-        //         bytemuck::cast_slice(&[self.arrow_aabb_params])
-        //     );
-        // }
+        // Prefix sum.
+        let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
+
+        // queue.write_buffer(
+        //     &self.buffers.get(&"fmm_params".to_string()).unwrap(),
+        //     0,
+        //     bytemuck::cast_slice(&[FmmParams {
+        //                               fmm_global_dimension: [16, 16, 16],
+        //                               visualize: 0,
+        //                               fmm_inner_dimension: [4, 4, 4],
+        //                               //triangle_count: 1 }
+        //                               triangle_count: 2036 }
+        //     ]));
+
+        // Compute interface.
+        self.compute_object_fmm_prefix_scan.dispatch(
+            &self.compute_bind_groups_fmm_prefix_scan,
+            &mut encoder_command,
+            1, 1, 1,
+            //udiv_up_safe32(1, thread_count), 1, 1,
+            //udiv_up_safe32(2036, thread_count), 1, 1,
+            // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+            Some("fmm prefix scan dispatch")
+        );
+
+        queue.submit(Some(encoder_command.finish()));
     }
 }
 
