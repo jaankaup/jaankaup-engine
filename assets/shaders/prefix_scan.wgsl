@@ -163,7 +163,7 @@ fn local_prefix_sum(thread_id: u32) {
     }
 }
 
-// Perform prefix sum for shared_aux. Return the exclusive part of the prefix sum.
+// Perform prefix sum for shared_aux. DONT't Return the exclusive part of the prefix sum.
 fn local_prefix_sum_aux(thread_id: u32) {
 
     // Create the local indices. TODO: add these to private attribute.
@@ -325,5 +325,4 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // Prefix sum
 
     // reduce
-    
 }

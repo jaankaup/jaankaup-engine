@@ -57,62 +57,10 @@ const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
 
 /// The size of draw buffer in bytes;
-const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
+// const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
 //const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>() / 4;
 
 const THREAD_COUNT: u32 = 64;
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct Vertex {
-    v: [f32; 4],
-    n: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct Triangle {
-    a: Vertex,
-    b: Vertex,
-    c: Vertex,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct AABB {
-    min: [f32; 4],
-    max: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct Arrow {
-    start_pos: [f32 ; 4],
-    end_pos: [f32 ; 4],
-    color: u32,
-    size: f32,
-    _padding: [u32; 2]
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct Char {
-    start_pos: [f32 ; 4],
-    value: [f32 ; 4],
-    font_size: f32,
-    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
-    color: u32,
-    z_offset: f32,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct ArrowAabbParams{
-    max_number_of_vertices: u32,
-    iterator_start_index: u32,
-    iterator_end_index: u32,
-    element_type: u32, // 0 :: array, 1 :: aabb, 2 :: aabb wire
-}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -143,12 +91,9 @@ struct FmmPrefixParams {
     blaah: u32,
 }
 
-impl_convert!{Arrow}
-impl_convert!{Char}
 impl_convert!{FmmCell}
 impl_convert!{FmmParams}
 impl_convert!{FmmBlock}
-impl_convert!{ArrowAabbParams}
 
 struct FmmFeatures {}
 
@@ -174,10 +119,6 @@ struct Fmm {
     pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
     pub render_object_vvvc: RenderObject,
     pub render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
-    //++ pub compute_object_char: ComputeObject, 
-    //++ pub compute_bind_groups_char: Vec<wgpu::BindGroup>,
-    //++ pub compute_object_arrow: ComputeObject, 
-    //++ pub compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
     pub compute_object_fmm: ComputeObject, 
     pub compute_bind_groups_fmm: Vec<wgpu::BindGroup>,
     pub compute_object_fmm_triangle: ComputeObject, 
@@ -186,13 +127,7 @@ struct Fmm {
     pub compute_bind_groups_fmm_prefix_scan: Vec<wgpu::BindGroup>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
-    pub histogram_draw_counts: Histogram,
-    pub histogram_fmm: Histogram,
-    pub draw_count_points: u32,
-    pub draw_count_triangles: u32,
-    pub arrow_aabb_params: ArrowAabbParams,
     pub keys: KeyboardManager,
-    pub block64mode: bool, // TODO: remove
     pub triangle_mesh_draw_count: u32,
     pub draw_triangle_mesh: bool,
 }
@@ -331,13 +266,6 @@ impl Application for Fmm {
         let histogram_draw_counts = Histogram::init(&configuration.device, &vec![0; 2]);
         let histogram_fmm = Histogram::init(&configuration.device, &vec![0; 4]);
 
-        let arrow_aabb_params = ArrowAabbParams {
-            max_number_of_vertices: VERTEX_BUFFER_SIZE as u32,
-            iterator_start_index: 0,
-            iterator_end_index: 0,
-            element_type: 0,
-        };
-        
         ////////////////////////////////////////////////////
         ////                 BUFFERS                    ////
         ////////////////////////////////////////////////////
@@ -612,13 +540,7 @@ impl Application for Fmm {
             compute_bind_groups_fmm_prefix_scan: compute_bind_groups_fmm_prefix_scan,
             buffers: buffers,
             camera: camera,
-            histogram_draw_counts: histogram_draw_counts,
-            histogram_fmm: histogram_fmm,
-            draw_count_points: 0,
-            draw_count_triangles: 0,
-            arrow_aabb_params: arrow_aabb_params,
             keys: keys,
-            block64mode: false,
             triangle_mesh_draw_count: triangle_mesh_draw_count, 
             draw_triangle_mesh: true,
         }
@@ -728,10 +650,6 @@ impl Application for Fmm {
 
         // Update screen.
         self.screen.prepare_for_rendering();
-
-        // Reset counter.
-        self.histogram_fmm.reset_all_cpu_version(queue, 0);
-
     }
 
     #[allow(unused)]
@@ -748,7 +666,6 @@ impl Application for Fmm {
         self.camera.update_from_input(&queue, &input);
 
         if self.keys.test_key(&Key::P, input) { 
-            println!("Space pressed.");
             self.draw_triangle_mesh = !self.draw_triangle_mesh;
         }
 
