@@ -1,3 +1,5 @@
+use crate::texture::Texture;
+use std::mem::size_of;
 use crate::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use std::borrow::Cow;
 use crate::misc::Convert2Vec;
@@ -9,6 +11,7 @@ use crate::common_functions::{
     create_uniform_bindgroup_layout,
     create_buffer_bindgroup_layout
 };
+use crate::buffer::{buffer_from_data};
 use crate::camera::Camera;
 use crate::histogram::Histogram;
 
@@ -68,26 +71,45 @@ impl_convert!{Arrow}
 impl_convert!{Char}
 
 pub struct GpuDebugger {
-    pub compute_object_char: ComputeObject, 
-    pub compute_bind_groups_char: Vec<wgpu::BindGroup>,
-    pub compute_object_arrow: ComputeObject, 
-    pub compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
-    pub buffers: HashMap<String, wgpu::Buffer>,
+    render_object_vvvvnnnn: RenderObject, 
+    render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
+    render_object_vvvc: RenderObject,
+    render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
+    compute_object_char: ComputeObject, 
+    compute_bind_groups_char: Vec<wgpu::BindGroup>,
+    compute_object_arrow: ComputeObject, 
+    compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
+    buffers: HashMap<String, wgpu::Buffer>,
+    arrow_aabb_params: ArrowAabbParams,
+    histogram_draw_counts: Histogram,
+    histogram_element_counter: Histogram,
+    max_number_of_vertices: u32,
+    max_number_of_chars: u32,
+    max_number_of_arrows: u32,
+    max_number_of_aabbs: u32,
+    max_number_of_aabb_wires: u32,
+    thread_count: u32,
 }
-
-//++ const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
-//++ const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
-//++ 
-//++ /// The size of draw buffer in bytes;
-//++ const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
 
 impl GpuDebugger {
 
-    pub fn Init(device: &wgpu::Device, camera: &mut Camera, vertex_buffer_size: u32) -> Self {
+    pub fn Init(device: &wgpu::Device,
+                camera: &mut Camera,
+                max_number_of_vertices: u32,
+                max_number_of_chars: u32,
+                max_number_of_arrows: u32,
+                max_number_of_aabbs: u32,
+                max_number_of_aabb_wires: u32,
+                thread_count: u32,
+                sc_desc: &wgpu::SurfaceConfiguration
+                ) -> Self {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         let histogram_draw_counts = Histogram::init(&device, &vec![0; 2]);
+
+        // This must be given to the shaders that uses GpuDebugger.
+        let histogram_element_counter = Histogram::init(&device, &vec![0; 4]);
 
         let arrow_aabb_params = ArrowAabbParams {
             max_number_of_vertices: 123 as u32,
@@ -96,6 +118,141 @@ impl GpuDebugger {
             iterator_end_index: 0,
             element_type: 0,
         };
+
+        ////////////////////////////////////////////////////
+        ////                 BUFFERS                    ////
+        ////////////////////////////////////////////////////
+
+        buffers.insert(
+            "output_arrows".to_string(),
+            device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_arrays buffer"),
+                size: (max_number_of_arrows * std::mem::size_of::<Arrow>() as u32) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+
+        buffers.insert(
+            "output_chars".to_string(),
+            device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_chars"),
+                size: (max_number_of_chars * std::mem::size_of::<Char>() as u32) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+
+        buffers.insert(
+            "output_aabbs".to_string(),
+            device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_aabbs"),
+                size: (max_number_of_aabbs * std::mem::size_of::<AABB>() as u32) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+
+        buffers.insert(
+            "output_aabb_wires".to_string(),
+            device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("output_aabbs"),
+                size: (max_number_of_aabb_wires * std::mem::size_of::<AABB>() as u32) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
+
+        buffers.insert(
+            "output_render".to_string(),
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("draw buffer"),
+                size: (max_number_of_vertices * size_of::<Vertex>() as u32) as u64, 
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        );
+
+        buffers.insert(
+            "arrow_aabb_params".to_string(),
+            buffer_from_data::<ArrowAabbParams>(
+            &device,
+            &vec![arrow_aabb_params],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
+
+        ////////////////////////////////////////////////////
+        ////               Render vvvvnnnn              ////
+        ////////////////////////////////////////////////////
+
+        let render_object_vvvvnnnn =
+                RenderObject::init(
+                    &device,
+                    &sc_desc,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("renderer_v4n4_debug_visualizator.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
+                    
+                    }),
+                    &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
+                    &vec![
+                        vec![
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
+                        ],
+                    ],
+                    Some("Debug visualizator vvvvnnnn renderer with camera."),
+                    true,
+                    wgpu::PrimitiveTopology::TriangleList
+        );
+        let render_bind_groups_vvvvnnnn = create_bind_groups(
+                                     &device,
+                                     &render_object_vvvvnnnn.bind_group_layout_entries,
+                                     &render_object_vvvvnnnn.bind_group_layouts,
+                                     &vec![
+                                          vec![
+                                              &camera.get_camera_uniform(&device).as_entire_binding(),
+                                         ]
+                                     ]
+        );
+
+        // vvvc
+        let render_object_vvvc =
+                RenderObject::init(
+                    &device,
+                    &sc_desc,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("renderer_v3c1.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
+                    
+                    }),
+                    &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
+                    &vec![
+                        vec![
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
+                        ],
+                    ],
+                    Some("Debug visualizator vvvc renderer with camera."),
+                    true,
+                    wgpu::PrimitiveTopology::PointList
+        );
+        let render_bind_groups_vvvc = create_bind_groups(
+                                     &device,
+                                     &render_object_vvvc.bind_group_layout_entries,
+                                     &render_object_vvvc.bind_group_layouts,
+                                     &vec![
+                                          vec![
+                                              &camera.get_camera_uniform(&device).as_entire_binding(),
+                                         ]
+                                     ]
+        );
+
 
         ////////////////////////////////////////////////////
         ////                 Compute char               ////
@@ -200,12 +357,228 @@ impl GpuDebugger {
         );
 
         Self {
+            render_object_vvvvnnnn: render_object_vvvvnnnn, 
+            render_bind_groups_vvvvnnnn: render_bind_groups_vvvvnnnn,
+            render_object_vvvc: render_object_vvvc,
+            render_bind_groups_vvvc: render_bind_groups_vvvc,
             compute_object_char: compute_object_char,
             compute_bind_groups_char: compute_bind_groups_char,
             compute_object_arrow: compute_object_arrow, 
             compute_bind_groups_arrow: compute_bind_groups_arrow,
             buffers: buffers,
-            // arrow_aabb_params: arrow_aabb_params,
+            arrow_aabb_params: arrow_aabb_params,
+            histogram_draw_counts: histogram_draw_counts,
+            histogram_element_counter: histogram_element_counter,
+            max_number_of_vertices: max_number_of_vertices,
+            max_number_of_chars: max_number_of_chars,
+            max_number_of_arrows: max_number_of_arrows,
+            max_number_of_aabbs: max_number_of_aabbs,
+            max_number_of_aabb_wires: max_number_of_aabb_wires,
+            thread_count: thread_count,
+        }
+    }
+
+    pub fn reset_element_counters(&mut self, queue: &wgpu::Queue) {
+        // Reset counter.
+        self.histogram_element_counter.reset_all_cpu_version(queue, 0);
+    }
+
+    pub fn get_element_counter_buffer(&self) -> &wgpu::Buffer {
+        &self.histogram_element_counter.get_histogram_buffer() 
+    }
+
+    pub fn render(&mut self,
+                  device: &wgpu::Device,
+                  queue: &wgpu::Queue,
+                  view: &wgpu::TextureView,
+                  depth_texture: Texture) {
+
+        // Get the total number of elements.
+        let elem_counter = self.histogram_element_counter.get_values(device, queue);
+
+        let number_of_chars = elem_counter[0];
+        let total_number_of_arrows = elem_counter[1];
+        let total_number_of_aabbs = elem_counter[2];
+        let total_number_of_aabb_wires = elem_counter[3];
+        
+        let vertices_per_element_arrow = 72;
+        let vertices_per_element_aabb = 36;
+        let vertices_per_element_aabb_wire = 432;
+
+        // The number of vertices created with one dispatch.
+        let vertices_per_dispatch_arrow = self.thread_count * vertices_per_element_arrow;
+        let vertices_per_dispatch_aabb = self.thread_count * vertices_per_element_aabb;
+        let vertices_per_dispatch_aabb_wire = self.thread_count * vertices_per_element_aabb_wire;
+
+        // [(element_type, total number of elements, number of vercies per dispatch, vertices_per_element)]
+        let draw_params = [(0, total_number_of_arrows,     vertices_per_dispatch_arrow, vertices_per_element_arrow),
+                           (1, total_number_of_aabbs,      vertices_per_dispatch_aabb, vertices_per_element_aabb), // !!!
+                           (2, total_number_of_aabb_wires, vertices_per_dispatch_aabb_wire, vertices_per_element_aabb_wire)]; 
+
+        // Clear the previous screen.
+        let mut clear = true;
+
+        // For each element type, create triangle meshes and render with respect of draw buffer size.
+        for (e_type, e_size, v_per_dispatch, vertices_per_elem) in draw_params.iter() {
+
+            // The number of safe dispathes. This ensures the draw buffer doesn't over flow.
+            let safe_number_of_dispatches = self.max_number_of_vertices as u32 / v_per_dispatch;
+
+            // // The number of remaining dispatches to complete the triangle mesh creation and
+            // // rendering.
+            // let mut total_number_of_dispatches = udiv_up_safe32(*e_size, thread_count);
+
+            // The number of items to create and draw.
+            let mut items_to_process = *e_size;
+
+            // Nothing to process.
+            if *e_size == 0 { continue; }
+
+            // Create the initial params.
+            self.arrow_aabb_params.iterator_start_index = 0;
+            self.arrow_aabb_params.iterator_end_index = std::cmp::min(*e_size, safe_number_of_dispatches * v_per_dispatch);
+            self.arrow_aabb_params.element_type = *e_type;
+
+            queue.write_buffer(
+                &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.arrow_aabb_params])
+            );
+
+            // Continue process until all element are rendered.
+            while items_to_process > 0 {
+
+                // The number of remaining dispatches to complete the triangle mesh creation and
+                // rendering.
+                let total_number_of_dispatches = udiv_up_safe32(items_to_process, self.thread_count);
+
+                // Calculate the number of dispatches for this run. 
+                let local_dispatch = std::cmp::min(total_number_of_dispatches, safe_number_of_dispatches);
+
+                // Then number of elements that are going to be rendered. 
+                let number_of_elements = std::cmp::min(local_dispatch * self.thread_count, items_to_process);
+
+                let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
+
+                self.arrow_aabb_params.iterator_end_index = self.arrow_aabb_params.iterator_start_index + std::cmp::min(number_of_elements, safe_number_of_dispatches * v_per_dispatch);
+
+                queue.write_buffer(
+                    &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                    0,
+                    bytemuck::cast_slice(&[self.arrow_aabb_params])
+                );
+
+                self.compute_object_arrow.dispatch(
+                    &self.compute_bind_groups_arrow,
+                    &mut encoder_arrow_aabb,
+                    local_dispatch, 1, 1, Some("arrow local dispatch")
+                );
+
+                queue.submit(Some(encoder_arrow_aabb.finish()));
+
+                let counter = self.histogram_draw_counts.get_values(device, queue);
+
+                let draw_count = number_of_elements * vertices_per_elem;
+
+                println!("local_dispatch == {}", local_dispatch);
+                println!("draw_count == {}", draw_count);
+
+                let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
+
+                draw(&mut encoder_arrow_rendering,
+                     &view,
+                     &depth_texture,
+                     &self.render_bind_groups_vvvvnnnn,
+                     &self.render_object_vvvvnnnn.pipeline,
+                     &self.buffers.get("output_render").unwrap(),
+                     0..draw_count,
+                     clear
+                );
+               
+                if clear { clear = false; }
+
+                // Decrease the total count of elements.
+                items_to_process = items_to_process - number_of_elements; 
+
+                queue.submit(Some(encoder_arrow_rendering.finish()));
+                self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+                self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_end_index; // + items_to_process;
+            } // for number_of_loop
+        }
+
+        //// DRAW CHARS
+
+        // Update Visualization params for arrows.
+          
+        self.arrow_aabb_params.iterator_start_index = 0;
+        self.arrow_aabb_params.iterator_end_index = number_of_chars;
+        self.arrow_aabb_params.element_type = 0;
+        // TODO: a better heurestic. This doesn't work as expected.
+        self.arrow_aabb_params.max_number_of_vertices = std::cmp::max(self.max_number_of_vertices as i32 - 500000, 0) as u32;
+        //self.arrow_aabb_params.max_number_of_vertices = MAX_NUMBER_OF_VVVC as u32;
+
+        queue.write_buffer(
+            &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.arrow_aabb_params])
+        );
+
+        self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+        let mut current_char_index = 0;
+
+        let mut ccc = -1;
+        loop { 
+            ccc = ccc + 1;
+
+            let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+
+            self.compute_object_char.dispatch(
+                &self.compute_bind_groups_char,
+                &mut encoder_char,
+                // 1, 1, 1, Some("numbers dispatch")
+                number_of_chars, 1, 1, Some("numbers dispatch")
+            );
+
+            queue.submit(Some(encoder_char.finish()));
+
+            let counter = self.histogram_draw_counts.get_values(device, queue);
+            // self.draw_count_triangles = counter[0];
+            let draw_count_triangles = counter[0];
+
+            current_char_index = counter[1];
+
+            let mut encoder_char_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+
+            draw(&mut encoder_char_rendering,
+                 &view,
+                 &depth_texture,
+                 &self.render_bind_groups_vvvc,
+                 &self.render_object_vvvc.pipeline,
+                 &self.buffers.get("output_render").unwrap(),
+                 0..draw_count_triangles.min(self.max_number_of_vertices * 2),
+                 clear
+            );
+            queue.submit(Some(encoder_char_rendering.finish()));
+
+            self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+            // There are still chars left.
+            if current_char_index != 0 && current_char_index != self.arrow_aabb_params.iterator_end_index - 1 {
+                self.arrow_aabb_params.iterator_start_index = current_char_index;
+                self.arrow_aabb_params.iterator_end_index = number_of_chars;
+                self.arrow_aabb_params.element_type = 0;
+                self.arrow_aabb_params.max_number_of_vertices = std::cmp::max((self.max_number_of_vertices * 2) as i32 - 500000, 0) as u32;
+
+                queue.write_buffer(
+                    &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+                    0,
+                    bytemuck::cast_slice(&[self.arrow_aabb_params])
+                );
+
+            }
+            else { break; }
         }
     }
 }
