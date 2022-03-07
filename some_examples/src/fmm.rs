@@ -20,7 +20,12 @@ use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
-use jaankaup_core::common_functions::{encode_rgba_u32, udiv_up_safe32};
+use jaankaup_core::common_functions::{
+    encode_rgba_u32,
+    udiv_up_safe32,
+    create_uniform_bindgroup_layout,
+    create_buffer_bindgroup_layout
+};
 use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 use jaankaup_core::cgmath::Vector4 as Vec4;
@@ -346,7 +351,6 @@ impl Application for Fmm {
             &configuration.device,
             &triangle_mesh_wood,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
-            //wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
 
@@ -382,12 +386,6 @@ impl Application for Fmm {
             &vec![FmmCell { tag: 0, value: 1000000.0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             Some("fmm data buffer.")
-            //configuration.device.create_buffer(&wgpu::BufferDescriptor{
-            //    label: Some("output_arrays buffer"),
-            //    size: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z * std::mem::size_of::<FmmCell>()) as u64,
-            //    usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            //    mapped_at_creation: false,
-            //    }
             )
         );
 
@@ -497,71 +495,20 @@ impl Application for Fmm {
                     Some("Visualizer Compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> camerauniform: Camera;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<uniform> arrow_aabb_params: VisualizationParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read_write> counter: Counter;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage, read> counter: array<Arrow>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(4)
-                            // var<storage,read_write> output: array<VertexBuffer>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 4,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> camerauniform: Camera;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> arrow_aabb_params: VisualizationParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> counter: Counter;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(3) var<storage, read> counter: array<Arrow>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(4) var<storage,read_write> output: array<VertexBuffer>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
                         ],
                     ]
         );
@@ -598,87 +545,26 @@ impl Application for Fmm {
                             Cow::Borrowed(include_str!("../../assets/shaders/arrow_aabb.wgsl"))),
                     
                     }),
-                    Some("Visualizer Compute object"),
+                    Some("Arrow_aabb Compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> arrow_aabb_params: VisualizationParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> counter: Counter;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read> counter: array<Arrow>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage, read_write> aabbs: array<AABB>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(4)
-                            // var<storage, read_write> aabb_wires: array<AABB>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 4,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(5)
-                            // var<storage,read_write> output: array<Triangle>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 5,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> arrow_aabb_params: VisualizationParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> counter: Counter;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read> counter: array<Arrow>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(3) var<storage, read_write> aabbs: array<AABB>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(4) var<storage, read_write> aabb_wires: array<AABB>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(5) var<storage,read_write> output: array<Triangle>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE),
                         ],
                     ]
         );
@@ -715,97 +601,26 @@ impl Application for Fmm {
                     Some("FMM Compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> fmm_params: FmmParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> fmm_data: array<FmmCell>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read_write> counter: array<atomic<u32>>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage,read_write> output_char: array<Char>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(4)
-                            // var<storage,read_write> output_arrow: array<Arrow>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 4,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(5)
-                            // var<storage,read_write> output_aabb: array<AABB>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 5,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(6)
-                            // var<storage,read_write> output_aabb_wire: array<AABB>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 6,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCell>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE),
                         ],
                     ]
         );
@@ -843,110 +658,29 @@ impl Application for Fmm {
                     Some("FMM triangle Compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> fmm_params: FmmParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> fmm_data: array<FmmCell>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read_write> triangle_mesh_in: array<Triangle>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage, read_write> counter: array<atomic<u32>>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(4)
-                            // var<storage,read_write> output_char: array<Char>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 4,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(5)
-                            // var<storage,read_write> output_arrow: array<Arrow>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 5,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(6)
-                            // var<storage,read_write> output_aabb: array<AABB>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 6,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(7)
-                            // var<storage,read_write> output_aabb_wire: array<AABB>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 7,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCell>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> triangle_mesh_in: array<Triangle>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE),
                         ],
                     ]
         );
@@ -986,45 +720,14 @@ impl Application for Fmm {
                     Some("FMM prefix scan compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> fmm_params: PrefixParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> fmm_blocks: array<FmmBlock>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read_write> temp_prefix_sum: array<u32>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> fmm_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
                         ],
                     ]
         );

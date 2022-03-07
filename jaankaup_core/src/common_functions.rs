@@ -215,7 +215,7 @@ pub fn r3_reverse(z: i32) -> (i32, i32, i32) {
     (x as i32, y as i32, x3 as i32)
 }
 
-fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
+pub fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
     let mut x_temp = (x      | (x      << 16 )) & 0x030000FF;
             x_temp = (x_temp | (x_temp <<  8 )) & 0x0300F00F;
             x_temp = (x_temp | (x_temp <<  4 )) & 0x030C30C3;
@@ -234,7 +234,7 @@ fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
     x_temp | (y_temp << 1) | (z_temp << 2)
 }
 
-fn get_third_bits32(m: u32) -> u32 {
+pub fn get_third_bits32(m: u32) -> u32 {
     let mut x = m & 0x9249249;
     x = (x ^ (x >> 2))  & 0x30c30c3;
     x = (x ^ (x >> 4))  & 0x0300f00f;
@@ -247,3 +247,28 @@ fn decode3Dmorton32(m: u32) -> [u32; 3] {
     [get_third_bits32(m), get_third_bits32(m >> 1), get_third_bits32(m >> 2)]
 }
 
+pub fn create_uniform_bindgroup_layout(binding_index: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding: binding_index,
+        visibility: visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
+}
+
+pub fn create_buffer_bindgroup_layout(binding_index: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding: binding_index,
+        visibility: visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only: false },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
+}
