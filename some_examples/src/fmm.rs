@@ -61,6 +61,7 @@ const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
 //const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>() / 4;
 
 const THREAD_COUNT: u32 = 64;
+const PREFIX_THREAD_COUNT: u32 = 1024;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -88,7 +89,12 @@ struct FmmBlock {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct FmmPrefixParams {
-    blaah: u32,
+    data_start_index: u32,
+    data_end_index: u32,
+    exclusive_parts_start_index: u32,
+    exclusive_parts_end_index: u32,
+    temp_prefix_data_start_index: u32,
+    temp_prefix_data_end_index: u32,
 }
 
 impl_convert!{FmmCell}
@@ -106,6 +112,8 @@ impl WGPUFeatures for FmmFeatures {
     }
     fn required_limits() -> wgpu::Limits {
         let mut limits = wgpu::Limits::default();
+        limits.max_compute_invocations_per_workgroup = 1024;
+        limits.max_compute_workgroup_size_x = 1024;
         limits.max_storage_buffers_per_shader_stage = 8;
         limits
     }
@@ -130,6 +138,7 @@ struct Fmm {
     pub keys: KeyboardManager,
     pub triangle_mesh_draw_count: u32,
     pub draw_triangle_mesh: bool,
+    pub once: bool,
 }
 
 impl Fmm {
@@ -143,21 +152,23 @@ impl Application for Fmm {
 
         log::info!("Adapter limits are: ");
 
-        // let adapter_limits = configuration.adapter.limits(); 
+        let once = true;
 
-        // log::info!("max_compute_workgroup_storage_size: {:?}", adapter_limits.max_compute_workgroup_storage_size);
-        // log::info!("max_compute_invocations_per_workgroup: {:?}", adapter_limits.max_compute_invocations_per_workgroup);
-        // log::info!("max_compute_workgroup_size_x: {:?}", adapter_limits.max_compute_workgroup_size_x);
-        // log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
-        // log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
-        // log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
+        let adapter_limits = configuration.adapter.limits(); 
+
+        log::info!("max_compute_workgroup_storage_size: {:?}", adapter_limits.max_compute_workgroup_storage_size);
+        log::info!("max_compute_invocations_per_workgroup: {:?}", adapter_limits.max_compute_invocations_per_workgroup);
+        log::info!("max_compute_workgroup_size_x: {:?}", adapter_limits.max_compute_workgroup_size_x);
+        log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
+        log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
+        log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.02);
+        camera.set_movement_sensitivity(0.2);
 
         // gpu debugger.
         let gpu_debugger = GpuDebugger::Init(
@@ -270,7 +281,6 @@ impl Application for Fmm {
         ////                 BUFFERS                    ////
         ////////////////////////////////////////////////////
 
-
         // Load model. Tower.
         let (_, mut triangle_mesh_wood, _) = load_triangles_from_obj(
             "assets/models/wood.obj",
@@ -313,12 +323,27 @@ impl Application for Fmm {
             None)
         );
 
+        let temp_prefix_start = 0;
+        let temp_prefix_end = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32;
+        let exclusive_start = temp_prefix_end;
+        let exclusive_end   = temp_prefix_end + ((FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32 / (PREFIX_THREAD_COUNT * 2)) as u32;
+
+        println!("temp_prefix_start == {}", temp_prefix_start);
+        println!("temp_prefix_end == {}", temp_prefix_end);
+        println!("exclusive_start == {}", exclusive_start);
+        println!("exclusive_end == {}", exclusive_end);
+
         buffers.insert(
             "fmm_prefix_params".to_string(),
             buffer_from_data::<FmmPrefixParams>(
             &configuration.device,
             &vec![FmmPrefixParams {
-                blaah: 123,
+                data_start_index: 0,
+                data_end_index: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32,
+                exclusive_parts_start_index: exclusive_start,
+                exclusive_parts_end_index: exclusive_end,
+                temp_prefix_data_start_index: temp_prefix_start,
+                temp_prefix_data_end_index: temp_prefix_end,
             }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
@@ -338,7 +363,7 @@ impl Application for Fmm {
             "temp_prefix_sum".to_string(),
             configuration.device.create_buffer(&wgpu::BufferDescriptor{
                 label: Some("termp_prefix_sum buffer"),
-                size: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * std::mem::size_of::<u32>()) as u64,
+                size: (exclusive_end as usize * std::mem::size_of::<u32>()) as u64,
                 usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
                 }
@@ -346,10 +371,14 @@ impl Application for Fmm {
         );
 
         let mut fmm_blocks: Vec<FmmBlock> = Vec::with_capacity(FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z);
+        
+
+        let magic_block_numbers = vec![2,3,4, 127, 128, 1023, 1024, 1025, 2055, 2047, 2048, 2049, 2051];
 
         // Create FMM blocks.
         for i in 0..FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z {
-           fmm_blocks.push(FmmBlock{index: i as u32, band_points_count: if i % 13 == 0 { 2 } else {0} , });
+            let contains = magic_block_numbers.iter().any(|x| *x == i);  
+            fmm_blocks.push(FmmBlock{index: i as u32, band_points_count: if contains { i as u32 } else {0} , });
         }
 
         buffers.insert(
@@ -563,6 +592,7 @@ impl Application for Fmm {
             keys: keys,
             triangle_mesh_draw_count: triangle_mesh_draw_count, 
             draw_triangle_mesh: false,
+            once: once,
         }
     }
 
@@ -619,30 +649,30 @@ impl Application for Fmm {
 
         queue.submit(Some(encoder_command.finish()));
 
-       let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm triangle encoder") });
+       //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm triangle encoder") });
 
-       queue.write_buffer(
-           &self.buffers.get(&"fmm_params".to_string()).unwrap(),
-           0,
-           bytemuck::cast_slice(&[FmmParams {
-                                     fmm_global_dimension: [16, 16, 16],
-                                     visualize: 1,
-                                     fmm_inner_dimension: [4, 4, 4],
-                                     triangle_count: 2036 }
-           ]));
+       //++ queue.write_buffer(
+       //++     &self.buffers.get(&"fmm_params".to_string()).unwrap(),
+       //++     0,
+       //++     bytemuck::cast_slice(&[FmmParams {
+       //++                               fmm_global_dimension: [16, 16, 16],
+       //++                               visualize: 1,
+       //++                               fmm_inner_dimension: [4, 4, 4],
+       //++                               triangle_count: 2036 }
+       //++     ]));
 
 
-       // Visualize.
-       self.compute_object_fmm_triangle.dispatch(
-           &self.compute_bind_groups_fmm_triangle,
-           &mut encoder_command,
-           (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-           Some("fmm triangle dispatch")
-       );
+       //++ // Visualize.
+       //++ self.compute_object_fmm_triangle.dispatch(
+       //++     &self.compute_bind_groups_fmm_triangle,
+       //++     &mut encoder_command,
+       //++     (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+       //++     Some("fmm triangle dispatch")
+       //++ );
 
-       queue.submit(Some(encoder_command.finish()));
+       //++ queue.submit(Some(encoder_command.finish()));
 
-       self.gpu_debugger.render(
+        self.gpu_debugger.render(
                   &device,
                   &queue,
                   &view,
@@ -707,7 +737,7 @@ impl Application for Fmm {
         self.compute_object_fmm_prefix_scan.dispatch(
             &self.compute_bind_groups_fmm_prefix_scan,
             &mut encoder_command,
-            1, 1, 1,
+            2, 1, 1,
             //udiv_up_safe32(1, thread_count), 1, 1,
             //udiv_up_safe32(2036, thread_count), 1, 1,
             // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
@@ -716,14 +746,20 @@ impl Application for Fmm {
 
         queue.submit(Some(encoder_command.finish()));
 
-        //++ let result =  to_vec::<u32>(
-        //++     &device,
-        //++     &queue,
-        //++     &self.buffers.get(&"temp_prefix_sum".to_string()).unwrap(),
-        //++     0,
-        //++     (4 * 128) as wgpu::BufferAddress
-        //++ );
-        //++ println!("{:?}", result);
+        let result =  to_vec::<u32>(
+            &device,
+            &queue,
+            &self.buffers.get(&"temp_prefix_sum".to_string()).unwrap(),
+            0,
+            (4 * 4098) as wgpu::BufferAddress
+        );
+        if self.once {
+            for i in 0..4098 {
+                println!("{:?} == {:?}", i, result[i]);
+            }
+            self.once = !self.once;
+        }
+        //println!("{:?}", result);
     }
 }
 

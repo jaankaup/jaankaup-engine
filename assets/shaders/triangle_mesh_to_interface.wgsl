@@ -362,14 +362,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         update_fmm_interface(tr_aabb, tr, local_index);
 
-        if (global_id.x == 0u) {
-            output_aabb_wire[global_id.x] =  
-                  AABB (
-                      vec4<f32>(0.0, 0.0, 0.0, color),
-                      vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
-                  );
-            atomicAdd(&counter[3], 1u);
-        }
+        //++ if (global_id.x == 0u) {
+        //++     output_aabb_wire[global_id.x] =  
+        //++           AABB (
+        //++               vec4<f32>(0.0, 0.0, 0.0, color),
+        //++               vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
+        //++           );
+        //++     atomicAdd(&counter[3], 1u);
+        //++ }
     }
 
     else if (fmm_params.visualize == 1u) {
