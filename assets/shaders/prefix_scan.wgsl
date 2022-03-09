@@ -229,7 +229,7 @@ fn copy_exclusive_data_to_shared_aux() {
 }
 
 // Perform prefix sum for one dispatch.
-fn local_prefix_sum() {
+fn local_prefix_sum(workgroup_index: u32) {
 
     var exclusive_part: u32 = 0u;
 
@@ -264,7 +264,8 @@ fn local_prefix_sum() {
 
         // Copy the last prefix sum to the shared_aux. 
         // local_exclusive_part = shared_prefix_sum[last_index];
-        temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + private_data.global_ai] = shared_prefix_sum[last_index];
+        //++ temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + private_data.global_ai] = shared_prefix_sum[last_index];
+        temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + workgroup_index] = shared_prefix_sum[last_index];
 
         // Add zero to the last index.
         shared_prefix_sum[last_index] = 0u;
@@ -346,24 +347,23 @@ fn local_prefix_sum_aux() {
 
 fn sum_auxiliar() {
 
-    // TODO: refactor.
-    // let data_count = fmm_prefix_params.temp_prefix_data_end_index -
-    //                  fmm_prefix_params.temp_prefix_data_start_index;
-    let data_count = fmm_prefix_params.data_start_index -
-                     fmm_prefix_params.data_end_index;
+    let data_count = fmm_prefix_params.data_end_index -
+                     fmm_prefix_params.data_start_index;
 
     let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
 
-    // DO we neet for loop now.
+    if (private_data.ai == 0u) {
+        let last_index = chunks + 1u;
+        stream_compaction_count = shared_aux[last_index + (last_index >> 4u)];
+    } 
+    workgroupBarrier();
+
     for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
-        // let items_to_process = min(THREAD_COUNT, data_count - i * THREAD_COUNT)        
 
-        // Load data from temp.
         let a = temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u];
-        let b = temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u];
-
-        // Add exclusive part from shared_aux.
         temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u] = a + shared_aux[i + (i >> 4u)];
+
+        let b = temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u];
         temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u] = b + shared_aux[i + (i >> 4u)];
      }
 };
@@ -443,7 +443,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         copy_block_to_shared_temp(THREAD_COUNT * 2u);
 
         // 1b. Perform prefix sum on shared_temp for the previous data. Copies the exclusive part to the global array (temp_prefix_sum).   
-        local_prefix_sum();
+        local_prefix_sum(work_group_id.x);
         
         // 1c. Save the prefix sum to global array (temp_prefix_sum).
         store_block_to_global_temp(THREAD_COUNT * 2u);
@@ -452,6 +452,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // STAGE 2.
     else if (fmm_prefix_params.stage == 2u) {
 
+      if (local_index == 0u) {
+          stream_compaction_count = 0u;
+      }
+      workgroupBarrier();
+
       // 2a. Load the exclusive data to the shared_aux. 
       copy_exclusive_data_to_shared_aux();
 
@@ -459,6 +464,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
       local_prefix_sum_aux();
 
       sum_auxiliar();
+      if (local_index == 0u) {
+          // create_number(123.3, vec4<f32>(0.0, 0.0, 0.0, 0.0)); 
+          create_number(f32(stream_compaction_count), vec4<f32>(0.0, 0.0, 0.0, 0.0)); 
+      }
     }
 
     // STAGE 3.

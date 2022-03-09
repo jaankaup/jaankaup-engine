@@ -170,7 +170,7 @@ impl Application for Fmm {
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.2);
+        camera.set_movement_sensitivity(0.02);
 
         // gpu debugger.
         let gpu_debugger = GpuDebugger::Init(
@@ -328,7 +328,7 @@ impl Application for Fmm {
         let temp_prefix_start = 0;
         let temp_prefix_end = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32;
         let exclusive_start = temp_prefix_end;
-        let exclusive_end   = temp_prefix_end + ((FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32 / (PREFIX_THREAD_COUNT * 2)) as u32;
+        let exclusive_end   = exclusive_start + (PREFIX_THREAD_COUNT * 2) as u32;
 
         println!("temp_prefix_start == {}", temp_prefix_start);
         println!("temp_prefix_end == {}", temp_prefix_end);
@@ -734,6 +734,14 @@ impl Application for Fmm {
             self.draw_triangle_mesh = !self.draw_triangle_mesh;
         }
 
+        self.fmm_prefix_params.stage = 1;
+
+        queue.write_buffer(
+            &self.buffers.get(&"fmm_prefix_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.fmm_prefix_params])
+        );
+
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
@@ -791,22 +799,20 @@ impl Application for Fmm {
 
         //++ queue.submit(Some(encoder_command.finish()));
 
-        self.fmm_prefix_params.stage = 1;
-
         let result =  to_vec::<u32>(
             &device,
             &queue,
             &self.buffers.get(&"temp_prefix_sum".to_string()).unwrap(),
             0,
-            (4 * 4098) as wgpu::BufferAddress
+            (4 * 4099) as wgpu::BufferAddress
         );
 
-        if self.once {
-            for i in 0..4098 {
+        // if self.once {
+            for i in 0..4099 {
                 println!("{:?} == {:?}", i, result[i]);
             }
             self.once = !self.once;
-        }
+        // }
         //println!("{:?}", result);
     }
 }
