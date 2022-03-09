@@ -24,26 +24,26 @@ struct PrivateData {
     global_bi: u32;
 };
 
-struct AABB {
-    min: vec4<f32>; 
-    max: vec4<f32>; 
-};
-
-struct Arrow {
-    start_pos: vec4<f32>;
-    end_pos:   vec4<f32>;
-    color: u32;
-    size:  f32;
-};
-
-struct Char {
-    start_pos: vec4<f32>;
-    value: vec4<f32>;
-    font_size: f32;
-    vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
-    color: u32;
-    z_offset: f32;
-};
+//debug struct AABB {
+//debug     min: vec4<f32>; 
+//debug     max: vec4<f32>; 
+//debug };
+//debug 
+//debug struct Arrow {
+//debug     start_pos: vec4<f32>;
+//debug     end_pos:   vec4<f32>;
+//debug     color: u32;
+//debug     size:  f32;
+//debug };
+//debug 
+//debug struct Char {
+//debug     start_pos: vec4<f32>;
+//debug     value: vec4<f32>;
+//debug     font_size: f32;
+//debug     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+//debug     color: u32;
+//debug     z_offset: f32;
+//debug };
 
 struct PrefixParams {
     data_start_index: u32;
@@ -74,35 +74,41 @@ var<storage, read_write> temp_prefix_sum: array<u32>;
 
 @group(0)
 @binding(3)
-var<storage, read_write> counter: array<atomic<u32>>;
-
-@group(0)
-@binding(4)
-var<storage,read_write> output_char: array<Char>;
-
-@group(0)
-@binding(5)
-var<storage,read_write> output_arrow: array<Arrow>;
-
-@group(0)
-@binding(6)
-var<storage,read_write> output_aabb: array<AABB>;
-
-@group(0)
-@binding(7)
-var<storage,read_write> output_aabb_wire: array<AABB>;
-
-@group(0)
-@binding(8)
 var<storage,read_write> filtered_blocks: array<FmmBlock>;
+
+//debug @group(0)
+//debug @binding(4)
+//debug var<storage, read_write> counter: array<atomic<u32>>;
+//debug 
+//debug @group(0)
+//debug @binding(5)
+//debug var<storage,read_write> output_char: array<Char>;
+//debug 
+//debug @group(0)
+//debug @binding(6)
+//debug var<storage,read_write> output_arrow: array<Arrow>;
+//debug 
+//debug @group(0)
+//debug @binding(7)
+//debug var<storage,read_write> output_aabb: array<AABB>;
+//debug 
+//debug @group(0)
+//debug @binding(8)
+//debug var<storage,read_write> output_aabb_wire: array<AABB>;
+
 
 // let THREAD_COUNT = 64u;
 // let SCAN_BLOCK_SIZE = 136; 
 // let X_OFFSET = vec4<f32>(64.0, 0.0, 0.0, 0.0);
+
 let THREAD_COUNT = 1024u;
 let SCAN_BLOCK_SIZE = 2176u; 
-let X_OFFSET = vec4<f32>(1024.0, 0.0, 0.0, 0.0);
-let X_FACTOR = 1.0;
+
+//let THREAD_COUNT = 256u;
+//let SCAN_BLOCK_SIZE = 544u; 
+
+//debug let X_OFFSET = vec4<f32>(1024.0, 0.0, 0.0, 0.0);
+//debug let X_FACTOR = 1.0;
 
 // The output of global active fmm block scan.
 var<workgroup> shared_prefix_sum: array<u32, SCAN_BLOCK_SIZE>; 
@@ -130,71 +136,66 @@ fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
 ////// Logging       //////
 ///////////////////////////
 
-fn create_arrow(pos_a: vec4<f32>, pos_b: vec4<f32>) {
-
-    output_arrow[atomicAdd(&counter[1], 1u)] =  
-          Arrow (
-              pos_a,
-              pos_b,
-              rgba_u32(0u, 0u, 2550u, 255u),
-              0.1
-    );
-}
-
-fn create_number(value: f32, pos: vec4<f32>) {
-
-    output_aabb[atomicAdd(&counter[2], 1u)] =  
-          AABB (
-              vec4<f32>(pos.x - 0.01,
-                        pos.y - 0.1,
-                        pos.z - 0.1,
-                        f32(rgba_u32(255u, 0u, 0u, 255u))),
-              vec4<f32>(pos.x + 0.25,
-                        pos.y + 0.2, 
-                        pos.z - 0.01,
-                        1.0)
-    );
-
-    output_char[atomicAdd(&counter[0], 1u)] =  
-    
-          Char (
-              vec4<f32>(pos.x,
-                        pos.y,
-                        pos.z,
-                        1.0 // check do we need this
-              ),
-              vec4<f32>(value, 0.0, 0.0, 0.0),
-              0.05,
-              1u,
-              rgba_u32(255u, 0u, 2550u, 255u),
-              0.1, // not used 
-    );
-}
+//debug fn create_arrow(pos_a: vec4<f32>, pos_b: vec4<f32>) {
+//debug 
+//debug     output_arrow[atomicAdd(&counter[1], 1u)] =  
+//debug           Arrow (
+//debug               pos_a,
+//debug               pos_b,
+//debug               rgba_u32(0u, 0u, 2550u, 255u),
+//debug               0.1
+//debug     );
+//debug }
+//debug 
+//debug fn create_number(value: f32, pos: vec4<f32>) {
+//debug 
+//debug     output_aabb[atomicAdd(&counter[2], 1u)] =  
+//debug           AABB (
+//debug               vec4<f32>(pos.x - 0.01,
+//debug                         pos.y - 0.1,
+//debug                         pos.z - 0.1,
+//debug                         f32(rgba_u32(255u, 0u, 0u, 255u))),
+//debug               vec4<f32>(pos.x + 0.25,
+//debug                         pos.y + 0.2, 
+//debug                         pos.z - 0.01,
+//debug                         1.0)
+//debug     );
+//debug 
+//debug     output_char[atomicAdd(&counter[0], 1u)] =  
+//debug     
+//debug           Char (
+//debug               vec4<f32>(pos.x,
+//debug                         pos.y,
+//debug                         pos.z,
+//debug                         1.0 // check do we need this
+//debug               ),
+//debug               vec4<f32>(value, 0.0, 0.0, 0.0),
+//debug               0.05,
+//debug               1u,
+//debug               rgba_u32(255u, 0u, 2550u, 255u),
+//debug               0.1, // not used 
+//debug     );
+//debug }
 
 ///////////////////////////
 ////// Prefix scan   //////
 ///////////////////////////
 
-fn store_block_to_global_temp(number_of_items: u32) {
+fn store_block_to_global_temp() {
 
     temp_prefix_sum[private_data.global_ai] = shared_prefix_sum[private_data.ai_bcf];
     temp_prefix_sum[private_data.global_bi] = shared_prefix_sum[private_data.bi_bcf];
 }
 
 // Copies FMM_Block to shared_prefix_sum {0,1}. "Add padding 0 if necessery." not implemented.
-fn copy_block_to_shared_temp(number_of_items: u32) {
+// fn copy_block_to_shared_temp(number_of_items: u32) {
+fn copy_block_to_shared_temp() {
 
     let a = fmm_blocks[private_data.global_ai];
     let b = fmm_blocks[private_data.global_bi];
 
-    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.ai < number_of_items && a.band_points_count > 0u);
-    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.bi < number_of_items && b.band_points_count > 0u);
-}
-
-fn copy_prefix_sum_to_temp() {
-
-    temp_prefix_sum[private_data.global_ai] = shared_prefix_sum[private_data.ai_bcf];
-    temp_prefix_sum[private_data.global_bi] = shared_prefix_sum[private_data.bi_bcf];
+    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < fmm_prefix_params.data_end_index && a.band_points_count > 0u);
+    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < fmm_prefix_params.data_end_index && b.band_points_count > 0u);
 }
 
 fn copy_exclusive_data_to_shared_aux() {
@@ -213,7 +214,7 @@ fn copy_exclusive_data_to_shared_aux() {
 // Perform prefix sum for one dispatch.
 fn local_prefix_sum(workgroup_index: u32) {
 
-    var exclusive_part: u32 = 0u;
+    // var exclusive_part: u32 = 0u;
 
     // Up sweep.
 
@@ -221,20 +222,21 @@ fn local_prefix_sum(workgroup_index: u32) {
     var offset = 1u;
 
     for (var d = n >> 1u ; d > 0u; d = d >> 1u) {
-      workgroupBarrier();
 
-      if (private_data.ai < d) {
+        workgroupBarrier();
 
-          var ai_temp = offset * (private_data.ai * 2u + 1u) - 1u;
-          var bi_temp = offset * (private_data.ai * 2u + 2u) - 1u;
+        if (private_data.ai < d) {
 
-          ai_temp = ai_temp + (ai_temp >> 4u);
-          bi_temp = bi_temp + (bi_temp >> 4u);
+            var ai_temp = offset * (private_data.ai * 2u + 1u) - 1u;
+            var bi_temp = offset * (private_data.ai * 2u + 2u) - 1u;
 
-          shared_prefix_sum[bi_temp] = shared_prefix_sum[bi_temp] + shared_prefix_sum[ai_temp];
+            ai_temp = ai_temp + (ai_temp >> 4u);
+            bi_temp = bi_temp + (bi_temp >> 4u);
 
-      }
-      offset = offset * 2u; // bit shift?
+            shared_prefix_sum[bi_temp] = shared_prefix_sum[bi_temp] + shared_prefix_sum[ai_temp];
+
+        }
+        offset = offset * 2u; // bit shift?
     }
     //++ workgroupBarrier();
       
@@ -246,7 +248,7 @@ fn local_prefix_sum(workgroup_index: u32) {
 
         // Copy the last prefix sum to the shared_aux. 
         // local_exclusive_part = shared_prefix_sum[last_index];
-        //++ temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + private_data.global_ai] = shared_prefix_sum[last_index];
+        // temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + private_data.global_ai] = shared_prefix_sum[last_index];
         temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + workgroup_index] = shared_prefix_sum[last_index];
 
         // Add zero to the last index.
@@ -408,58 +410,19 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         global_bi
     );
 
-    //++ let fmm_block = fmm_blocks[global_ai];
-    //++ let fmm_block2 = fmm_blocks[global_bi];
-
-    //++ let start_pos = vec4<f32>(f32(private_data.global_ai) * X_FACTOR, 0.0, 22.0, 0.0);
-    //++ base_position = start_pos;
-
-    //++ create_number(f32(fmm_block.index),              base_position - vec4<f32>(0.0, 0.5, 0.0, 0.0));
-    //++ create_number(f32(fmm_block.band_points_count),  base_position - vec4<f32>(0.0, 0.75, 0.0, 0.0));
-
-    //++ create_number(f32(fmm_block2.index),             base_position - vec4<f32>(0.0, 0.5,  0.0, 0.0) + X_OFFSET);
-    //++ create_number(f32(fmm_block2.band_points_count), base_position - vec4<f32>(0.0, 0.75, 0.0, 0.0) + X_OFFSET);
-
-    //++ base_position = start_pos + vec4<f32>(0.0, 1.0, 0.0, 0.0);
-
-    //++ // TODO: min of ... 
-    //++ copy_block_to_shared_temp(THREAD_COUNT * 2u);
-
-    //++ // copy_prefix_sum_to_temp();
-    //++ local_prefix_sum();
-
-    //++ store_block_to_global_temp(THREAD_COUNT * 2u);
-
-    //++ let shared_sum  = shared_prefix_sum[private_data.ai_bcf]; 
-    //++ let shared_sum2 = shared_prefix_sum[private_data.bi_bcf]; 
-
-    //++ base_position = base_position + vec4<f32>(0.0, 0.5, 0.0, 0.0);
-    //++ create_number(f32(shared_sum),   base_position); 
-    //++ create_number(f32(shared_sum2),  base_position + X_OFFSET); 
-
-    //++ base_position = base_position + vec4<f32>(0.0, 0.5, 0.0, 0.0);
-
-    // if (local_index == 0u) {
-
-    //     create_number(f32(local_exclusive_part), base_position);
-
-    // }
-    // Prefix sum
-
-    // reduce
-
     // STAGE 1.
     if (fmm_prefix_params.stage == 1u) {
 
         // 1a. This is done using multiple dispatches. This creates the 0,1 data (has band points) to shared_prefix_sum.
         // This could also be done using loop.
-        copy_block_to_shared_temp(THREAD_COUNT * 2u);
+        //copy_block_to_shared_temp(THREAD_COUNT * 2u);
+        copy_block_to_shared_temp();
 
         // 1b. Perform prefix sum on shared_temp for the previous data. Copies the exclusive part to the global array (temp_prefix_sum).   
         local_prefix_sum(work_group_id.x);
         
         // 1c. Save the prefix sum to global array (temp_prefix_sum).
-        store_block_to_global_temp(THREAD_COUNT * 2u);
+        store_block_to_global_temp();
     }
 
     // STAGE 2.

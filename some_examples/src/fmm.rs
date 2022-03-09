@@ -61,6 +61,7 @@ const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
 //const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>() / 4;
 
 const THREAD_COUNT: u32 = 64;
+//const PREFIX_THREAD_COUNT: u32 = 256;
 const PREFIX_THREAD_COUNT: u32 = 1024;
 
 #[repr(C)]
@@ -350,15 +351,6 @@ impl Application for Fmm {
             buffer_from_data::<FmmPrefixParams>(
             &configuration.device,
             &[fmm_prefix_params],
-//            &vec![FmmPrefixParams {
-//                data_start_index: 0,
-//                data_end_index: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32,
-//                exclusive_parts_start_index: exclusive_start,
-//                exclusive_parts_end_index: exclusive_end,
-//                temp_prefix_data_start_index: temp_prefix_start,
-//                temp_prefix_data_end_index: temp_prefix_end,
-//                stage: 1,
-//            }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -376,7 +368,7 @@ impl Application for Fmm {
         buffers.insert(
             "temp_prefix_sum".to_string(),
             configuration.device.create_buffer(&wgpu::BufferDescriptor{
-                label: Some("termp_prefix_sum buffer"),
+                label: Some("temp_prefix_sum buffer"),
                 size: (exclusive_end as usize * std::mem::size_of::<u32>()) as u64,
                 usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
@@ -391,8 +383,8 @@ impl Application for Fmm {
         // Create FMM blocks.
         for i in 0..FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z {
             let contains = magic_block_numbers.iter().any(|x| *x == i);  
-            let fmm_block = FmmBlock{index: i as u32, band_points_count: 0 , };
-            //let fmm_block = FmmBlock{index: i as u32, band_points_count: if contains { i as u32 } else {0} , };
+            //let fmm_block = FmmBlock{index: i as u32, band_points_count: 0 , };
+            let fmm_block = FmmBlock{index: i as u32, band_points_count: if contains { i as u32 } else {0} , };
             fmm_blocks.push(fmm_block);
             println!("{:?}", fmm_block); 
         }
@@ -563,23 +555,24 @@ impl Application for Fmm {
                             // @group(0) @binding(2) var<storage, read_write> temp_prefix_sum: array<u32>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
+                            // @group(0) @binding(3) var<storage,read_write> filtered_blocks: array<FmmBlock>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
+                            //debug // @group(0) @binding(4) var<storage, read_write> counter: array<atomic<u32>>;
+                            //debug create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE),
+                            //debug // @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
+                            //debug create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
-                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE),
+                            //debug // @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
+                            //debug create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
-                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE),
+                            //debug // @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
+                            //debug create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(8) var<storage,read_write> filtered_blocks: array<FmmBlock>;
-                            create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE),
+                            //debug // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            //debug create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE),
+
                         ],
                     ]
         );
@@ -594,12 +587,12 @@ impl Application for Fmm {
                          &buffers.get(&"fmm_prefix_params".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"temp_prefix_sum".to_string()).unwrap().as_entire_binding(),
-                         &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
                          &buffers.get(&"filtered_blocks".to_string()).unwrap().as_entire_binding(),
+                         //debug &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                         //debug &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                         //debug &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                         //debug &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                         //debug &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
                     ]
                 ]
         );
@@ -760,6 +753,10 @@ impl Application for Fmm {
             bytemuck::cast_slice(&[self.fmm_prefix_params])
         );
 
+        // How many dispatches.
+        let number_of_dispathces = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32 / (PREFIX_THREAD_COUNT * 2); 
+        println!("number_of_dispathces == {}", number_of_dispathces);
+
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
@@ -767,10 +764,7 @@ impl Application for Fmm {
         self.compute_object_fmm_prefix_scan.dispatch(
             &self.compute_bind_groups_fmm_prefix_scan,
             &mut encoder_command,
-            2, 1, 1,
-            //udiv_up_safe32(1, thread_count), 1, 1,
-            //udiv_up_safe32(2036, thread_count), 1, 1,
-            // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+            number_of_dispathces, 1, 1,
             Some("fmm prefix scan dispatch")
         );
 
@@ -824,6 +818,14 @@ impl Application for Fmm {
             0,
             (size_of::<FmmBlock>() * 128) as wgpu::BufferAddress
         );
+
+        // let result =  to_vec::<u32>(
+        //     &device,
+        //     &queue,
+        //     &self.buffers.get(&"temp_prefix_sum".to_string()).unwrap(),
+        //     0,
+        //     (size_of::<u32>() * 4608) as wgpu::BufferAddress
+        // );
 
         if self.once {
             for i in 0..128 {
