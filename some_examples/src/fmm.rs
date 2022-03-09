@@ -95,6 +95,7 @@ struct FmmPrefixParams {
     exclusive_parts_end_index: u32,
     temp_prefix_data_start_index: u32,
     temp_prefix_data_end_index: u32,
+    stage: u32,
 }
 
 impl_convert!{FmmCell}
@@ -139,6 +140,7 @@ struct Fmm {
     pub triangle_mesh_draw_count: u32,
     pub draw_triangle_mesh: bool,
     pub once: bool,
+    pub fmm_prefix_params: FmmPrefixParams, 
 }
 
 impl Fmm {
@@ -333,18 +335,30 @@ impl Application for Fmm {
         println!("exclusive_start == {}", exclusive_start);
         println!("exclusive_end == {}", exclusive_end);
 
-        buffers.insert(
-            "fmm_prefix_params".to_string(),
-            buffer_from_data::<FmmPrefixParams>(
-            &configuration.device,
-            &vec![FmmPrefixParams {
+        let fmm_prefix_params = FmmPrefixParams {
                 data_start_index: 0,
                 data_end_index: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32,
                 exclusive_parts_start_index: exclusive_start,
                 exclusive_parts_end_index: exclusive_end,
                 temp_prefix_data_start_index: temp_prefix_start,
                 temp_prefix_data_end_index: temp_prefix_end,
-            }],
+                stage: 1,
+        };
+
+        buffers.insert(
+            "fmm_prefix_params".to_string(),
+            buffer_from_data::<FmmPrefixParams>(
+            &configuration.device,
+            &[fmm_prefix_params],
+//            &vec![FmmPrefixParams {
+//                data_start_index: 0,
+//                data_end_index: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32,
+//                exclusive_parts_start_index: exclusive_start,
+//                exclusive_parts_end_index: exclusive_end,
+//                temp_prefix_data_start_index: temp_prefix_start,
+//                temp_prefix_data_end_index: temp_prefix_end,
+//                stage: 1,
+//            }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -593,6 +607,7 @@ impl Application for Fmm {
             triangle_mesh_draw_count: triangle_mesh_draw_count, 
             draw_triangle_mesh: false,
             once: once,
+            fmm_prefix_params: fmm_prefix_params,
         }
     }
 
@@ -722,17 +737,6 @@ impl Application for Fmm {
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
-        // queue.write_buffer(
-        //     &self.buffers.get(&"fmm_params".to_string()).unwrap(),
-        //     0,
-        //     bytemuck::cast_slice(&[FmmParams {
-        //                               fmm_global_dimension: [16, 16, 16],
-        //                               visualize: 0,
-        //                               fmm_inner_dimension: [4, 4, 4],
-        //                               //triangle_count: 1 }
-        //                               triangle_count: 2036 }
-        //     ]));
-
         // Compute interface.
         self.compute_object_fmm_prefix_scan.dispatch(
             &self.compute_bind_groups_fmm_prefix_scan,
@@ -746,6 +750,49 @@ impl Application for Fmm {
 
         queue.submit(Some(encoder_command.finish()));
 
+        self.fmm_prefix_params.stage = 2;
+
+        queue.write_buffer(
+            &self.buffers.get(&"fmm_prefix_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.fmm_prefix_params])
+        );
+
+        // Prefix sum.
+        let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
+
+        // Compute interface.
+        self.compute_object_fmm_prefix_scan.dispatch(
+            &self.compute_bind_groups_fmm_prefix_scan,
+            &mut encoder_command,
+            1, 1, 1,
+            Some("fmm prefix scan dispatch 2")
+        );
+
+        queue.submit(Some(encoder_command.finish()));
+
+        //++ self.fmm_prefix_params.stage = 3;
+
+        //++ queue.write_buffer(
+        //++     &self.buffers.get(&"fmm_prefix_params".to_string()).unwrap(),
+        //++     0,
+        //++     bytemuck::cast_slice(&[self.fmm_prefix_params])
+        //++ );
+
+        //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
+
+        //++ // Compute interface.
+        //++ self.compute_object_fmm_prefix_scan.dispatch(
+        //++     &self.compute_bind_groups_fmm_prefix_scan,
+        //++     &mut encoder_command,
+        //++     1, 1, 1,
+        //++     Some("fmm prefix scan dispatch 2")
+        //++ );
+
+        //++ queue.submit(Some(encoder_command.finish()));
+
+        self.fmm_prefix_params.stage = 1;
+
         let result =  to_vec::<u32>(
             &device,
             &queue,
@@ -753,6 +800,7 @@ impl Application for Fmm {
             0,
             (4 * 4098) as wgpu::BufferAddress
         );
+
         if self.once {
             for i in 0..4098 {
                 println!("{:?} == {:?}", i, result[i]);
