@@ -92,6 +92,10 @@ var<storage,read_write> output_aabb: array<AABB>;
 @binding(7)
 var<storage,read_write> output_aabb_wire: array<AABB>;
 
+@group(0)
+@binding(8)
+var<storage,read_write> filtered_blocks: array<FmmBlock>;
+
 // let THREAD_COUNT = 64u;
 // let SCAN_BLOCK_SIZE = 136; 
 // let X_OFFSET = vec4<f32>(64.0, 0.0, 0.0, 0.0);
@@ -185,9 +189,6 @@ fn copy_block_to_shared_temp(number_of_items: u32) {
 
     shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.ai < number_of_items && a.band_points_count > 0u);
     shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.bi < number_of_items && b.band_points_count > 0u);
-
-    //debug create_number(f32(shared_prefix_sum[private_data.ai_bcf]), base_position);
-    //debug create_number(f32(shared_prefix_sum[private_data.bi_bcf]), base_position + X_OFFSET);
 }
 
 fn copy_prefix_sum_to_temp() {
@@ -207,25 +208,6 @@ fn copy_exclusive_data_to_shared_aux() {
     // TODO: remove select.
     shared_aux[private_data.ai_bcf] = select(0u, data_a, private_data.ai < data_count);
     shared_aux[private_data.bi_bcf] = select(0u, data_b, private_data.bi < data_count);
-
-    //++ let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
-    //++ 
-    //++ // Do we need now for loop.
-    //++ for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
-
-    //++     let ai = private_data.ai + i * THREAD_COUNT * 2u; 
-    //++     let bi = private_data.bi + i * THREAD_COUNT * 2u; 
-    //++     let ai_bcf = ai + (ai >> 4u); 
-    //++     let bi_bcf = bi + (bi >> 4u); 
-    //++     
-    //++     // Are these conditions necessery?
-    //++     if (ai < data_count) {
-    //++         shared_aux[ai_bcf] = temp_prefix_sum[fmm_prefix_params.temp_prefix_data_start_index + ai];
-    //++     }
-    //++     if (bi < data_count) {
-    //++         shared_aux[bi_bcf] = temp_prefix_sum[fmm_prefix_params.temp_prefix_data_start_index + bi];
-    //++     }
-    //++ }
 }
 
 // Perform prefix sum for one dispatch.
@@ -368,6 +350,37 @@ fn sum_auxiliar() {
      }
 };
 
+// The stream_compaction_count must be solved before calling this function.
+fn gather_data() {
+
+    let data_count = fmm_prefix_params.data_end_index -
+                     fmm_prefix_params.data_start_index;
+
+    let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
+
+    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
+
+        let index_a = private_data.ai + i * THREAD_COUNT * 2u;
+        let index_b = private_data.bi + i * THREAD_COUNT * 2u;
+
+        let a = fmm_blocks[index_a];
+        let b = fmm_blocks[index_b];
+
+        let a_offset = temp_prefix_sum[index_a];
+        let b_offset = temp_prefix_sum[index_b];
+
+        let predicate_a = index_a < data_count && a.band_points_count > 0u;
+        let predicate_b = index_b < data_count && b.band_points_count > 0u;
+
+        if (predicate_a) {
+            filtered_blocks[a_offset] = a;
+        }
+        if (predicate_b) {
+            filtered_blocks[b_offset] = b;
+        }
+    }
+}
+
 @stage(compute)
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -462,19 +475,24 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
       // 2b. Perform prefix sum on shared_aux data.  
       local_prefix_sum_aux();
+      workgroupBarrier();
 
       sum_auxiliar();
-      if (local_index == 0u) {
-          // create_number(123.3, vec4<f32>(0.0, 0.0, 0.0, 0.0)); 
-          create_number(f32(stream_compaction_count), vec4<f32>(0.0, 0.0, 0.0, 0.0)); 
-      }
+      workgroupBarrier();
+
+      gather_data();
+
+      //if (local_index == 0u) {
+      //    // create_number(123.3, vec4<f32>(0.0, 0.0, 0.0, 0.0)); 
+      //    create_number(f32(stream_compaction_count), vec4<f32>(0.0, 0.0, 0.0, 0.0)); 
+      //}
     }
 
     // STAGE 3.
     // else if (fmm_prefix_params.stage == 3u) {
 
     //     // 3a. Sum the exclusive parts to the actual prefix sum.
-    //     sum_auxiliar();
+    //     // sum_auxiliar();
 
     //     // 3b. Gather the filtered data.
     // }
