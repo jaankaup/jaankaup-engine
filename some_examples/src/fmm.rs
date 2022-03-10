@@ -163,7 +163,7 @@ impl Application for Fmm {
         let gpu_timer = GpuTimer::init(
             &configuration.device,
             &configuration.queue,
-            2,
+            8,
             Some("gpu timer")
         );
 
@@ -773,7 +773,7 @@ impl Application for Fmm {
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
-        wgpu_timer_unwrapped.start(&mut encoder_command, 0);
+        wgpu_timer_unwrapped.start(&mut encoder_command);
 
         // Compute interface.
         self.compute_object_fmm_prefix_scan.dispatch(
@@ -783,14 +783,18 @@ impl Application for Fmm {
             Some("fmm prefix scan dispatch")
         );
 
-        wgpu_timer_unwrapped.end(&mut encoder_command, 0);
-        wgpu_timer_unwrapped.start(&mut encoder_command, 1);
-        wgpu_timer_unwrapped.end(&mut encoder_command, 1);
+        wgpu_timer_unwrapped.end(&mut encoder_command);
+        // wgpu_timer_unwrapped.start(&mut encoder_command);
+        // wgpu_timer_unwrapped.end(&mut encoder_command);
+        // wgpu_timer_unwrapped.start(&mut encoder_command);
+        // wgpu_timer_unwrapped.end(&mut encoder_command);
+
         wgpu_timer_unwrapped.resolve_timestamps(&mut encoder_command);
 
         queue.submit(Some(encoder_command.finish()));
 
         self.fmm_prefix_params.stage = 2;
+
 
         queue.write_buffer(
             &self.buffers.get(&"fmm_prefix_params".to_string()).unwrap(),
@@ -798,9 +802,11 @@ impl Application for Fmm {
             bytemuck::cast_slice(&[self.fmm_prefix_params])
         );
 
+
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
+        wgpu_timer_unwrapped.start(&mut encoder_command);
 
         // Compute interface.
         self.compute_object_fmm_prefix_scan.dispatch(
@@ -810,12 +816,16 @@ impl Application for Fmm {
             Some("fmm prefix scan dispatch 2")
         );
 
+        wgpu_timer_unwrapped.end(&mut encoder_command);
+        wgpu_timer_unwrapped.resolve_timestamps(&mut encoder_command);
 
         queue.submit(Some(encoder_command.finish()));
 
         wgpu_timer_unwrapped.create_timestamp_data(&device, &queue);
 
         wgpu_timer_unwrapped.print_data();
+
+        wgpu_timer_unwrapped.reset();
         // let gpu_timer_result = wgpu_timer_unwrapped.get_data(); 
 
         // println!("{:?}", gpu_timer_result);
