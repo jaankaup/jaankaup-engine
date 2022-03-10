@@ -815,9 +815,10 @@ impl Application for Fmm {
 
         wgpu_timer_unwrapped.create_timestamp_data(&device, &queue);
 
-        let gpu_timer_result = wgpu_timer_unwrapped.get_data(); 
+        wgpu_timer_unwrapped.print_data();
+        // let gpu_timer_result = wgpu_timer_unwrapped.get_data(); 
 
-        println!("{:?}", gpu_timer_result);
+        // println!("{:?}", gpu_timer_result);
         //++ self.fmm_prefix_params.stage = 3;
 
         //++ queue.write_buffer(

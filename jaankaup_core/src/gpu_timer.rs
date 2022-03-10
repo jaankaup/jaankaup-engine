@@ -125,4 +125,15 @@ impl GpuTimer {
     pub fn get_data(&self) -> Vec<TimestampData> {
         self.data.clone()
     }
+
+    pub fn print_data(&self) {
+
+        for (i, elem) in self.data.iter().enumerate() {
+            let nanoseconds =
+                (elem.end - elem.start) as f32 * self.timestamp_period;
+            let microseconds = nanoseconds / 1000.0;
+            let milli = microseconds / 1000.0;
+            println!("{:?} time is {:?} milli seconds.", i, milli);
+        }
+    }
 }
