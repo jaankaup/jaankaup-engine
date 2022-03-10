@@ -23,6 +23,7 @@ use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::histogram::Histogram;
 use jaankaup_core::impl_convert;
+use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::common_functions::{
     encode_rgba_u32,
     udiv_up_safe32,
@@ -107,7 +108,8 @@ struct FmmFeatures {}
 
 impl WGPUFeatures for FmmFeatures {
     fn optional_features() -> wgpu::Features {
-        wgpu::Features::empty()
+        wgpu::Features::TIMESTAMP_QUERY
+        // wgpu::Features::empty()
     }
     fn required_features() -> wgpu::Features {
         wgpu::Features::empty()
@@ -142,6 +144,7 @@ struct Fmm {
     pub draw_triangle_mesh: bool,
     pub once: bool,
     pub fmm_prefix_params: FmmPrefixParams, 
+    pub gpu_timer: Option<GpuTimer>,
 }
 
 impl Fmm {
@@ -156,6 +159,13 @@ impl Application for Fmm {
         log::info!("Adapter limits are: ");
 
         let once = true;
+
+        let gpu_timer = GpuTimer::init(
+            &configuration.device,
+            &configuration.queue,
+            2,
+            Some("gpu timer")
+        );
 
         let adapter_limits = configuration.adapter.limits(); 
 
@@ -619,6 +629,7 @@ impl Application for Fmm {
             draw_triangle_mesh: false,
             once: once,
             fmm_prefix_params: fmm_prefix_params,
+            gpu_timer: gpu_timer,
         }
     }
 
@@ -757,8 +768,12 @@ impl Application for Fmm {
         let number_of_dispathces = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32 / (PREFIX_THREAD_COUNT * 2); 
         println!("number_of_dispathces == {}", number_of_dispathces);
 
+        let wgpu_timer_unwrapped = self.gpu_timer.as_mut().unwrap();
+
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
+
+        wgpu_timer_unwrapped.start(&mut encoder_command, 0);
 
         // Compute interface.
         self.compute_object_fmm_prefix_scan.dispatch(
@@ -767,6 +782,11 @@ impl Application for Fmm {
             number_of_dispathces, 1, 1,
             Some("fmm prefix scan dispatch")
         );
+
+        wgpu_timer_unwrapped.end(&mut encoder_command, 0);
+        wgpu_timer_unwrapped.start(&mut encoder_command, 1);
+        wgpu_timer_unwrapped.end(&mut encoder_command, 1);
+        wgpu_timer_unwrapped.resolve_timestamps(&mut encoder_command);
 
         queue.submit(Some(encoder_command.finish()));
 
@@ -781,6 +801,7 @@ impl Application for Fmm {
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
+
         // Compute interface.
         self.compute_object_fmm_prefix_scan.dispatch(
             &self.compute_bind_groups_fmm_prefix_scan,
@@ -789,8 +810,14 @@ impl Application for Fmm {
             Some("fmm prefix scan dispatch 2")
         );
 
+
         queue.submit(Some(encoder_command.finish()));
 
+        wgpu_timer_unwrapped.create_timestamp_data(&device, &queue);
+
+        let gpu_timer_result = wgpu_timer_unwrapped.get_data(); 
+
+        println!("{:?}", gpu_timer_result);
         //++ self.fmm_prefix_params.stage = 3;
 
         //++ queue.write_buffer(
