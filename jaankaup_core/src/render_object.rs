@@ -1,3 +1,5 @@
+use crate::impl_convert;
+use crate::misc::Convert2Vec;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::RenderEncoder;
 use core::ops::Range;
@@ -11,6 +13,8 @@ pub struct DrawIndirect {
     pub base_vertex: u32, // The Index of the first vertex to draw.
     pub base_instance: u32, // The instance ID of the first instance to draw.
 }
+
+impl_convert!{DrawIndirect}
 
 pub struct ComputeObject {
     pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,

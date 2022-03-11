@@ -1,7 +1,8 @@
 struct NoiseParams {
     global_dim: vec3<u32>;
+    time: f32;
     local_dim: vec3<u32>;
-    time: u32;
+    value: f32;
 };
 
 struct Output {
@@ -313,8 +314,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let offset = 256u;
 
-    let noise_velocity = 2.4;
-    let wave_height_factor = 0.2;
+    let noise_velocity = 2.4 + noise_params.time;
+    let wave_height_factor = noise_params.value;
 
     let actual_global_id = local_id.x + offset * 4u * work_group_id.x; 
 
@@ -328,9 +329,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let ball2 = pow(c2.x - scene_center.x, 2.0) + pow(c2.y - scene_center.y, 2.0) + pow(c2.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
     let ball3 = pow(c3.x - scene_center.x, 2.0) + pow(c3.y - scene_center.y, 2.0) + pow(c3.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
  
-    noise_output.output[actual_global_id]               = ball0 + cnoise(c0 * 0.2) * 1300.0;
-    noise_output.output[actual_global_id + offset]      = ball1 + cnoise(c1 * 0.2) * 1300.0;
-    noise_output.output[actual_global_id + offset * 2u] = ball2 + cnoise(c2 * 0.2) * 1300.0;
-    noise_output.output[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2) * 1300.0;
+    noise_output.output[actual_global_id]               = ball0 + cnoise(c0 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+    noise_output.output[actual_global_id + offset]      = ball1 + cnoise(c1 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+    noise_output.output[actual_global_id + offset * 2u] = ball2 + cnoise(c2 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+    noise_output.output[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
 }
 

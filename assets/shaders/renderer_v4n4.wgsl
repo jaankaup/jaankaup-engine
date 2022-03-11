@@ -90,16 +90,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         specular_coeffient = pow(cosAngle, material_shininess);
     }
 
-    var offset_factor: f32 = 1.5;
+    var offset_factor: f32 = 0.05;
     
     var coord1: vec2<f32> = in.pos.xy*offset_factor;
     var coord2: vec2<f32> = in.pos.xz*offset_factor;
     var coord3: vec2<f32> = in.pos.yz*offset_factor + in.pos.xz*offset_factor*offset_factor;
     
+    var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord3) / 1.0).xyz;
+    var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2) / 1.0).xyz;
     // var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord2 + coord3) / 3.0).xyz;
     // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 + coord3) / 3.0).xyz;
-    var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, 0.5 * offset_factor * (sin(coord1) + cos(coord2) + coord3) / 3.0).xyz;
-    var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 0.5 * (cos(coord1) + sin(coord2) + coord3) / 3.0).xyz;
+    // var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, 0.5 * offset_factor * (sin(coord1) + cos(coord2) + coord3) / 3.0).xyz;
+    // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 0.5 * (cos(coord1) + sin(coord2) + coord3) / 3.0).xyz;
     var surface_color: vec3<f32> = mix(
         surfaceColor_rock, surfaceColor_grass,
         vec3<f32>(clamp(0.4*in.nor.x + 0.6*in.nor.y, 0.0, 1.0)));

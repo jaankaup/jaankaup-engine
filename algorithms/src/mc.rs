@@ -123,9 +123,35 @@ impl MarchingCubes {
     pub fn get_counter_value(&self, device:&wgpu::Device, queue: &wgpu::Queue) -> u32 {
         self.buffer_counter.get_values(device, queue)[0]
     }
-
+    pub fn get_draw_indirect_buffer(&self) -> &wgpu::Buffer {
+        &self.indirect_buffer
+    }
     pub fn reset_counter_value(&self, device: &wgpu::Device, queue: &wgpu::Queue) {
         self.buffer_counter.set_values_cpu_version(queue, &vec![0]);
+        
+        queue.write_buffer(
+            &self.indirect_buffer,
+            0,
+            bytemuck::cast_slice(&[
+                DrawIndirect {
+                    vertex_count: 0,
+                    instance_count: 1,
+                    base_vertex: 0,
+                    base_instance: 0,
+                }
+            ])
+        );
+    }
+
+    pub fn update_mc_params(&mut self, queue: &wgpu::Queue, isovalue: f32) {
+
+        self.mc_params.isovalue = isovalue;
+
+        queue.write_buffer(
+            &self.mc_params_buffer,
+            0,
+            bytemuck::cast_slice(&[self.mc_params ])
+        );
     }
 
     pub fn init_with_noise_buffer(device: &wgpu::Device,
@@ -141,7 +167,7 @@ impl MarchingCubes {
         let indirect_data =  
             DrawIndirect {
                 vertex_count: 0,
-                instance_count: 0,
+                instance_count: 1,
                 base_vertex: 0,
                 base_instance: 0,
             };
@@ -150,7 +176,11 @@ impl MarchingCubes {
             buffer_from_data::<DrawIndirect>(
             &device,
             &[indirect_data],
-            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
+            wgpu::BufferUsages::VERTEX |
+            wgpu::BufferUsages::COPY_SRC |
+            wgpu::BufferUsages::COPY_DST |
+            wgpu::BufferUsages::STORAGE |
+            wgpu::BufferUsages::INDIRECT,
             None
         );
 
@@ -164,7 +194,7 @@ impl MarchingCubes {
                             // @group(0) @binding(0) var<uniform> mc_uniform: McParams;
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(1) var<storage, read_write> indirect: array<atomic<DrawIndirect>>;
+                            // @group(0) @binding(1) var<storage, read_write> indirect: array<DrawIndirect>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(2) var<storage, read_write> counter: atomic<u32>;

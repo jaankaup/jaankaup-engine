@@ -7,10 +7,10 @@ use jaankaup_core::template::{
         Application,
         BasicLoop,
 };
-use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
+use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups, draw, draw_indirect, DrawIndirect};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
-use jaankaup_core::buffer::{buffer_from_data};
+use jaankaup_core::buffer::{buffer_from_data}; //, to_vec};
 use jaankaup_core::wgpu;
 use jaankaup_core::winit;
 use jaankaup_core::log;
@@ -54,10 +54,10 @@ const THREAD_COUNT: u32 = 64;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct NoiseParams {
-    global_dim: [u32; 4],
-    local_dim: [u32; 4],
-    time: u32,
-    _pad: [u32; 3],
+    global_dim: [u32; 3],
+    time: f32,
+    local_dim: [u32; 3],
+    value: f32,
 }
 
 struct McAppFeatures {}
@@ -87,8 +87,8 @@ struct McApp {
     pub textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
-    pub histogram: Histogram,
-    pub draw_count: u32,
+    //pub histogram: Histogram,
+    // pub draw_count: u32,
     // pub visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
     pub marching_cubes: MarchingCubes,
@@ -104,21 +104,21 @@ impl McApp {
             &configuration.device,
             &configuration.sc_desc,
             1,
-            &include_bytes!("../../assets/textures/grass2.png")[..],
+            &include_bytes!("../../assets/textures/slime.png")[..],
             None);
         let rock_texture = Texture::create_from_bytes(
             &configuration.queue,
             &configuration.device,
             &configuration.sc_desc,
             1,
-            &include_bytes!("../../assets/textures/rock.png")[..],
+            &include_bytes!("../../assets/textures/slime2.png")[..],
             None);
         let slime_texture = Texture::create_from_bytes(
             &configuration.queue,
             &configuration.device,
             &configuration.sc_desc,
             1,
-            &include_bytes!("../../assets/textures/lava.png")[..],
+            &include_bytes!("../../assets/textures/xXqQP0.png")[..],
             //&include_bytes!("../../assets/textures/slime.png")[..],
             None);
         let slime_texture2 = Texture::create_from_bytes(
@@ -251,10 +251,10 @@ impl Application for McApp {
         println!("Creating compute object.");
 
         let noise_params = NoiseParams {
-            global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION, 0],
-            local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION, 0],
-            time: 123,
-            _pad: [0,0,0],
+            global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
+            time: 0.0,
+            local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
+            value: 0.0,
         };
 
         buffers.insert(
@@ -325,7 +325,7 @@ impl Application for McApp {
 
         println!("creating noise compute object");
 
-        let histogram = Histogram::init(&configuration.device, &vec![0; 1]);
+        // let histogram = Histogram::init(&configuration.device, &vec![0; 1]);
 
         let noise_compute_object =
                 ComputeObject::init(
@@ -390,8 +390,8 @@ impl Application for McApp {
             textures: textures,
             buffers: buffers,
             camera: camera,
-            histogram: histogram,
-            draw_count: 0,
+            // histogram: histogram,
+            // draw_count: 0,
             // visualization_params: params,
             keys: keys,
             marching_cubes: mc_instance,
@@ -417,17 +417,37 @@ impl Application for McApp {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
 
-        draw(&mut encoder,
+        // draw(&mut encoder,
+        //      &view,
+        //      self.screen.depth_texture.as_ref().unwrap(),
+        //      &self.render_bind_groups,
+        //      &self.render_object.pipeline,
+        //      &self.buffers.get("mc_output").unwrap(),
+        //      0..self.draw_count, 
+        //      clear
+        // );
+        //
+        // let result =  to_vec::<DrawIndirect>(
+        //     &device,
+        //     &queue,
+        //     self.marching_cubes.get_draw_indirect_buffer(),
+        //     0,
+        //     (size_of::<DrawIndirect>()) as wgpu::BufferAddress
+        // );
+
+        // println!("{:?}", result);
+        draw_indirect(
+             &mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
              &self.render_bind_groups,
              &self.render_object.pipeline,
              &self.buffers.get("mc_output").unwrap(),
-             0..self.draw_count, 
+             self.marching_cubes.get_draw_indirect_buffer(),
              clear
         );
         queue.submit(Some(encoder.finish()));
-        self.histogram.set_values_cpu_version(queue, &vec![0]);
+        // self.histogram.set_values_cpu_version(queue, &vec![0]);
 
         self.screen.prepare_for_rendering();
 
@@ -448,7 +468,25 @@ impl Application for McApp {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
 
-        if !self.update { return; }
+        // if !self.update { return; }
+
+        let val = (((input.get_time() / 5000000) as f32) * 0.0015).sin() * 500.0;
+        let val2 = (((input.get_time() / 5000000) as f32) * 0.0015).cos() * 1.0;
+
+        let noise_params = NoiseParams {
+            global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
+            time: (input.get_time() / 5000000) as f32,
+            local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
+            value: val2,
+        };
+
+        queue.write_buffer(
+            &self.buffers.get(&("noise_params".to_string())).unwrap(),
+            0,
+            bytemuck::cast_slice(&[noise_params])
+        );
+    
+        self.marching_cubes.update_mc_params(queue, val);    
 
         let total_grid_count = GLOBAL_NOISE_X_DIMENSION *
                                GLOBAL_NOISE_Y_DIMENSION * 
@@ -470,9 +508,9 @@ impl Application for McApp {
         // Submit compute.
         queue.submit(Some(encoder_command.finish()));
 
-        self.draw_count = self.marching_cubes.get_counter_value(device, queue);
+        // self.draw_count = self.marching_cubes.get_counter_value(device, queue);
 
-        self.update = false;
+        // self.update = false;
 
         // let counter = self.histogram.get_values(device, queue);
         // self.draw_count = counter[0] * 3;

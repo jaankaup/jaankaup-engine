@@ -463,7 +463,7 @@ fn calculate_density(v: vec3<i32>) -> f32 {
         v.z < 0 ||
         v.x >= i32(mc_uniform.noise_local_dimension.x) ||
         v.y >= i32(mc_uniform.noise_local_dimension.y) ||
-        v.z >= i32(mc_uniform.noise_local_dimension.z)) { return 0.0; }
+        v.z >= i32(mc_uniform.noise_local_dimension.z)) { return 10000.0; }
 
     // if (encode3Dmorton32(u32(v.x), u32(v.y), u32(v.z)) > 64u*64u*64u) { return 0.0; }
 
@@ -667,7 +667,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         if (base_index != 16777215u) { 
 
-            let index = atomicAdd(&counter[0], 3u);
+            //let index = atomicAdd(&counter[0], 3u);
+            let index = atomicAdd(&indirect[0].vertex_count, 3u);
 
             // Create the triangle vertices and normals.
             createVertex(i32((base_index & 0xff0000u) >> 16u), i32(index));
