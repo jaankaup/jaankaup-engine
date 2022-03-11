@@ -13,7 +13,17 @@ use crate::common_functions::{
 };
 use crate::buffer::{buffer_from_data};
 use crate::camera::Camera;
+
 use crate::histogram::Histogram;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct DrawIndirect {
+    vertex_count: u32, // The number of vertices to draw.
+    instance_count: u32, // The number of instances to draw.
+    base_vertex: u32, // The Index of the first vertex to draw.
+    base_instance: u32, // The instance ID of the first instance to draw.
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -135,6 +145,17 @@ impl GpuDebugger {
         ////////////////////////////////////////////////////
         ////                 BUFFERS                    ////
         ////////////////////////////////////////////////////
+
+        buffers.insert(
+            "indirect_buffer".to_string(),
+            device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("indirect buffer"), // YHYY
+                size: (max_number_of_arrows * std::mem::size_of::<Arrow>() as u32) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+            )
+        );
 
         buffers.insert(
             "output_arrows".to_string(),
@@ -402,6 +423,7 @@ impl GpuDebugger {
         &self.histogram_element_counter.get_histogram_buffer() 
     }
 
+    // draw indirect! Reduce finish() calls.
     pub fn render(&mut self,
                   device: &wgpu::Device,
                   queue: &wgpu::Queue,

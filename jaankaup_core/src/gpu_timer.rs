@@ -1,6 +1,5 @@
 use std::ops::Add;
 use std::mem::size_of;
-// use std::collections::HashMap;
 use crate::impl_convert;
 use crate::misc::Convert2Vec;
 use bytemuck::{Pod, Zeroable};
@@ -22,7 +21,6 @@ pub struct GpuTimer {
     timestamp_period: f32,
     query_buffer: wgpu::Buffer,
     max_number_of_time_stamps: u32,
-    // query_hash_table: HashMap<u32, (bool, bool)>,
     start_count: u32,
     end_count: u32,
     data: Vec<TimestampData>,
@@ -57,7 +55,6 @@ impl GpuTimer {
 
                 let timestamp_period = queue.get_timestamp_period();
 
-                //println!("mem::size_of::<QueryData>() == {}", mem::size_of::<QueryData>());
                 // TODO: Try to implement buffer reading without 'wgpu::BufferUsages::COPY_SRC'
                 let query_buffer = device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("Query buffer"),
