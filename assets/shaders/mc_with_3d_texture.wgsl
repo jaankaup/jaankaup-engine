@@ -18,20 +18,31 @@ struct Cube {
     normals:  array<vec4<f32>, 8>;
 };
 
+struct DrawIndirect {
+    vertex_count: atomic<u32>; // The number of vertices to draw.
+    instance_count: u32; // The number of instances to draw.
+    base_vertex: u32; // The Index of the first vertex to draw.
+    base_instance: u32; // The instance ID of the first instance to draw.
+};
+
 @group(0)
 @binding(0)
 var<uniform> mc_uniform: McParams;
 
 @group(0)
 @binding(1)
-var<storage, read_write> counter: array<atomic<u32>>; // atomic<32> doesn't work!
+var<storage, read_write> indirect: array<DrawIndirect>;
 
 @group(0)
 @binding(2)
-var<storage, read> noise_values: array<f32>;
+var<storage, read_write> counter: array<atomic<u32>>; // atomic<32> doesn't work!
 
 @group(0)
 @binding(3)
+var<storage, read> noise_values: array<f32>;
+
+@group(0)
+@binding(4)
 var<storage, read_write> output: array<Vertex>;
 
 var<private> cube: Cube;

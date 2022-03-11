@@ -164,15 +164,17 @@ impl MarchingCubes {
                             // @group(0) @binding(0) var<uniform> mc_uniform: McParams;
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(1) var<storage, read_write> counter: atomic<u32>;
+                            // @group(0) @binding(1) var<storage, read_write> indirect: array<atomic<DrawIndirect>>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // READ_ONLY == true
-                            // @group(0) @binding(2) var<storage, write> noise_values: array<Vertex>;
-                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, true),
+                            // @group(0) @binding(2) var<storage, read_write> counter: atomic<u32>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage, write> output: array<Vertex>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(3) var<storage, write> noise_values: array<Vertex>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, true),
+
+                            // @group(0) @binding(4) var<storage, write> output: array<Vertex>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
@@ -191,6 +193,7 @@ impl MarchingCubes {
                 &vec![
                     vec![
                          &mc_params_buffer.as_entire_binding(),
+                         &indirect_buffer.as_entire_binding(),
                          &histogram.get_histogram_buffer().as_entire_binding(),
                          &noise_buffer.as_entire_binding(),
                          &output_buffer.as_entire_binding()
