@@ -260,12 +260,12 @@ pub fn create_uniform_bindgroup_layout(binding_index: u32, visibility: wgpu::Sha
     }
 }
 
-pub fn create_buffer_bindgroup_layout(binding_index: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
+pub fn create_buffer_bindgroup_layout(binding_index: u32, visibility: wgpu::ShaderStages, read_only: bool) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding: binding_index,
         visibility: visibility,
         ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Storage { read_only: false },
+            ty: wgpu::BufferBindingType::Storage { read_only: read_only },
             has_dynamic_offset: false,
             min_binding_size: None,
         },

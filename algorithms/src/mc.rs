@@ -1,8 +1,12 @@
 use jaankaup_core::wgpu;
 use bytemuck::{Zeroable, Pod};
 use jaankaup_core::buffer::buffer_from_data;
-use jaankaup_core::render_object::{ComputeObject, create_bind_groups};
+use jaankaup_core::render_object::{ComputeObject, create_bind_groups, DrawIndirect};
 use jaankaup_core::histogram::Histogram;
+use jaankaup_core::common_functions::{
+    create_uniform_bindgroup_layout,
+    create_buffer_bindgroup_layout
+};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -110,6 +114,7 @@ pub struct MarchingCubes {
     mc_params: McParams,
     mc_params_buffer: wgpu::Buffer,
     buffer_counter: Histogram,
+    indirect_buffer: wgpu::Buffer,
     bind_groups: Vec<wgpu::BindGroup>,
 }
 
@@ -132,6 +137,23 @@ impl MarchingCubes {
 
         let histogram = Histogram::init(device, &vec![0]);
 
+        // Initialize the draw indirect data.
+        let indirect_data =  
+            DrawIndirect {
+                vertex_count: 0,
+                instance_count: 0,
+                base_vertex: 0,
+                base_instance: 0,
+            };
+
+        let indirect_buffer = 
+            buffer_from_data::<DrawIndirect>(
+            &device,
+            &[indirect_data],
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
+            None
+        );
+
         let compute_object =
                 ComputeObject::init(
                     &device,
@@ -139,58 +161,18 @@ impl MarchingCubes {
                     Some("Marching cubes Compute object"), // TODO: from parameter
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> mc_uniform: McParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> counter: atomic<u32>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, write> noise_values: array<Vertex>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage, write> output: array<Vertex>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> mc_uniform: McParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> counter: atomic<u32>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // READ_ONLY == true
+                            // @group(0) @binding(2) var<storage, write> noise_values: array<Vertex>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, true),
+
+                            // @group(0) @binding(3) var<storage, write> output: array<Vertex>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
@@ -221,6 +203,7 @@ impl MarchingCubes {
             mc_params: *mc_params,
             mc_params_buffer: mc_params_buffer,
             buffer_counter: histogram,
+            indirect_buffer: indirect_buffer,
             bind_groups: bind_groups,
         }
     }

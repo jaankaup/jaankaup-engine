@@ -18,15 +18,6 @@ use crate::histogram::Histogram;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct DrawIndirect {
-    vertex_count: u32, // The number of vertices to draw.
-    instance_count: u32, // The number of instances to draw.
-    base_vertex: u32, // The Index of the first vertex to draw.
-    base_instance: u32, // The instance ID of the first instance to draw.
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Vertex {
     v: [f32; 4],
     n: [f32; 4],
@@ -313,13 +304,13 @@ impl GpuDebugger {
                             create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
 
                             // @group(0) @binding(2) var<storage, read_write> counter: Counter;
-                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(3) var<storage, read> counter: array<Arrow>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(4) var<storage,read_write> output: array<VertexBuffer>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
@@ -359,19 +350,19 @@ impl GpuDebugger {
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
                             // @group(0) @binding(1) var<storage, read_write> counter: Counter;
-                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(2) var<storage, read> counter: array<Arrow>;
-                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(3) var<storage, read_write> aabbs: array<AABB>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(4) var<storage, read_write> aabb_wires: array<AABB>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(5) var<storage,read_write> output: array<Triangle>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
