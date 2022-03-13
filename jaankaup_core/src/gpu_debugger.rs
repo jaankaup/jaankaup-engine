@@ -1,6 +1,6 @@
 use crate::texture::Texture;
 use std::mem::size_of;
-use crate::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
+use crate::render_object::{RenderObject, ComputeObject, create_bind_groups,draw, draw_indirect, DrawIndirect};
 use std::borrow::Cow;
 use crate::misc::Convert2Vec;
 use crate::impl_convert;
@@ -56,7 +56,7 @@ struct Char {
     font_size: f32,
     vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32,
-    z_offset: f32,
+    draw_index: u32,
 }
 
 #[repr(C)]
@@ -68,8 +68,18 @@ struct ArrowAabbParams{
     element_type: u32, // 0 :: array, 1 :: aabb, 2 :: aabb wire
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct CharParams{
+    iterator_start: u32,
+    itreator_end: u32,
+    number_of_threads: u32,
+    draw_index: u32, 
+}
+
 impl_convert!{Arrow}
 impl_convert!{Char}
+impl_convert!{CharParams}
 
 pub struct GpuDebugger {
     render_object_vvvvnnnn: RenderObject, 
@@ -80,6 +90,8 @@ pub struct GpuDebugger {
     compute_bind_groups_char: Vec<wgpu::BindGroup>,
     compute_object_arrow: ComputeObject, 
     compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
+    compute_object_char_preprocessor: ComputeObject, 
+    compute_bind_groups_char_preprocessor: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     arrow_aabb_params: ArrowAabbParams,
     histogram_draw_counts: Histogram,
@@ -139,13 +151,22 @@ impl GpuDebugger {
 
         buffers.insert(
             "indirect_buffer".to_string(),
-            device.create_buffer(&wgpu::BufferDescriptor{
-                label: Some("indirect buffer"), // YHYY
-                size: (max_number_of_arrows * std::mem::size_of::<Arrow>() as u32) as u64,
-                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-                }
-            )
+                buffer_from_data::<DrawIndirect>(
+                    &device,
+                    &vec![DrawIndirect{ vertex_count: 0, instance_count: 1, base_vertex: 0, base_instance: 0, } ; 64],
+                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDIRECT,
+                    None
+                )
+        );
+
+        buffers.insert(
+            "char_params".to_string(),
+                buffer_from_data::<CharParams>(
+                    &device,
+                    &vec![CharParams{ iterator_start: 0, itreator_end: 0, number_of_threads: 256, draw_index: 0, }],
+                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    None
+                )
         );
 
         buffers.insert(
@@ -280,7 +301,6 @@ impl GpuDebugger {
                                      ]
         );
 
-
         ////////////////////////////////////////////////////
         ////                 Compute char               ////
         ////////////////////////////////////////////////////
@@ -294,7 +314,7 @@ impl GpuDebugger {
                             Cow::Borrowed(include_str!("../../assets/shaders/numbers.wgsl"))),
                     
                     }),
-                    Some("Visualizer Compute object"),
+                    Some("Numbers Compute object"),
                     &vec![
                         vec![
                             // @group(0) @binding(0) var<uniform> camerauniform: Camera;
@@ -303,7 +323,9 @@ impl GpuDebugger {
                             // @group(0) @binding(1) var<uniform> arrow_aabb_params: VisualizationParams;
                             create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(2) var<storage, read_write> counter: Counter;
+                            // // @group(0) @binding(2) var<storage, read_write> counter: Counter;
+                            // create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(2) var<storage, read_write> indirec: array<DrawIndirect>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(3) var<storage, read> counter: array<Arrow>;
@@ -323,12 +345,60 @@ impl GpuDebugger {
                                           vec![
                                               &camera_buffer.as_entire_binding(),
                                               &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
-                                              &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
+                                              &buffers.get(&"indirect_buffer".to_string()).unwrap().as_entire_binding(),
+                                              // &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                                               &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
                                       ]
         );
+
+        ////////////////////////////////////////////////////
+        ////                 Char preprocessor          ////
+        ////////////////////////////////////////////////////
+
+        let compute_object_char_preprocessor =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("char_preprocessor.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/char_preprocessor.wgsl"))),
+                    
+                    }),
+                    Some("Char preprocessor Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> camera: Camera;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> char_params: array<CharParams>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage, read_write> indirect: array<DrawIndirect>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage,read_write> chars_array: array<Char>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ]
+        );
+
+        let compute_bind_groups_char_preprocessor =
+                create_bind_groups(
+                    &device,
+                    &compute_object_char_preprocessor.bind_group_layout_entries,
+                    &compute_object_char_preprocessor.bind_group_layouts,
+                    &vec![
+                        vec![
+                            &camera_buffer.as_entire_binding(),
+                            &buffers.get(&"char_params".to_string()).unwrap().as_entire_binding(),
+                            &buffers.get(&"indirect_buffer".to_string()).unwrap().as_entire_binding(),
+                            &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
+                        ]
+                    ]
+        );
+
 
         ////////////////////////////////////////////////////
         ////               Compute arrow/aabb           ////
@@ -392,6 +462,8 @@ impl GpuDebugger {
             compute_bind_groups_char: compute_bind_groups_char,
             compute_object_arrow: compute_object_arrow, 
             compute_bind_groups_arrow: compute_bind_groups_arrow,
+            compute_object_char_preprocessor: compute_object_char_preprocessor, 
+            compute_bind_groups_char_preprocessor: compute_bind_groups_char_preprocessor,
             buffers: buffers,
             arrow_aabb_params: arrow_aabb_params,
             histogram_draw_counts: histogram_draw_counts,
@@ -425,7 +497,6 @@ impl GpuDebugger {
         // Get the total number of elements.
         let elem_counter = self.histogram_element_counter.get_values(device, queue);
 
-        let number_of_chars = elem_counter[0];
         let total_number_of_arrows = elem_counter[1];
         let total_number_of_aabbs = elem_counter[2];
         let total_number_of_aabb_wires = elem_counter[3];
@@ -536,7 +607,12 @@ impl GpuDebugger {
         //// DRAW CHARS
 
         // Update Visualization params for arrows.
+
+
+        // TODO:
           
+        let number_of_chars = elem_counter[0];
+
         self.arrow_aabb_params.iterator_start_index = 0;
         self.arrow_aabb_params.iterator_end_index = number_of_chars;
         self.arrow_aabb_params.element_type = 0;
@@ -554,9 +630,9 @@ impl GpuDebugger {
 
         let mut current_char_index = 0;
 
-        let mut ccc = -1;
+        // let mut ccc = -1;
         loop { 
-            ccc = ccc + 1;
+            // ccc = ccc + 1;
 
             let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
 

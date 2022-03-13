@@ -57,13 +57,20 @@ struct Char {
     font_size: f32;
     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32;
-    z_offset: f32;
+    draw_index: u32;
 };
 
 // A struct for errors.
 // vertex_overflow: 0 :: OK, n :: amount of overflow.
 struct Errors {
     vertex_buffer_overflow: u32;
+};
+
+struct DrawIndirect {
+    vertex_count: atomic<u32>;
+    instance_count: u32;
+    base_vertex: u32;
+    base_instance: u32;
 };
 
 @group(0)
@@ -74,9 +81,12 @@ var<uniform> camera: Camera;
 @binding(1)
 var<uniform> params: ArrowAabbParams;
 
+// @group(0)
+// @binding(2)
+// var<storage, read_write> counter: array<atomic<u32>>;
 @group(0)
 @binding(2)
-var<storage, read_write> counter: array<atomic<u32>>;
+var<storage, read_write> indirect: array<DrawIndirect>;
 
 @group(0)
 @binding(3)
@@ -503,10 +513,12 @@ fn create_char(char_index: u32,
         if (local_index == 0u) {
 
             // The start position for storing the vertices.
-            let start_index: u32 = atomicAdd(&counter[0], count);
+            //let start_index: u32 = atomicAdd(&counter[0], count);
+            let start_index: u32 = atomicAdd(&indirect[0].vertex_count, count);
 
+            // TODO: this doesn't work.
             if (start_index + count >= params.max_number_of_vertices) {
-                atomicMax(&counter[1], private_params.this_id); //workgroup_params.stop = true;
+                atomicMax(&indirect[1].vertex_count, private_params.this_id); //workgroup_params.stop = true;
             }
             //else {
                 // Update the thread group params.
@@ -726,7 +738,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
    private_params.this_id = work_group_id.x + params.iterator_start_index;
 
    if (local_index == 0u) {
-        let st = select(false, true, (counter[1] > 0u));
+        let st = select(false, true, (indirect[1].vertex_count > 0u));
         workgroup_params = 
             WorkGroupParams (
                 0u,
@@ -741,7 +753,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
    var the_char = input[private_params.this_id];
 
    // Check if the execution should end. 
-   //if (local_index == 0u && atomicAdd(&counter[1], 0u) > 0u) {
+   //if (local_index == 0u && atomicAdd(&indirect[].vertex_count, 0u) > 0u) {
    //   workgroup_params.stop = true; 
    //}
    //workgroupBarrier();

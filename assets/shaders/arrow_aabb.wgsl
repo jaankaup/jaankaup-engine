@@ -47,9 +47,9 @@ struct Errors {
 @binding(0)
 var<uniform> arrow_aabb_params: ArrowAabbParams;
 
-@group(0)
-@binding(1)
-var<storage, read_write> counter: array<atomic<u32>>;
+// @group(0)
+// @binding(1)
+// var<storage, read_write> counter: array<atomic<u32>>;
 
 @group(0)
 @binding(2)
