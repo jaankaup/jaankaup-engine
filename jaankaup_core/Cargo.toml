@@ -11,8 +11,9 @@ input_debug = []
 texture_debug = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="0ac9ce002656565ccd05b889f5856f4e2c38fa73" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="1bd85a835a7fa88028d1e908991fc23be1084220", features = ["spirv"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c314c55788eaa1f1d311f4c3fa2ac56604006a00", features = ["webgl"] }
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c314c55788eaa1f1d311f4c3fa2ac56604006a00", features = ["vulkan-portability"] }
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="0ac9ce002656565ccd05b889f5856f4e2c38fa73" }
 winit = { version = "0.26"}
 async-executor = "1.0"
 cgmath = "0.18"

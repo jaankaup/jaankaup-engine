@@ -18,7 +18,11 @@ use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
-use jaankaup_core::common_functions::encode_rgba_u32;
+use jaankaup_core::common_functions::{
+    encode_rgba_u32, 
+    create_uniform_bindgroup_layout,
+    create_buffer_bindgroup_layout
+};
 use jaankaup_core::histogram::Histogram;
 use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use bytemuck::{Pod, Zeroable};
@@ -172,6 +176,7 @@ impl Application for McApp {
                         label: Some("renderer_v4n4_debug_visualizator_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
+                            // Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_wasm.wgsl"))),
                     
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
@@ -240,10 +245,10 @@ impl Application for McApp {
                                                  offset: 0,
                                                  size: None,
                                          })],
-                                        vec![&wgpu::BindingResource::TextureView(&textures.get("grass").unwrap().view),
-                                             &wgpu::BindingResource::Sampler(&textures.get("grass").unwrap().sampler),
-                                             &wgpu::BindingResource::TextureView(&textures.get("rock").unwrap().view),
-                                             &wgpu::BindingResource::Sampler(&textures.get("rock").unwrap().sampler)
+                                        vec![&wgpu::BindingResource::TextureView(&textures.get("slime").unwrap().view),
+                                             &wgpu::BindingResource::Sampler(&textures.get("slime").unwrap().sampler),
+                                             &wgpu::BindingResource::TextureView(&textures.get("slime2").unwrap().view),
+                                             &wgpu::BindingResource::Sampler(&textures.get("slime2").unwrap().sampler)
                                         ]
                                      ]
         );
@@ -312,6 +317,7 @@ impl Application for McApp {
                         label: Some("mc compute shader"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),
+                            //Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture_wasm.wgsl"))),
                         }
         );
 
@@ -334,37 +340,17 @@ impl Application for McApp {
                         label: Some("noise compute object"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),
+                            // Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer_wasm.wgsl"))),
                     
                     }),
                     Some("Noise compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> noise_params: NoiseParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> counter: Counter;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> noise_params: NoiseParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> counter: Counter;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
@@ -470,12 +456,12 @@ impl Application for McApp {
 
         // if !self.update { return; }
 
-        let val = (((input.get_time() / 5000000) as f32) * 0.0015).sin() * 500.0;
-        let val2 = (((input.get_time() / 5000000) as f32) * 0.0015).cos() * 1.0;
+        let val = (((input.get_time() / 5000000) as f32) * 0.0015).sin() * 5.0;
+        let val2 = (((input.get_time() / 5000000) as f32) * 0.0015).cos() * 0.35;
 
         let noise_params = NoiseParams {
             global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
-            time: (input.get_time() / 5000000) as f32,
+            time: (input.get_time() / 50000000) as f32,
             local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
             value: val2,
         };

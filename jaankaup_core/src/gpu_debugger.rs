@@ -72,9 +72,11 @@ struct ArrowAabbParams{
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct CharParams{
     iterator_start: u32,
-    itreator_end: u32,
+    iterator_end: u32,
     number_of_threads: u32,
     draw_index: u32, 
+    max_points_per_char: u32,
+    max_number_of_vertices: u32,
 }
 
 impl_convert!{Arrow}
@@ -163,7 +165,12 @@ impl GpuDebugger {
             "char_params".to_string(),
                 buffer_from_data::<CharParams>(
                     &device,
-                    &vec![CharParams{ iterator_start: 0, itreator_end: 0, number_of_threads: 256, draw_index: 0, }],
+                    &vec![CharParams{ iterator_start: 0,
+                                      iterator_end: 0,
+                                      number_of_threads: 256,
+                                      draw_index: 0,
+                                      max_points_per_char: 5000,
+                                      max_number_of_vertices: 123}],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     None
                 )

@@ -176,11 +176,11 @@ impl MarchingCubes {
             buffer_from_data::<DrawIndirect>(
             &device,
             &[indirect_data],
-            wgpu::BufferUsages::VERTEX |
+            // wgpu::BufferUsages::VERTEX |
             wgpu::BufferUsages::COPY_SRC |
             wgpu::BufferUsages::COPY_DST |
-            wgpu::BufferUsages::STORAGE |
-            wgpu::BufferUsages::INDIRECT,
+            wgpu::BufferUsages::INDIRECT |
+            wgpu::BufferUsages::STORAGE,
             None
         );
 

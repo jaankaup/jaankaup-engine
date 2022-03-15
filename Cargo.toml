@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "jaankaup_core",
     "some_examples",
+    "run_wasm",
 ]
 
 [profile.dev]
