@@ -51,12 +51,13 @@ struct Arrow {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Char {
-    start_pos: [f32 ; 4],
-    value: [f32 ; 4],
+    start_pos: [f32 ; 3],
     font_size: f32,
+    value: [f32 ; 4],
     vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32,
     draw_index: u32,
+    point_count: u32,
 }
 
 #[repr(C)]

@@ -317,7 +317,7 @@ impl Application for McApp {
                         label: Some("mc compute shader"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),
-                            //Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture_wasm.wgsl"))),
+                            // Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture_wasm.wgsl"))),
                         }
         );
 

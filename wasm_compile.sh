@@ -1,6 +1,7 @@
 #!/bin/bash
 
-clear ; cargo run-wasm --release --example $1 
+clear ; cargo run-wasm --example $1 
+#clear ; cargo run-wasm --release --example $1 
 #clear ; cargo run-wasm --release --example $1 --features webgl 
 #scp ./target/wasm-examples/$1/* jaankaup@130.234.208.250:/home/jaankaup/public_html/$1
 

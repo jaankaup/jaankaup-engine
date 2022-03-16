@@ -11,12 +11,13 @@ struct Arrow {
 };
 
 struct Char {
-    start_pos: vec4<f32>;
-    value: vec4<f32>;
+    start_pos: vec3<f32>; // encode start.pos.w the decimal_count. TODO: something better.
     font_size: f32;
+    value: vec4<f32>;
     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32;
-    z_offset: f32;
+    draw_index: u32;
+    point_count: u32;
 };
 
 struct ModF {
@@ -174,6 +175,56 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
+
+        let min_box = vec3<f32>(global_id) + vec3<f32>(6.0); 
+        let max_box = vec3<f32>(global_id) + vec3<f32>(6.5); 
+
+        output_arrow[atomicAdd(&counter[1], 1u)] =  
+              Arrow (
+                  vec4<f32>(f32(global_id.x), f32(global_id.y), f32(global_id.z), 0.0),
+                  vec4<f32>(f32(global_id.x), f32(global_id.y) + 4.0, f32(global_id.z), 0.0),
+                  rgba_u32(255u, 0u, 0u, 255u),
+                  0.5
+        );
+
+        output_aabb[atomicAdd(&counter[2], 1u)] =  
+              AABB (
+                  vec4<f32>(min_box.x,
+                            min_box.y,
+                            min_box.z,
+                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(max_box.x,
+                            max_box.y, 
+                            max_box.z,
+                            1.0)
+        );
+        
+        output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+              AABB (
+                  vec4<f32>(min_box.x,
+                            min_box.y + 3.0,
+                            min_box.z,
+                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(max_box.x,
+                            max_box.y + 3.0, 
+                            max_box.z,
+                            0.1)
+        );
+
+        output_char[atomicAdd(&counter[0], 1u)] =  
+        
+              Char (
+                  vec3<f32>(min_box.x,
+                            min_box.y,
+                            min_box.z + 2.0
+                  ),
+                  0.3,
+                  vec4<f32>(1.0, 0.0, 0.0, 0.0),
+                  1u,
+                  rgba_u32(255u, 0u, 2550u, 255u),
+                  0u,
+                  500u
+              );
 
     // if (local_index == 0u) {
     // }

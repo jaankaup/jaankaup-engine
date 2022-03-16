@@ -25,6 +25,10 @@ struct DrawIndirect {
     base_instance: u32; // The instance ID of the first instance to draw.
 };
 
+struct Counter {
+    counter: atomic<u32>;
+};
+
 [[group(0), binding(0)]]
 var<uniform> mc_uniform: McParams;
 
@@ -33,7 +37,7 @@ var<uniform> mc_uniform: McParams;
 var<storage, read_write> indirect: array<DrawIndirect>;
 
 [[group(0), binding(2)]]
-var<storage, read_write> counter: array<atomic<u32>>; // atomic<32> doesn't work!
+var<storage, read_write> counter: array<Counter>; // atomic<32> doesn't work!
 
 [[group(0), binding(3)]]
 var<storage, read> noise_values: array<f32>;

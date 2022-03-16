@@ -51,13 +51,23 @@ struct PirateParams {
 var<workgroup> workgroup_params: WorkGroupParams; 
 var<private> private_params: PirateParams; 
 
+// struct Char {
+//     start_pos: vec4<f32>; // encode start.pos.w the decimal_count. TODO: something better.
+//     value: vec4<f32>;
+//     font_size: f32;
+//     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+//     color: u32;
+//     draw_index: u32;
+// };
+
 struct Char {
-    start_pos: vec4<f32>; // encode start.pos.w the decimal_count. TODO: something better.
-    value: vec4<f32>;
+    start_pos: vec3<f32>; // encode start.pos.w the decimal_count. TODO: something better.
     font_size: f32;
+    value: vec4<f32>;
     vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32;
     draw_index: u32;
+    total_point_count: u32;
 };
 
 // A struct for errors.
@@ -464,7 +474,11 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 fn bezier_4c(thread_index: u32, 
              vertices_per_thread: u32,
              total_num_points: u32,
-             c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, color: u32) {
+             c0: vec3<f32>,
+             c1: vec3<f32>,
+             c2: vec3<f32>,
+             c3: vec3<f32>,
+             color: u32) {
 
     for (var i: u32 = 0u ; i < vertices_per_thread ; i = i + 1u) {
         let t = f32(i * 64u + thread_index) / (f32(total_num_points) - 1.0);
@@ -486,7 +500,7 @@ fn bezier_4c(thread_index: u32,
 fn create_char(char_index: u32,
                local_index: u32,
                num_points: u32,
-               offset: vec4<f32>,
+               offset: vec3<f32>,
                color: u32,
                font_size: f32) {
     let index = bez_indices[char_index];
@@ -545,10 +559,10 @@ fn create_char(char_index: u32,
             local_index,
             vertices_per_thread,
             count,
-            font_size * bez_table[bez_index    ]  + offset,
-            font_size * bez_table[bez_index + 1u] + offset,
-            font_size * bez_table[bez_index + 2u] + offset,
-            font_size * bez_table[bez_index + 3u] + offset,
+            font_size * bez_table[bez_index    ].xyz  + offset,
+            font_size * bez_table[bez_index + 1u].xyz + offset,
+            font_size * bez_table[bez_index + 2u].xyz + offset,
+            font_size * bez_table[bez_index + 3u].xyz + offset,
             color
         );
     }
@@ -572,8 +586,8 @@ var<private> joo: array<i32, 10> =  array<i32, 10> (
 // @ignore_first : ignore the first number. This should be false when rendering u32. 
 // @base_pos : the starting position for rendering. 
 // @total_vertex_count : total number of vertices for rendering. 
-// @cola : the color of the vertices. 
-fn log_number(n: i32, thread_index: u32, ignore_first: bool, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
+// @color : the color of the vertices. 
+fn log_number(n: i32, thread_index: u32, ignore_first: bool, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 
     var found = false;
     var ignore = ignore_first;
@@ -581,13 +595,13 @@ fn log_number(n: i32, thread_index: u32, ignore_first: bool, base_pos: ptr<funct
 
     if (n == 0) {
         create_char(0u, thread_index, total_vertex_count, *base_pos, col, font_size);
-        *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0) * font_size;
+        *base_pos = *base_pos + vec3<f32>(1.0, 0.0, 0.0) * font_size;
     }
 
     // Add minus if negative.
     if (n < 0) {
         create_char(10u, thread_index, total_vertex_count, *base_pos, col, font_size);
-        *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0) * font_size;
+        *base_pos = *base_pos + vec3<f32>(1.0, 0.0, 0.0) * font_size;
     }
 
     for (var i: i32 = 9 ; i>=0 ; i = i - 1) {
@@ -598,7 +612,7 @@ fn log_number(n: i32, thread_index: u32, ignore_first: bool, base_pos: ptr<funct
             if (ignore == true) { ignore = false; continue; }
             
             create_char(u32(remainder), thread_index, total_vertex_count, *base_pos, col, font_size);
-            *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0) * font_size;
+            *base_pos = *base_pos + vec3<f32>(1.0, 0.0, 0.0) * font_size;
         }
     }
 }
@@ -617,28 +631,19 @@ fn my_modf(f: f32) -> ModF {
     );
 }
 
-fn log_float(f: f32, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
+fn log_float(f: f32, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 
     if (f == 0.0) {
         log_number(0, thread_index, false, base_pos, total_vertex_count, col, font_size);
-        *base_pos = *base_pos - vec4<f32>(0.1, 0.0, 0.0, 0.0) * font_size;
+        *base_pos = *base_pos - vec3<f32>(0.1, 0.0, 0.0) * font_size;
         create_char(13u, thread_index, total_vertex_count, *base_pos, col, font_size);
-        *base_pos = *base_pos + vec4<f32>(0.3, 0.0, 0.0, 0.0) * font_size;
+        *base_pos = *base_pos + vec3<f32>(0.3, 0.0, 0.0) * font_size;
 
         for (var i: i32 = 0; i<i32(max_decimals); i = i + 1) {
             log_number(0, thread_index, true, base_pos, total_vertex_count, col, font_size);
         }
         return;
     }
-
-    // // Add minus if negative.
-    // if (f < 0.0) {
-    //     create_char(10u, thread_index, total_vertex_count, *base_pos, col);
-    //     *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0);
-    // }
-
-    // Get rid of the minus. Necessery?
-    // let f_positive = abs(f);
 
     let fract_and_whole = my_modf(f); 
 
@@ -652,64 +657,64 @@ fn log_float(f: f32, max_decimals: u32, thread_index: u32, base_pos: ptr<functio
     log_number(integer_part, thread_index, false, base_pos, total_vertex_count, col, font_size);
 
     // TODO: create_dot function for this.
-    *base_pos = *base_pos - vec4<f32>(0.1, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos - vec3<f32>(0.1, 0.0, 0.0) * font_size;
     create_char(13u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    *base_pos = *base_pos + vec4<f32>(0.3, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(0.3, 0.0, 0.0) * font_size;
 
     // Parse the frag part.
     log_number(abs(fract_part), thread_index, true, base_pos, total_vertex_count, col, font_size);
 }
 
-fn log_vec4_f32(v: vec4<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
+fn log_vec4_f32(v: vec4<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 
     // TODO: create_dot function for this.
     create_char(11u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
 
     log_float(v.x, max_decimals, thread_index, base_pos, total_vertex_count, col, font_size);
 
-    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(2.0, 0.0, 0.0) * font_size;
 
     log_float(v.y, max_decimals, thread_index, base_pos, total_vertex_count, col, font_size);
 
-    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(2.0, 0.0, 0.0) * font_size;
 
     log_float(v.w, max_decimals, thread_index, base_pos, total_vertex_count, col, font_size);
 
-    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(2.0, 0.0, 0.0) * font_size;
 
     log_float(v.z, max_decimals, thread_index, base_pos, total_vertex_count, col, font_size);
 
     // TODO: create_dot function for this.
-    *base_pos = *base_pos + vec4<f32>(-0.5, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(-0.5, 0.0, 0.0) * font_size;
     create_char(12u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
 }
 
-fn log_vec3_f32(v: vec3<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
+fn log_vec3_f32(v: vec3<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 
     // TODO: create_dot function for this.
     create_char(11u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
 
     log_float(v.x, max_decimals, thread_index, base_pos, total_vertex_count, col, font_size);
 
-    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(2.0, 0.0, 0.0) * font_size;
 
     log_float(v.y, max_decimals, thread_index, base_pos, total_vertex_count, col, font_size);
 
-    *base_pos = *base_pos + vec4<f32>(2.0, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(2.0, 0.0, 0.0) * font_size;
 
     log_float(v.z, max_decimals, thread_index, base_pos, total_vertex_count, col, font_size);
 
     // TODO: create_dot function for this.
-    *base_pos = *base_pos + vec4<f32>(-0.5, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(-0.5, 0.0, 0.0) * font_size;
     create_char(12u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    *base_pos = *base_pos + vec4<f32>(0.5, 0.0, 0.0, 0.0) * font_size;
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
 }
 
 // bit_count must be in range 1..32. Otherwise there will be undefined behaviour. TODO: fix.
-fn log_u32_b2(n: u32, bit_count: u32, thread_index: u32, base_pos: ptr<function, vec4<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
+fn log_u32_b2(n: u32, bit_count: u32, thread_index: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 
     var bit_c = select(bit_count, 32u, n > 32u);
     bit_c = select(bit_count, 1u, n == 0u);
@@ -761,7 +766,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
    //if (workgroup_params.stop) { return; }
 
    // Check the distance between camera and number object.
-   let dist = min(max(1.0, distance(camera.pos.xyz, the_char.start_pos.xyz)), 255.0);
+   let dist = min(max(1.0, distance(camera.pos.xyz, the_char.start_pos)), 255.0);
 
    let total_vertex_count = min(u32(f32(max_vertex_count) / f32(dist)), max_vertex_count);
 
@@ -770,7 +775,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
    // Log f32.
    if (the_char.vec_dim_count == 1u) {
        log_float(the_char.value.x,
-                 u32(the_start_position.w),
+                 2u, //u32(the_start_position.w),
                  local_index,
                  &the_start_position,
                  total_vertex_count,
@@ -780,7 +785,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
    // Log vec3<f32>.
    else if (the_char.vec_dim_count == 3u) {
        log_vec3_f32(the_char.value.xyz,
-                    u32(the_start_position.w),
+                    2u, //u32(the_start_position.w),
                     local_index,
                     &the_start_position,
                     total_vertex_count,
@@ -790,7 +795,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
    // Log vec4<f32>.
    else if (the_char.vec_dim_count == 4u) {
        log_vec4_f32(the_char.value,
-                    u32(the_start_position.w),
+                    2u, //u32(the_start_position.w),
                     local_index,
                     &the_start_position,
                     total_vertex_count,

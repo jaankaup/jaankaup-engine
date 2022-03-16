@@ -667,22 +667,22 @@ impl Application for Fmm {
                                       triangle_count: 2036 }
             ]));
 
-        //self.compute_object_fmm.dispatch(
-        //    &self.compute_bind_groups_fmm,
-        //    &mut encoder_command,
-        //    1, 1, 1, Some("fmm dispatch")
-        //);
+        self.compute_object_fmm.dispatch(
+            &self.compute_bind_groups_fmm,
+            &mut encoder_command,
+            1, 1, 1, Some("fmm dispatch")
+        );
 
         // Compute interface.
-        self.compute_object_fmm_triangle.dispatch(
-            &self.compute_bind_groups_fmm_triangle,
-            &mut encoder_command,
-            2036, 1, 1,
-            //udiv_up_safe32(1, thread_count), 1, 1,
-            //udiv_up_safe32(2036, thread_count), 1, 1,
-            // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-            Some("fmm triangle dispatch")
-        );
+        // self.compute_object_fmm_triangle.dispatch(
+        //     &self.compute_bind_groups_fmm_triangle,
+        //     &mut encoder_command,
+        //     2036, 1, 1,
+        //     //udiv_up_safe32(1, thread_count), 1, 1,
+        //     //udiv_up_safe32(2036, thread_count), 1, 1,
+        //     // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+        //     Some("fmm triangle dispatch")
+        // );
 
         queue.submit(Some(encoder_command.finish()));
 
