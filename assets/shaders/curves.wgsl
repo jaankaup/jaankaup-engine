@@ -1,43 +1,43 @@
 struct AABB {
-    min: vec4<f32>; 
-    max: vec4<f32>; 
+    min: vec4<f32>, 
+    max: vec4<f32>, 
 };
 
 struct Quaternion {
-    w: f32;
-    x: f32;
-    y: f32;
-    z: f32;
+    w: f32,
+    x: f32,
+    y: f32,
+    z: f32,
 };
 
 struct VisualizationParams{
-    curve_number: u32;
-    iterator_start_index: u32;
-    iterator_end_index: u32;
-    arrow_size: f32;
-    thread_mode: u32;
-    thread_mode_start_index: u32;
-    thread_mode_end_index: u32;
+    curve_number: u32,
+    iterator_start_index: u32,
+    iterator_end_index: u32,
+    arrow_size: f32,
+    thread_mode: u32,
+    thread_mode_start_index: u32,
+    thread_mode_end_index: u32,
 };
 
 struct Vertex {
-    v: vec4<f32>;
-    n: vec4<f32>;
+    v: vec4<f32>,
+    n: vec4<f32>,
 };
 
 struct Triangle {
-    a: Vertex;
-    b: Vertex;
-    c: Vertex;
+    a: Vertex,
+    b: Vertex,
+    c: Vertex,
 };
 
 type Hexaedra = array<Vertex , 8>;
 
 struct Arrow {
-    start_pos: vec4<f32>;
-    end_pos:   vec4<f32>;
-    color: u32;
-    size:  f32;
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
 };
 
 let THREAD_COUNT: u32 = 256u;

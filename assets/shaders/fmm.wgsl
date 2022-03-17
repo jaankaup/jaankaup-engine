@@ -1,37 +1,37 @@
 struct AABB {
-    min: vec4<f32>; 
-    max: vec4<f32>; 
+    min: vec4<f32>, 
+    max: vec4<f32>, 
 };
 
 struct Arrow {
-    start_pos: vec4<f32>;
-    end_pos:   vec4<f32>;
-    color: u32;
-    size:  f32;
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
 };
 
 struct Char {
-    start_pos: vec3<f32>; // encode start.pos.w the decimal_count. TODO: something better.
-    font_size: f32;
-    value: vec4<f32>;
-    vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
-    color: u32;
-    draw_index: u32;
-    point_count: u32;
+    start_pos: vec3<f32>, // encode start.pos.w the decimal_count. TODO: something better.
+    font_size: f32,
+    value: vec4<f32>,
+    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+    color: u32,
+    draw_index: u32,
+    point_count: u32,
 };
 
 struct ModF {
-    fract: f32;
-    whole: f32;
+    fract: f32,
+    whole: f32,
 };
 
 struct FmmCell {
-    tag: u32;
-    value: f32;
+    tag: u32,
+    value: f32,
 };
 
 struct FmmParams {
-    blah: f32;
+    blah: f32,
 };
 
 @group(0)

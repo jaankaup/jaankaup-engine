@@ -1,40 +1,40 @@
 struct AABB {
-    min: vec4<f32>; 
-    max: vec4<f32>; 
+    min: vec4<f32>, 
+    max: vec4<f32>, 
 };
 
 struct Quaternion {
-    w: f32;
-    x: f32;
-    y: f32;
-    z: f32;
+    w: f32,
+    x: f32,
+    y: f32,
+    z: f32,
 };
 
 struct VisualizationParams{
-    max_number_of_vertices: u32;
-    iterator_start_index: u32;
-    iterator_end_index: u32;
-    arrow_size: f32;
+    max_number_of_vertices: u32,
+    iterator_start_index: u32,
+    iterator_end_index: u32,
+    arrow_size: f32,
 };
 
 struct Vertex {
-    v: vec4<f32>;
-    n: vec4<f32>;
+    v: vec4<f32>,
+    n: vec4<f32>,
 };
 
 type Hexaedra = array<Vertex , 8>;
 
 struct Arrow {
-    start_pos: vec4<f32>;
-    end_pos:   vec4<f32>;
-    color: u32;
-    size:  f32;
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
 };
 
 // A struct for errors.
 // vertex_overflow: 0 :: OK, n :: amount of overflow.
 struct Errors {
-    vertex_buffer_overflow: u32;
+    vertex_buffer_overflow: u32,
 };
 
 @group(0)

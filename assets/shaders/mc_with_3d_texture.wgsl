@@ -1,28 +1,28 @@
 struct McParams {
-    base_position: vec4<f32>;
-    isovalue: f32;
-    cube_length: f32;
-    for_future_usage1: f32;
-    for_future_usage2: f32;
-    noise_global_dimension: vec3<u32>; 
-    noise_local_dimension: vec3<u32>; 
+    base_position: vec4<f32>,
+    isovalue: f32,
+    cube_length: f32,
+    for_future_usage1: f32,
+    for_future_usage2: f32,
+    noise_global_dimension: vec3<u32>, 
+    noise_local_dimension: vec3<u32>, 
 };
 
 struct Vertex {
-    v: vec4<f32>;
-    n: vec4<f32>;
+    v: vec4<f32>,
+    n: vec4<f32>,
 };
 
 struct Cube {
-    vertices: array<vec4<f32>, 8>;
-    normals:  array<vec4<f32>, 8>;
+    vertices: array<vec4<f32>, 8>,
+    normals:  array<vec4<f32>, 8>,
 };
 
 struct DrawIndirect {
-    vertex_count: atomic<u32>; // The number of vertices to draw.
-    instance_count: u32; // The number of instances to draw.
-    base_vertex: u32; // The Index of the first vertex to draw.
-    base_instance: u32; // The instance ID of the first instance to draw.
+    vertex_count: atomic<u32>, // The number of vertices to draw.
+    instance_count: u32, // The number of instances to draw.
+    base_vertex: u32, // The Index of the first vertex to draw.
+    base_instance: u32, // The instance ID of the first instance to draw.
 };
 
 @group(0)

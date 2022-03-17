@@ -16,27 +16,27 @@
 // 1024 :: 2176
 
 struct PrivateData {
-    ai: u32;
-    bi: u32;
-    ai_bcf: u32;
-    bi_bcf: u32;
-    global_ai: u32;
-    global_bi: u32;
+    ai: u32,
+    bi: u32,
+    ai_bcf: u32,
+    bi_bcf: u32,
+    global_ai: u32,
+    global_bi: u32,
 };
 
 struct PrefixParams {
-    data_start_index: u32;
-    data_end_index: u32;
-    exclusive_parts_start_index: u32;
-    exclusive_parts_end_index: u32;
-    temp_prefix_data_start_index: u32;
-    temp_prefix_data_end_index: u32;
-    stage: u32;
+    data_start_index: u32,
+    data_end_index: u32,
+    exclusive_parts_start_index: u32,
+    exclusive_parts_end_index: u32,
+    temp_prefix_data_start_index: u32,
+    temp_prefix_data_end_index: u32,
+    stage: u32,
 };
 
 struct FmmBlock {
-    index: u32;
-    band_points_count: u32;
+    index: u32,
+    band_points_count: u32,
 };
 
 @group(0)

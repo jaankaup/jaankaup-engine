@@ -1,12 +1,12 @@
 struct NoiseParams {
-    global_dim: vec3<u32>;
-    time: f32;
-    local_dim: vec3<u32>;
-    value: f32;
+    global_dim: vec3<u32>,
+    time: f32,
+    local_dim: vec3<u32>,
+    value: f32,
 };
 
 struct Output {
-    output: array<f32>;
+    output: array<f32>,
 };
 
 @group(0)

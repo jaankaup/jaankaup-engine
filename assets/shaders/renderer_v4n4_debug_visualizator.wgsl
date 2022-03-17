@@ -1,6 +1,6 @@
 struct Camera {
-    u_view_proj: mat4x4<f32>;
-    camera_pos: vec4<f32>;
+    u_view_proj: mat4x4<f32>,
+    camera_pos: vec4<f32>,
 };
 
 @group(0)
@@ -32,13 +32,13 @@ fn decode_color(c: u32) -> vec4<f32> {
 // }
 
 struct VertexOutput {
-    @builtin(position) my_pos: vec4<f32>;
-    @location(0) pos: vec4<f32>;
-    @location(1) nor: vec4<f32>;
-    @location(2) diff_coeffient: f32;
-    @location(3) reflection_vector: vec3<f32>;
-    @location(4) camera_dir: vec3<f32>;
-    @location(5) @interpolate(flat) col: vec3<f32>;
+    @builtin(position) my_pos: vec4<f32>,
+    @location(0) pos: vec4<f32>,
+    @location(1) nor: vec4<f32>,
+    @location(2) diff_coeffient: f32,
+    @location(3) reflection_vector: vec3<f32>,
+    @location(4) camera_dir: vec3<f32>,
+    @location(5) @interpolate(flat) col: vec3<f32>,
 };
 
 // Ligth/material properties.

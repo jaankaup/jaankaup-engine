@@ -1,50 +1,50 @@
 struct Camera {
-    u_view_proj: mat4x4<f32>;
-    pos: vec4<f32>;
+    u_view_proj: mat4x4<f32>,
+    pos: vec4<f32>,
 };
 
 struct AABB {
-    min: vec4<f32>; 
-    max: vec4<f32>; 
+    min: vec4<f32>, 
+    max: vec4<f32>, 
 };
 
 struct ModF {
-    fract: f32;
-    whole: f32;
+    fract: f32,
+    whole: f32,
 };
 
 struct Quaternion {
-    w: f32;
-    x: f32;
-    y: f32;
-    z: f32;
+    w: f32,
+    x: f32,
+    y: f32,
+    z: f32,
 };
 
 struct VisualizationParams{
-    max_vertex_capacity: u32;
-    iterator_start_index: u32;
-    iterator_end_index: u32;
-    arrow_size: f32;
+    max_vertex_capacity: u32,
+    iterator_start_index: u32,
+    iterator_end_index: u32,
+    arrow_size: f32,
 };
 
 struct Vertex {
-    v: vec4<f32>;
-    n: vec4<f32>;
+    v: vec4<f32>,
+    n: vec4<f32>,
 };
 
 struct VVVC {
-    pos: vec3<f32>;
-    col: u32;
+    pos: vec3<f32>,
+    col: u32,
 };
 
 struct WorkGroupParams {
-    start_index: u32; // Start position of the output buffer.
-    last_index: u32;  // Last legal position.
+    start_index: u32, // Start position of the output buffer.
+    last_index: u32,  // Last legal position.
 };
 
 struct PirateParams {
-    this_offset: u32;      // This thread offset in the current work group.
-    number_of_writes: u32; // Number of points to calculate/store.
+    this_offset: u32,      // This thread offset in the current work group.
+    number_of_writes: u32, // Number of points to calculate/store.
 };
 
 var<workgroup> workgroup_params: WorkGroupParams; 
@@ -60,16 +60,16 @@ var<private> private_params: PirateParams;
 type Hexaedra = array<Vertex , 8>;
 
 struct Arrow {
-    start_pos: vec4<f32>;
-    end_pos:   vec4<f32>;
-    color: u32;
-    size:  f32;
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
 };
 
 // A struct for errors.
 // vertex_overflow: 0 :: OK, n :: amount of overflow.
 struct Errors {
-    vertex_buffer_overflow: u32;
+    vertex_buffer_overflow: u32,
 };
 
 @group(0)

@@ -1,6 +1,6 @@
 struct Camera {
-    u_view_proj: mat4x4<f32>;
-    camera_pos: vec4<f32>;
+    u_view_proj: mat4x4<f32>,
+    camera_pos: vec4<f32>,
 };
 
 @group(0)
@@ -45,9 +45,9 @@ fn hsv2rgb(c: vec3<f32>) -> vec3<f32>  {
 }
 
 struct VertexOutput {
-    @builtin(position) my_pos: vec4<f32>;
-    @location(0) pos: vec4<f32>;
-    @location(1) nor: vec4<f32>;
+    @builtin(position) my_pos: vec4<f32>,
+    @location(0) pos: vec4<f32>,
+    @location(1) nor: vec4<f32>,
 };
 
 @stage(vertex)

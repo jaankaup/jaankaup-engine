@@ -1,37 +1,37 @@
 struct Camera {
-    u_view_proj: mat4x4<f32>;
-    pos: vec4<f32>;
+    u_view_proj: mat4x4<f32>,
+    pos: vec4<f32>,
 };
 
 struct CharParams{
-    iterator_start: atomic<u32>;
-    iterator_end: u32;
-    number_of_threads: u32;
-    draw_index: atomic<u32>; 
-    max_points_per_char: u32;
-    max_number_of_vertices: u32;
+    iterator_start: atomic<u32>,
+    iterator_end: u32,
+    number_of_threads: u32,
+    draw_index: atomic<u32>, 
+    max_points_per_char: u32,
+    max_number_of_vertices: u32,
 };
 
 struct Char {
-    start_pos: vec3<f32>; // encode start.pos.w the decimal_count. TODO: something better.
-    font_size: f32;
-    value: vec4<f32>;
-    vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
-    color: u32;
-    draw_index: u32;
-    point_count: u32;
+    start_pos: vec3<f32>, // encode start.pos.w the decimal_count. TODO: something better.
+    font_size: f32,
+    value: vec4<f32>,
+    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+    color: u32,
+    draw_index: u32,
+    point_count: u32,
 };
 
 struct DrawIndirect {
-    vertex_count: atomic<u32>;
-    instance_count: u32;
-    base_vertex: u32;
-    base_instance: u32;
+    vertex_count: atomic<u32>,
+    instance_count: u32,
+    base_vertex: u32,
+    base_instance: u32,
 };
 
 struct ModF {
-    fract: f32;
-    whole: f32;
+    fract: f32,
+    whole: f32,
 };
 
 @group(0) @binding(0)
@@ -64,50 +64,84 @@ fn my_modf(f: f32) -> ModF {
     );
 }
 
+/// if the given integer is < 0, return 0. Otherwise 1 is returned.
 fn the_sign_of_i32(n: i32) -> u32 {
-    return 1u ^ (u32(n) >> 31u);
+    return (u32(n) >> 31u);
+    //return 1u ^ (u32(n) >> 31u);
 }
 
-//++ fn abs_i32(n: i32) -> i32 {
-//++     let mask = n >> 31;
-//++     (n + mask) ^ mask 
-//++ }
-//++ 
-//++ fn log2_u32(n: u32) -> u32 {
-//++ 
-//++     let mut v = n;
-//++     let mut r = ((v > 0xFFFF) as u32) << 4;
-//++     let mut shift = 0;
-//++ 
-//++     v  = v >> r;
-//++     shift = ((v > 0xFF) as u32) << 3;
-//++ 
-//++     v = v >> shift;
-//++     r = r | shift;
-//++ 
-//++     shift = ((v > 0xF) as u32) << 2;
-//++     v = v >> shift;
-//++     r = r | shift;
-//++ 
-//++     shift = ((v > 0x3) as u32) << 1;
-//++     v = v >> shift;
-//++     r = r | shift;
-//++     r = r | (v >> 1);
-//++     r
-//++ }
-//++ 
-//++ static PowersOf10: &'static [u32] = &[1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000];
-//++ 
-//++ fn log10_u32(n: u32) -> u32 {
-//++     
-//++     let mut v = n;
-//++     let mut r = 0;
-//++     let mut t = 0;
-//++     
-//++     t = (log2_u32(v) + 1) * 1233 >> 12; // (use a lg2 method from above)
-//++     r = t - ((v < PowersOf10[t as usize]) as u32);
-//++     r
-//++ }
+fn abs_i32(n: i32) -> u32 {
+    let mask = u32(n) >> 31u;
+    return (u32(n) + mask) ^ mask;
+}
+
+fn log2_u32(n: u32) -> u32 {
+
+    var v = n;
+    var r = (u32((v > 0xFFFFu))) << 4u;
+    var shift = 0u;
+
+    v  = v >> r;
+    shift = (u32((v > 0xFFu))) << 3u;
+
+    v = v >> shift;
+    r = r | shift;
+
+    shift = (u32(v > 0xFu)) << 2u;
+    v = v >> shift;
+    r = r | shift;
+
+    shift = (u32(v > 0x3u)) << 1u;
+    v = v >> shift;
+    r = r | shift;
+    r = r | (v >> 1u);
+    return r;
+}
+
+var<private> PowersOf10: array<u32, 10> = array<u32, 10>(1u, 10u, 100u, 1000u, 10000u, 100000u, 1000000u, 10000000u, 100000000u, 1000000000u);
+
+// NOT defined if u == 0u.
+fn log10_u32(n: u32) -> u32 {
+    
+    var v = n;
+    var r: u32;
+    var t: u32;
+    
+    t = (log2_u32(v) + 1u) * 1233u >> 12u;
+    r = t - u32(v < PowersOf10[t]);
+    return r;
+}
+
+// Calculates the number of digits + minus.
+fn number_of_chars_i32(n: i32) -> u32 {
+
+    if (n == 0) { return 1u; }
+    return the_sign_of_i32(n) + log10_u32(abs_i32(n)) + 1u;
+} 
+
+fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
+
+    let m = my_modf(f);
+    return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u;
+}
+
+// dots, brachets
+// vec_dim_count == 1   a
+// vec_dim_count == 2   (a , b)
+// vec_dim_count == 3   (a , b , c)
+// vec_dim_count == 4   (a , b , c , d)
+var<private> NumberOfExtraChars: array<u32, 4> = array<u32, 4>(0u, 3u, 4u, 5u);
+
+fn number_of_chars_data(data: ptr<function, vec4<f32>>, vec_dim_count: u32, number_of_decimals: u32) -> u32 {
+    
+    // Calculate all possible char counts to avoid branches.
+    let a = number_of_chars_f32((*data).x, number_of_decimals) * u32(vec_dim_count >= 1u);
+    let b = number_of_chars_f32((*data).y, number_of_decimals) * u32(vec_dim_count >= 2u);
+    let c = number_of_chars_f32((*data).z, number_of_decimals) * u32(vec_dim_count >= 3u);
+    let d = number_of_chars_f32((*data).w, number_of_decimals) * u32(vec_dim_count >= 4u);
+
+    return a + b + c + d + NumberOfExtraChars[vec_dim_count]; 
+}
 
 // @param n : number that should be rendered.
 // @ignore_first : ignore the first number. This should be false when rendering u32. 
@@ -199,4 +233,5 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let total_vertex_count = min(u32(f32(char_params[0].max_points_per_char) / f32(dist)), char_params[0].max_points_per_char);
 
     // Determine the draw start offset and the number of vertices for drawing the element.
+
 }

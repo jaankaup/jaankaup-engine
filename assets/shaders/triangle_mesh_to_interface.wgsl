@@ -16,57 +16,57 @@ let OUTSIDE  = 4u;
 let THREAD_COUNT: u32 = 64u;
 
 struct AABB {
-    min: vec4<f32>; 
-    max: vec4<f32>; 
+    min: vec4<f32>, 
+    max: vec4<f32>, 
 };
 
 struct AABB_Uvec3 {
-    min: vec3<u32>; 
-    max: vec3<u32>; 
+    min: vec3<u32>, 
+    max: vec3<u32>, 
 };
 
 struct Arrow {
-    start_pos: vec4<f32>;
-    end_pos:   vec4<f32>;
-    color: u32;
-    size:  f32;
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
 };
 
 struct Vertex {
-    v: vec4<f32>;
-    n: vec4<f32>;
+    v: vec4<f32>,
+    n: vec4<f32>,
 };
 
 struct Triangle {
-    a: Vertex;
-    b: Vertex;
-    c: Vertex;
+    a: Vertex,
+    b: Vertex,
+    c: Vertex,
 };
 
 struct Char {
-    start_pos: vec4<f32>;
-    value: vec4<f32>;
-    font_size: f32;
-    vec_dim_count: u32; // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
-    color: u32;
-    z_offset: f32;
+    start_pos: vec4<f32>,
+    value: vec4<f32>,
+    font_size: f32,
+    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+    color: u32,
+    z_offset: f32,
 };
 
 struct ModF {
-    fract: f32;
-    whole: f32;
+    fract: f32,
+    whole: f32,
 };
 
 struct FmmCell {
-    tag: u32;
-    value: f32;
+    tag: u32,
+    value: f32,
 };
 
 struct FmmParams {
-    fmm_global_dimension: vec3<u32>; 
-    visualize: u32; // 0 -> no, 1 -> yes!
-    fmm_inner_dimension: vec3<u32>; 
-    triangle_count: u32;
+    fmm_global_dimension: vec3<u32>, 
+    visualize: u32, // 0 -> no, 1 -> yes!
+    fmm_inner_dimension: vec3<u32>, 
+    triangle_count: u32,
 };
 
 @group(0)
