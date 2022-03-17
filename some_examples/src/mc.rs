@@ -175,8 +175,8 @@ impl Application for McApp {
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_debug_visualizator_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
-                            // Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_wasm.wgsl"))),
+                            //Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_wasm.wgsl"))),
                     
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
@@ -316,8 +316,8 @@ impl Application for McApp {
         let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("mc compute shader"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),
-                            // Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture_wasm.wgsl"))),
+                            //Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture_wasm.wgsl"))),
                         }
         );
 
@@ -339,8 +339,8 @@ impl Application for McApp {
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("noise compute object"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),
-                            // Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer_wasm.wgsl"))),
+                            //Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer_wasm.wgsl"))),
                     
                     }),
                     Some("Noise compute object"),
@@ -366,6 +366,8 @@ impl Application for McApp {
                                                ]
                                            ]
         );
+
+        println!("Done!.");
 
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),

@@ -57,19 +57,16 @@ fn vs_main([[location(0)]] pos: vec4<f32>, [[location(1)]] nor: vec4<f32>) -> Ve
     return out;
 }
 
-
-
-// Ligth/material properties.
-let light_pos: vec3<f32> = vec3<f32>(3.0, 28.0, 3.0);
+//let light_pos: vec3<f32> = vec3<f32>(1.0, 1.0, 1.0);
+let light_pos: vec3<f32> = vec3<f32>(10.0, 10.0, 13.0);
 let light_color: vec3<f32> = vec3<f32>(0.8, 0.3, 0.3);
 let material_spec_color: vec3<f32> = vec3<f32>(0.5, 0.1, 0.1);
 let material_shininess: f32 = 55.0;
 let ambient_coeffience: f32 = 0.15;
-let attentuation_factor: f32 = 0.013;
+let attentuation_factor: f32 = 0.000013;
 
 [[stage(fragment)]]
 
-//fn fs_main(in: VertexOutput, [[builtin(position)]] frag_pos: vec4<f32>) -> [[location(0)]] vec4<f32> {
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 
     var light_dir: vec3<f32> = normalize(light_pos - in.pos.xyz);
@@ -85,14 +82,14 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
         specular_coeffient = pow(cosAngle, material_shininess);
     }
 
-    var offset_factor: f32 = 1.5;
+    var offset_factor: f32 = 0.5;
     
     var coord1: vec2<f32> = in.pos.xy*offset_factor;
     var coord2: vec2<f32> = in.pos.xz*offset_factor;
     var coord3: vec2<f32> = in.pos.yz*offset_factor + in.pos.xz*offset_factor*offset_factor;
     
-    var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord2 + coord3) / 3.0).xyz; //, offset_factor * (coord1 + coord2 + coord3) / 3.0).xyz;
-    var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 + coord3) / 3.0).xyz;
+    var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord3) / 59.0).xyz;
+    var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 - coord3) / 13.0).xyz;
     var surface_color: vec3<f32> = mix(
         surfaceColor_rock, surfaceColor_grass,
         vec3<f32>(clamp(0.4*in.nor.x + 0.6*in.nor.y, 0.0, 1.0)));
@@ -106,13 +103,62 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     
     var final_color: vec4<f32> = vec4<f32>(ambient_component + attentuation * (diffuse_component + specular_component) , 1.0);
 
-    var the_color: vec3<f32> = rgb2hsv(final_color.xyz);
+    return final_color;
 
-    var dist_to_frag: f32 = distance(camerauniform.camera_pos.xyz, in.pos.xyz);
-    var blah: f32 = 1.0 / (1.0 + 0.0005 * pow(dist_to_frag,2.0));
+    // ++ var light_dir: vec3<f32> = normalize(light_pos - in.pos.xyz);
+    // ++ var normal: vec3<f32> = normalize(in.nor).xyz; // is this necessery? 
+    // ++ var diff_coeffient: f32 = max(0.0, dot(normal, light_dir));
+    // ++ var reflection_vector: vec3<f32> = reflect(-light_dir, normal);
+    // ++ var camera_dir: vec3<f32> = normalize(camerauniform.camera_pos.xyz - in.pos.xyz);
+    // ++ 
+    // ++ var cosAngle: f32 = max(0.0, dot(camera_dir, reflection_vector));
+    // ++ var specular_coeffient: f32 = 0.0;
 
-    the_color = the_color + vec3<f32>(0.0, 0.2, 0.0);
-    var the_color2: vec3<f32> = hsv2rgb(the_color);
+    // ++ if (diff_coeffient > 0.0) {
+    // ++     specular_coeffient = pow(cosAngle, material_shininess);
+    // ++ }
 
-    return vec4<f32>(mix(vec3<f32>(0.5, 0.0, 0.0), the_color2, vec3<f32>(blah)), 1.0);
+    // ++ var offset_factor: f32 = 1.5;
+    // ++ 
+    // ++ var coord1: vec2<f32> = in.pos.xy*offset_factor;
+    // ++ var coord2: vec2<f32> = in.pos.xz*offset_factor;
+    // ++ var coord3: vec2<f32> = in.pos.yz*offset_factor + in.pos.xz*offset_factor*offset_factor;
+
+    // ++ var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord3) / 59.0).xyz;
+    // ++ var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 - coord3) / 13.0).xyz;
+    // ++ // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (in.nor.xy + in.nor.yz) / 2.0).xyz;
+    // ++ // var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord2 + coord3) / 3.0).xyz;
+    // ++ // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 + coord3) / 3.0).xyz;
+    // ++ // var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, 0.5 * offset_factor * (sin(coord1) + cos(coord2) + coord3) / 3.0).xyz;
+    // ++ // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 0.5 * (cos(coord1) + sin(coord2) + coord3) / 3.0).xyz;
+    // ++ var surface_color: vec3<f32> = mix(
+    // ++     surfaceColor_rock, surfaceColor_grass,
+    // ++     vec3<f32>(clamp(0.4*in.nor.x + 0.6*in.nor.y, 0.0, 1.0)));
+    // ++ 
+   /// ++ /  var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord2 + coord3) / 3.0).xyz; //, offset_factor * (coord1 + coord2 + coord3) / 3.0).xyz;
+   /// ++ /  var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 + coord3) / 3.0).xyz;
+   /// ++ /  var surface_color: vec3<f32> = mix(
+   /// ++ /      surfaceColor_rock, surfaceColor_grass,
+   /// ++ /      vec3<f32>(clamp(0.4*in.nor.x + 0.6*in.nor.y, 0.0, 1.0)));
+
+    // ++ var specular_component: vec3<f32> = specular_coeffient * material_spec_color * light_color;
+    // ++ var ambient_component:  vec3<f32> = ambient_coeffience * light_color * surface_color.xyz;
+    // ++ var diffuse_component:  vec3<f32> = diff_coeffient * light_color * surface_color.xyz;
+    // ++ 
+    // ++ var distance_to_light: f32 = distance(in.pos.xyz, light_pos); 
+    // ++ var attentuation: f32 = 1.0 / (1.0 + attentuation_factor * pow(distance_to_light,2.0));
+    // ++ 
+    // ++ var final_color: vec4<f32> = vec4<f32>(ambient_component + attentuation * (diffuse_component + specular_component) , 1.0);
+
+    // ++ return final_color;
+
+    // ++ //var the_color: vec3<f32> = rgb2hsv(final_color.xyz);
+
+    // ++ // var dist_to_frag: f32 = distance(camerauniform.camera_pos.xyz, in.pos.xyz);
+    // ++ // var blah: f32 = 1.0 / (1.0 + 0.0005 * pow(dist_to_frag,2.0));
+
+    // ++ // the_color = the_color + vec3<f32>(0.0, 0.2, 0.0);
+    // ++ // var the_color2: vec3<f32> = hsv2rgb(the_color);
+
+    // ++ // return vec4<f32>(mix(vec3<f32>(0.5, 0.0, 0.0), the_color2, vec3<f32>(blah)), 1.0);
 }

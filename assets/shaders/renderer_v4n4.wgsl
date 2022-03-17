@@ -98,11 +98,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     
     var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord3) / 59.0).xyz;
     var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 - coord3) / 13.0).xyz;
-    // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (in.nor.xy + in.nor.yz) / 2.0).xyz;
-    // var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord2 + coord3) / 3.0).xyz;
-    // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 + coord3) / 3.0).xyz;
-    // var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, 0.5 * offset_factor * (sin(coord1) + cos(coord2) + coord3) / 3.0).xyz;
-    // var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 0.5 * (cos(coord1) + sin(coord2) + coord3) / 3.0).xyz;
     var surface_color: vec3<f32> = mix(
         surfaceColor_rock, surfaceColor_grass,
         vec3<f32>(clamp(0.4*in.nor.x + 0.6*in.nor.y, 0.0, 1.0)));

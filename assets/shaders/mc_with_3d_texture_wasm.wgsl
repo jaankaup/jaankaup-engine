@@ -25,8 +25,20 @@ struct DrawIndirect {
     base_instance: u32; // The instance ID of the first instance to draw.
 };
 
+struct VertexArray {
+    data: [[stride(32)]] array<Vertex>;
+};
+
+struct DI {
+    data: [[stride(16)]] array<DrawIndirect>; //oho0
+};
+
 struct Counter {
-    counter: atomic<u32>;
+    counter: [[stride(4)]] array<atomic<u32>>;
+};
+
+struct Noise {
+    data: [[stride(4)]] array<f32>;
 };
 
 [[group(0), binding(0)]]
@@ -34,16 +46,16 @@ var<uniform> mc_uniform: McParams;
 
 [[group(0), binding(1)]]
 //var<storage, read_write> indirect: array<DrawIndirect>;
-var<storage, read_write> indirect: array<DrawIndirect>;
+var<storage, read_write> indirect: DI;
 
 [[group(0), binding(2)]]
-var<storage, read_write> counter: array<Counter>; // atomic<32> doesn't work!
+var<storage, read_write> counter: Counter; //array<Counter>; // atomic<32> doesn't work!
 
 [[group(0), binding(3)]]
-var<storage, read> noise_values: array<f32>;
+var<storage, read> noise_values: Noise; //array<f32>;
 
 [[group(0), binding(4)]]
-var<storage, read_write> output: array<Vertex>;
+var<storage, read_write> output: VertexArray; // array<Vertex>;
 
 var<private> cube: Cube;
 
@@ -467,7 +479,7 @@ fn calculate_density(v: vec3<i32>) -> f32 {
 
     // if (encode3Dmorton32(u32(v.x), u32(v.y), u32(v.z)) > 64u*64u*64u) { return 0.0; }
 
-    return noise_values[
+    return noise_values.data[
 	encode3Dmorton32(
             u32(v.x), u32(v.y), u32(v.z)
         )
@@ -583,7 +595,7 @@ fn createVertex(edgeValue: i32, arrayIndex: i32) {
     v.v = interpolateV(vert_a, vert_b);
     v.n = interpolateN(cube.normals[edge.x], cube.normals[edge.y], vert_a.a, vert_b.a);
 
-    output[arrayIndex] = v;
+    output.data[arrayIndex] = v;
 }
 
 fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u32> {
@@ -666,9 +678,12 @@ fn main([[builtin(local_invocation_id)]] local_id: vec3<u32>,
 
         if (base_index != 16777215u) { 
 
-            //let index = atomicAdd(&counter[0], 3u);
+            //let index = atomicAdd(&counter.counter[0], 3u);
+
             //let index = atomicAdd(&indirect[0].vertex_count, 3u);
-            let index = atomicAdd(&indirect.vertex_count, 3u);
+            //let index = atomicAdd(&indirect[0].vertex_count, 3u);
+            //let index = atomicAdd(&(DI.data[0].vertex_count), 3u);
+            let index = atomicAdd(&indirect.data[0].vertex_count, 3u);
 
             // Create the triangle vertices and normals.
             createVertex(i32((base_index & 0xff0000u) >> 16u), i32(index));
