@@ -119,7 +119,6 @@ impl Application for BasicApp {
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
                             //Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_wasm.wgsl"))),
-                    
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
                     &vec![

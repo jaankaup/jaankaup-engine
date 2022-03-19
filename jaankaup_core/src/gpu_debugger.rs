@@ -11,7 +11,7 @@ use crate::common_functions::{
     create_uniform_bindgroup_layout,
     create_buffer_bindgroup_layout
 };
-use crate::buffer::{buffer_from_data};
+use crate::buffer::{buffer_from_data, to_vec};
 use crate::camera::Camera;
 
 use crate::histogram::Histogram;
@@ -171,7 +171,7 @@ impl GpuDebugger {
                                       number_of_threads: 256,
                                       draw_index: 0,
                                       max_points_per_char: 5000,
-                                      max_number_of_vertices: 123}],
+                                      max_number_of_vertices: max_number_of_vertices}],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     None
                 )
@@ -637,6 +637,44 @@ impl GpuDebugger {
         self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
 
         let mut current_char_index = 0;
+
+        let cp = CharParams{ iterator_start: 0,
+                             iterator_end: number_of_chars,
+                             number_of_threads: 1024,
+                             draw_index: 0,
+                             max_points_per_char: 5000,
+                             max_number_of_vertices: self.max_number_of_vertices
+        };
+
+        queue.write_buffer(
+            &self.buffers.get(&"char_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[cp])
+        );
+
+        let mut encoder_char_preprocessor = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("char preprocessor encoder") });
+
+        self.compute_object_char_preprocessor.dispatch(
+            &self.compute_bind_groups_char_preprocessor,
+            &mut encoder_char_preprocessor,
+            // 1, 1, 1, Some("numbers dispatch")
+            1, 1, 1, Some("char preprocessor dispatch")
+        );
+
+        queue.submit(Some(encoder_char_preprocessor.finish()));
+
+        let pre_processor_result = to_vec::<Char>(
+            &device,
+            &queue,
+            self.buffers.get(&"output_chars".to_string()).unwrap(),
+            0,
+            (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
+        );
+
+        for (i, v) in pre_processor_result.iter().enumerate() {
+            println!("{:?} :: {:?}", i, v);
+        }
+
 
         // let mut ccc = -1;
         loop { 

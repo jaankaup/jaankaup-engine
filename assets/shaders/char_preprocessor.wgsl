@@ -9,7 +9,7 @@ struct CharParams{
     number_of_threads: u32,
     draw_index: atomic<u32>, 
     max_points_per_char: u32,
-    max_number_of_vertices: u32,
+    max_number_of_vertices: u32, // The maximum capacity of vexter buffer.
 };
 
 struct Char {
@@ -46,9 +46,26 @@ var<storage, read_write> indirect: array<DrawIndirect>;
 @group(0) @binding(3)
 var<storage,read_write> chars_array: array<Char>;
 
-var<private> total_char_count: u32;
+var<workgroup> wg_total_char_count: atomic<u32>; // Is atomic necessery?
+var<workgroup> wg_current_draw_indirect_number: atomic<u32>;
 
 var<workgroup> char_params_wg: CharParams;
+var<workgroup> wg_start_index: u32; 
+
+let NUMBER_OF_DRAW_INDIRECTS = 64u;
+let NUMBER_OF_THREADS = 1024u;
+
+// Temporary storage for elements.
+//var<workgroup> wg_chars: array<Char, NUMBER_OF_THREADS>; 
+var<workgroup> workgroup_chars: array<Char, NUMBER_OF_THREADS>; 
+
+// The number of DrawIndirects is 64.
+var<workgroup> wg_indirect_draws: array<DrawIndirect, 64>; 
+
+fn udiv_up_safe32(x: u32, y: u32) -> u32 {
+    let tmp = (x + y - 1u) / y;
+    return select(tmp, 0u, y == 0u); 
+}
 
 fn myTruncate(f: f32) -> f32 {
     return select(f32( i32( floor(f) ) ), f32( i32( ceil(f) ) ), f < 0.0); 
@@ -126,91 +143,26 @@ fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
 }
 
 // dots, brachets
+// vec_dim_count == 0   _  not used
 // vec_dim_count == 1   a
 // vec_dim_count == 2   (a , b)
 // vec_dim_count == 3   (a , b , c)
 // vec_dim_count == 4   (a , b , c , d)
-var<private> NumberOfExtraChars: array<u32, 4> = array<u32, 4>(0u, 3u, 4u, 5u);
+// vec_dim_count == 5   undefined
+var<private> NumberOfExtraChars: array<u32, 5> = array<u32, 5>(0u, 0u, 3u, 4u, 5u);
 
-fn number_of_chars_data(data: ptr<function, vec4<f32>>, vec_dim_count: u32, number_of_decimals: u32) -> u32 {
+// TODO: Instead of data, Element as reference.
+fn number_of_chars_data(data: vec4<f32>, vec_dim_count: u32, number_of_decimals: u32) -> u32 {
     
     // Calculate all possible char counts to avoid branches.
-    let a = number_of_chars_f32((*data).x, number_of_decimals) * u32(vec_dim_count >= 1u);
-    let b = number_of_chars_f32((*data).y, number_of_decimals) * u32(vec_dim_count >= 2u);
-    let c = number_of_chars_f32((*data).z, number_of_decimals) * u32(vec_dim_count >= 3u);
-    let d = number_of_chars_f32((*data).w, number_of_decimals) * u32(vec_dim_count >= 4u);
+    let a = number_of_chars_f32(data.x, number_of_decimals) * u32(vec_dim_count >= 1u);
+    let b = number_of_chars_f32(data.y, number_of_decimals) * u32(vec_dim_count >= 2u);
+    let c = number_of_chars_f32(data.z, number_of_decimals) * u32(vec_dim_count >= 3u);
+    let d = number_of_chars_f32(data.w, number_of_decimals) * u32(vec_dim_count >= 4u);
 
     return a + b + c + d + NumberOfExtraChars[vec_dim_count]; 
 }
 
-// @param n : number that should be rendered.
-// @ignore_first : ignore the first number. This should be false when rendering u32. 
-// @total_vertex_count : total number of vertices per cha for rendering. 
-fn log_number(n: i32, ignore_first: bool, total_vertex_count: u32) {
-
-    var found = false;
-    var ignore = ignore_first;
-    var temp_n = abs(n);
-
-    //++ // Only one char are produced.
-    //++ if (n == 0) {
-
-    //++     create_char(0u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    //++     *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0) * font_size;
-    //++ }
-
-    //++ // Add minus if negative.
-    //++ if (n < 0) {
-    //++     create_char(10u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    //++     *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0) * font_size;
-    //++ }
-
-    //++ for (var i: i32 = 9 ; i>=0 ; i = i - 1) {
-    //++     let remainder = temp_n / i32(joo[i]);  
-    //++     temp_n = temp_n - remainder * joo[i];
-    //++     found = select(found, true, remainder != 0);
-    //++     if (found == true) {
-    //++         if (ignore == true) { ignore = false; continue; }
-    //++         
-    //++         create_char(u32(remainder), thread_index, total_vertex_count, *base_pos, col, font_size);
-    //++         *base_pos = *base_pos + vec4<f32>(1.0, 0.0, 0.0, 0.0) * font_size;
-    //++     }
-    //++ }
-}
-
-fn numb_vertices_float(f: f32, max_decimals: u32, total_vertex_count: u32) {
-
-    //++ if (f == 0.0) {
-    //++     log_number(0, thread_index, false, base_pos, total_vertex_count, col, font_size);
-    //++     *base_pos = *base_pos - vec4<f32>(0.1, 0.0, 0.0, 0.0) * font_size;
-    //++     create_char(13u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    //++     *base_pos = *base_pos + vec4<f32>(0.3, 0.0, 0.0, 0.0) * font_size;
-
-    //++     for (var i: i32 = 0; i<i32(max_decimals); i = i + 1) {
-    //++         log_number(0, thread_index, true, base_pos, total_vertex_count, col, font_size);
-    //++     }
-    //++     return;
-    //++ }
-
-    //++ let fract_and_whole = my_modf(f); 
-
-    //++ // Multiply fractional part. 
-    //++ let fract_part = i32((abs(fract_and_whole.fract) + 1.0) * f32(joo[max_decimals]));
-
-    //++ // Cast integer part to uint.
-    //++ let integer_part = i32(fract_and_whole.whole);
-
-    //++ // Parse the integer part.
-    //++ log_number(integer_part, thread_index, false, base_pos, total_vertex_count, col, font_size);
-
-    //++ // TODO: create_dot function for this.
-    //++ *base_pos = *base_pos - vec4<f32>(0.1, 0.0, 0.0, 0.0) * font_size;
-    //++ create_char(13u, thread_index, total_vertex_count, *base_pos, col, font_size);
-    //++ *base_pos = *base_pos + vec4<f32>(0.3, 0.0, 0.0, 0.0) * font_size;
-
-    //++ // Parse the frag part.
-    //++ log_number(abs(fract_part), thread_index, true, base_pos, total_vertex_count, col, font_size);
-}
 
 @stage(compute)
 @workgroup_size(1024,1,1)
@@ -219,19 +171,59 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    if (global_id.x >= char_params[0].iterator_end) { return; } 
+    // Initialize workgroup attributes.
+    if (local_id.x == 0u) {
+        wg_start_index = 0u;
+        wg_total_char_count = 0u;
+        wg_current_draw_indirect_number = 0u;
+    }
+    workgroupBarrier();
 
-    total_char_count = 0u;
+    // Initialize the workgroup DrawIndirect structs.
+    if (local_index < NUMBER_OF_DRAW_INDIRECTS) {
+        atomicAnd(&(wg_indirect_draws[local_index].vertex_count), 0u);
+        wg_indirect_draws[local_index].instance_count = 1u;
+        wg_indirect_draws[local_index].base_vertex = 0u;
+        wg_indirect_draws[local_index].base_instance = 0u;
+    }
+    workgroupBarrier();
 
-    // Load element. 
-    let ch = chars_array[global_id.x];
+    let number_of_chunks = udiv_up_safe32(NUMBER_OF_THREADS, char_params[0].iterator_end);
 
-    // Calculate distance to the element
-    let dist = min(max(1.0, distance(camera.pos.xyz, ch.start_pos.xyz)), 255.0);
+    for (var i: u32 = 0u; i < number_of_chunks ; i = i + 1u) {
+        workgroupBarrier();
 
-    // Calculate the vertex count per char.
-    let total_vertex_count = min(u32(f32(char_params[0].max_points_per_char) / f32(dist)), char_params[0].max_points_per_char);
+        let global_index = local_index + i * NUMBER_OF_THREADS;
+        
+        // Avoid buffer overflow.
+        if (global_index >= char_params[0].iterator_end) { continue; }
 
-    // Determine the draw start offset and the number of vertices for drawing the element.
+        //++ total_char_count = 0u;
 
+        // Load element. 
+        var ch = chars_array[global_index];
+
+        // Calculate the distance between camera and element
+        let dist = min(max(1.0, distance(camera.pos.xyz, ch.start_pos.xyz)), 255.0);
+
+        // Calculate the vertex count per char.
+        let vertex_count_per_char = min(u32(f32(char_params[0].max_points_per_char) / f32(dist)), char_params[0].max_points_per_char);
+
+        // Calculate the total vertex count. 
+        let total_number_of_vertices = number_of_chars_data(ch.value, ch.vec_dim_count, 2u); // 2u, number of cedimals.
+
+        // Update the total vertice count.
+        let vertices_so_far = atomicAdd(&wg_total_char_count, total_number_of_vertices);
+
+        ch.point_count = total_number_of_vertices; // * vertex_count_per_char;
+        ch.draw_index = vertices_so_far / char_params[0].max_number_of_vertices;
+
+        // var hekoheko = atomicCompareExchangeWeak(&wg_current_draw_indirect_number,  
+ 
+        chars_array[global_index] = ch;
+
+        // workgroup_chars[local_index] = ch;
+    }
+
+    //++ // Determine the draw start offset and the number of vertices for drawing the element.
 }

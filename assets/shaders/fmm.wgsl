@@ -219,11 +219,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                             min_box.z + 2.0
                   ),
                   0.3,
-                  vec4<f32>(1.0, 0.0, 0.0, 0.0),
-                  1u,
+                  vec4<f32>(f32(global_id.x) * 3.0, 0.0, f32(global_id.x) * 100.0, 0.0),
+                  4u,
                   rgba_u32(255u, 0u, 2550u, 255u),
                   0u,
-                  500u
+                  0u
               );
 
     // if (local_index == 0u) {
