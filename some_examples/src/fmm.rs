@@ -396,7 +396,7 @@ impl Application for Fmm {
             //let fmm_block = FmmBlock{index: i as u32, band_points_count: 0 , };
             let fmm_block = FmmBlock{index: i as u32, band_points_count: if contains { i as u32 } else {0} , };
             fmm_blocks.push(fmm_block);
-            println!("{:?}", fmm_block); 
+            // println!("{:?}", fmm_block); 
         }
 
 

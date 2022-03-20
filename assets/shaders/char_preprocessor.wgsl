@@ -56,11 +56,20 @@ let NUMBER_OF_DRAW_INDIRECTS = 64u;
 let NUMBER_OF_THREADS = 1024u;
 
 // Temporary storage for elements.
-//var<workgroup> wg_chars: array<Char, NUMBER_OF_THREADS>; 
 var<workgroup> workgroup_chars: array<Char, NUMBER_OF_THREADS>; 
 
 // The number of DrawIndirects is 64.
 var<workgroup> wg_indirect_draws: array<DrawIndirect, 64>; 
+
+let DUMMY_CHAR = Char(
+    vec3<f32>(0.0, 0.0, 0.0),
+    0.0,
+    vec4<f32>(0.0, 0.0, 0.0, 0.0),
+    0u,
+    0u,
+    5000000u,
+    0u,
+);
 
 fn udiv_up_safe32(x: u32, y: u32) -> u32 {
     let tmp = (x + y - 1u) / y;
@@ -163,6 +172,24 @@ fn number_of_chars_data(data: vec4<f32>, vec_dim_count: u32, number_of_decimals:
     return a + b + c + d + NumberOfExtraChars[vec_dim_count]; 
 }
 
+// Bitonic sort.
+fn bitonic(thread_index: u32) {
+
+  for (var k: u32 = 2u; k <= NUMBER_OF_THREADS; k = k << 1u) {
+  for (var j: u32 = k >> 1u ; j > 0u; j = j >> 1u) {
+    workgroupBarrier();
+
+    let index = thread_index; 
+    let ixj = index ^ j;
+    let a = workgroup_chars[index];
+    let b = workgroup_chars[ixj];
+    if (ixj > index && (((index & k) == 0u && a.draw_index > b.draw_index) || ((index & k) != 0u && a.draw_index < b.draw_index)) ) {
+            workgroup_chars[index] = b;
+            workgroup_chars[ixj] = a;
+    }
+  }};
+}
+
 
 @stage(compute)
 @workgroup_size(1024,1,1)
@@ -195,8 +222,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         let global_index = local_index + i * NUMBER_OF_THREADS;
         
-        // Avoid buffer overflow.
-        if (global_index >= char_params[0].iterator_end) { continue; }
+        // Add some dummy padding values. Avoid buffer overflow.
+        if (global_index >= char_params[0].iterator_end) {
+             workgroup_chars[local_index] = DUMMY_CHAR;
+             continue;
+        }
 
         //++ total_char_count = 0u;
 
@@ -213,14 +243,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         let total_number_of_vertices = number_of_chars_data(ch.value, ch.vec_dim_count, 2u); // 2u, number of cedimals.
 
         // Update the total vertice count.
-        let vertices_so_far = atomicAdd(&wg_total_char_count, total_number_of_vertices);
+        let vertices_so_far = atomicAdd(&wg_total_char_count, total_number_of_vertices * vertex_count_per_char);
 
-        ch.point_count = total_number_of_vertices; // * vertex_count_per_char;
-        ch.draw_index = vertices_so_far / char_params[0].max_number_of_vertices;
+        ch.point_count = total_number_of_vertices * vertex_count_per_char;
+        ch.draw_index = vertices_so_far / 7000u; // char_params[0].max_number_of_vertices;
 
-        // var hekoheko = atomicCompareExchangeWeak(&wg_current_draw_indirect_number,  
+        workgroup_chars[local_index] = ch;
+
+        bitonic(local_index);
  
-        chars_array[global_index] = ch;
+        chars_array[global_index] = workgroup_chars[local_index]; //ch;
 
         // workgroup_chars[local_index] = ch;
     }
