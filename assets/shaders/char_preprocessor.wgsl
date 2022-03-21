@@ -4,7 +4,7 @@ struct Camera {
 };
 
 struct CharParams{
-    iterator_start: atomic<u32>,
+    vertices_so_far: atomic<u32>,
     iterator_end: u32,
     number_of_threads: u32,
     draw_index: atomic<u32>, 
@@ -29,6 +29,12 @@ struct DrawIndirect {
     base_instance: u32,
 };
 
+struct DispatchIndirect {
+    x: atomic<u32>,
+    y: atomic<u32>,
+    z: atomic<u32>,
+};
+
 struct ModF {
     fract: f32,
     whole: f32,
@@ -41,16 +47,15 @@ var<uniform> camera: Camera;
 var<storage, read_write> char_params: array<CharParams>;
 
 @group(0) @binding(2)
-var<storage, read_write> indirect: array<DrawIndirect>;
+var<storage, read_write> indirect: array<DispatchIndirect>;
+//var<storage, read_write> indirect: array<DrawIndirect>;
 
 @group(0) @binding(3)
 var<storage,read_write> chars_array: array<Char>;
 
-var<workgroup> wg_total_char_count: atomic<u32>; // Is atomic necessery?
-var<workgroup> wg_current_draw_indirect_number: atomic<u32>;
+var<workgroup> wg_total_vertice_count: atomic<u32>; // Is atomic necessery?
 
-var<workgroup> char_params_wg: CharParams;
-var<workgroup> wg_start_index: u32; 
+var<workgroup> wg_char_params: CharParams;
 
 let NUMBER_OF_DRAW_INDIRECTS = 64u;
 let NUMBER_OF_THREADS = 1024u;
@@ -58,8 +63,8 @@ let NUMBER_OF_THREADS = 1024u;
 // Temporary storage for elements.
 var<workgroup> workgroup_chars: array<Char, NUMBER_OF_THREADS>; 
 
-// The number of DrawIndirects is 64.
-var<workgroup> wg_indirect_draws: array<DrawIndirect, 64>; 
+// The number of DispatchIndirects is 64.
+var<workgroup> wg_indirect_dispatchs: array<DispatchIndirect, 64>; 
 
 let DUMMY_CHAR = Char(
     vec3<f32>(0.0, 0.0, 0.0),
@@ -67,7 +72,7 @@ let DUMMY_CHAR = Char(
     vec4<f32>(0.0, 0.0, 0.0, 0.0),
     0u,
     0u,
-    5000000u,
+    5000000u, // Big enough.
     0u,
 );
 
@@ -200,62 +205,93 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // Initialize workgroup attributes.
     if (local_id.x == 0u) {
-        wg_start_index = 0u;
-        wg_total_char_count = 0u;
-        wg_current_draw_indirect_number = 0u;
+        wg_char_params = char_params[0];
+        // wg_total_vertice_count = 0u;
     }
     workgroupBarrier();
 
     // Initialize the workgroup DrawIndirect structs.
     if (local_index < NUMBER_OF_DRAW_INDIRECTS) {
-        atomicAnd(&(wg_indirect_draws[local_index].vertex_count), 0u);
-        wg_indirect_draws[local_index].instance_count = 1u;
-        wg_indirect_draws[local_index].base_vertex = 0u;
-        wg_indirect_draws[local_index].base_instance = 0u;
+        // wg_indirect_dispatchs[local_index] = DispatchIndirect(0u, 1u, 1u);
+        wg_indirect_dispatchs[local_index].x = 0u;
+        wg_indirect_dispatchs[local_index].y = 1u;
+        wg_indirect_dispatchs[local_index].z = 1u;
     }
     workgroupBarrier();
 
-    let number_of_chunks = udiv_up_safe32(NUMBER_OF_THREADS, char_params[0].iterator_end);
+    //let number_of_chunks = udiv_up_safe32(NUMBER_OF_THREADS, wg_char_params.iterator_end);
+    let number_of_chunks = udiv_up_safe32(wg_char_params.iterator_end, NUMBER_OF_THREADS);
 
     for (var i: u32 = 0u; i < number_of_chunks ; i = i + 1u) {
         workgroupBarrier();
 
         let global_index = local_index + i * NUMBER_OF_THREADS;
         
-        // Add some dummy padding values. Avoid buffer overflow.
-        if (global_index >= char_params[0].iterator_end) {
-             workgroup_chars[local_index] = DUMMY_CHAR;
-             continue;
+        if (global_index < wg_char_params.iterator_end) {
+
+            // Load element. 
+            var ch = chars_array[global_index];
+
+            // Calculate the distance between camera and element
+            let dist = min(max(1.0, distance(camera.pos.xyz, ch.start_pos.xyz)), 255.0);
+
+            // Calculate the vertex count per char.
+            let vertex_count_per_char = min(u32(f32(wg_char_params.max_points_per_char) / f32(dist)), char_params[0].max_points_per_char);
+
+            // Calculate the total vertex count. 
+            let total_number_of_chars = number_of_chars_data(ch.value, ch.vec_dim_count, 2u); // 2u, number of cedimals.
+
+            // Update the total vertice count.
+            let vertices_so_far = atomicAdd(&(wg_char_params.vertices_so_far), total_number_of_chars * vertex_count_per_char);
+
+            // Calculate the actual vertex count.
+            ch.point_count = total_number_of_chars * vertex_count_per_char;
+
+            // Determine in which indirect draw group this element belongs to. 
+            ch.draw_index = vertices_so_far / wg_char_params.max_number_of_vertices;
+
+            // Update indirect dispatch x.
+            atomicAdd(&wg_indirect_dispatchs[ch.draw_index].x, 1u);
+
+            // Copy data to workgroup memory.
+            workgroup_chars[local_index] = ch;
         }
 
-        //++ total_char_count = 0u;
+        // Add some dummy padding values. The is necessery because we use bitonic sort. Avoid buffer overflow.
+        if (global_index >= wg_char_params.iterator_end) {
+             workgroup_chars[local_index] = DUMMY_CHAR;
+        }
 
-        // Load element. 
-        var ch = chars_array[global_index];
-
-        // Calculate the distance between camera and element
-        let dist = min(max(1.0, distance(camera.pos.xyz, ch.start_pos.xyz)), 255.0);
-
-        // Calculate the vertex count per char.
-        let vertex_count_per_char = min(u32(f32(char_params[0].max_points_per_char) / f32(dist)), char_params[0].max_points_per_char);
-
-        // Calculate the total vertex count. 
-        let total_number_of_vertices = number_of_chars_data(ch.value, ch.vec_dim_count, 2u); // 2u, number of cedimals.
-
-        // Update the total vertice count.
-        let vertices_so_far = atomicAdd(&wg_total_char_count, total_number_of_vertices * vertex_count_per_char);
-
-        ch.point_count = total_number_of_vertices * vertex_count_per_char;
-        ch.draw_index = vertices_so_far / 7000u; // char_params[0].max_number_of_vertices;
-
-        workgroup_chars[local_index] = ch;
-
+        // Sort data by draw index.
         bitonic(local_index);
  
-        chars_array[global_index] = workgroup_chars[local_index]; //ch;
+        if (global_index < wg_char_params.iterator_end) {
 
-        // workgroup_chars[local_index] = ch;
+            // Scatter the data back to global memory.
+            chars_array[global_index] = workgroup_chars[local_index];
+        }
+
     }
 
-    //++ // Determine the draw start offset and the number of vertices for drawing the element.
+    // Scatter indirect results.
+    if (local_index < NUMBER_OF_DRAW_INDIRECTS) {
+        indirect[local_index] = wg_indirect_dispatchs[local_index];
+    }
+
+    // Finally update the final output parameters.
+    if (local_index == 0u) {
+        // TODO: can this overflow?
+        wg_char_params.draw_index = wg_char_params.vertices_so_far / wg_char_params.max_number_of_vertices;
+        char_params[0] = wg_char_params; //.draw_index = wg_total_vertice_count / wg_char_params.max_number_of_vertices;
+        // char_params[0].vertices_so_far = wg_char_params.vertices_so_far;
+    }
+
+// struct CharParams{
+//     iterator_start: atomic<u32>,
+//     iterator_end: u32,
+//     number_of_threads: u32,
+//     draw_index: atomic<u32>, 
+//     max_points_per_char: u32,
+//     max_number_of_vertices: u32, // The maximum capacity of vexter buffer.
+// };
 }

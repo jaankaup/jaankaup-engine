@@ -14,7 +14,16 @@ pub struct DrawIndirect {
     pub base_instance: u32, // The instance ID of the first instance to draw.
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct DispatchIndirect {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+}
+
 impl_convert!{DrawIndirect}
+impl_convert!{DispatchIndirect}
 
 pub struct ComputeObject {
     pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,

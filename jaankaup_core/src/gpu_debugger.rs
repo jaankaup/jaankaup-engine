@@ -1,6 +1,6 @@
 use crate::texture::Texture;
 use std::mem::size_of;
-use crate::render_object::{RenderObject, ComputeObject, create_bind_groups,draw, draw_indirect, DrawIndirect};
+use crate::render_object::{RenderObject, ComputeObject, create_bind_groups,draw, draw_indirect, DrawIndirect, DispatchIndirect};
 use std::borrow::Cow;
 use crate::misc::Convert2Vec;
 use crate::impl_convert;
@@ -72,7 +72,7 @@ struct ArrowAabbParams{
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct CharParams{
-    iterator_start: u32,
+    vertices_this_far: u32,
     iterator_end: u32,
     number_of_threads: u32,
     draw_index: u32, 
@@ -153,12 +153,22 @@ impl GpuDebugger {
         ////////////////////////////////////////////////////
 
         buffers.insert(
-            "indirect_buffer".to_string(),
+            "indirect_draw_buffer".to_string(),
                 buffer_from_data::<DrawIndirect>(
                     &device,
                     &vec![DrawIndirect{ vertex_count: 0, instance_count: 1, base_vertex: 0, base_instance: 0, } ; 64],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDIRECT,
-                    None
+                    Some("Indirect draw buffer")
+                )
+        );
+
+        buffers.insert(
+            "indirect_dispatch_buffer".to_string(),
+                buffer_from_data::<DispatchIndirect>(
+                    &device,
+                    &vec![DispatchIndirect{ x: 0, y: 0, z: 0, } ; 64],
+                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDIRECT,
+                    Some("Indirect dispatch buffer")
                 )
         );
 
@@ -166,7 +176,7 @@ impl GpuDebugger {
             "char_params".to_string(),
                 buffer_from_data::<CharParams>(
                     &device,
-                    &vec![CharParams{ iterator_start: 0,
+                    &vec![CharParams{ vertices_this_far: 0,
                                       iterator_end: 0,
                                       number_of_threads: 256,
                                       draw_index: 0,
@@ -353,7 +363,7 @@ impl GpuDebugger {
                                           vec![
                                               &camera_buffer.as_entire_binding(),
                                               &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
-                                              &buffers.get(&"indirect_buffer".to_string()).unwrap().as_entire_binding(),
+                                              &buffers.get(&"indirect_draw_buffer".to_string()).unwrap().as_entire_binding(),
                                               // &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                                               &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
@@ -383,7 +393,7 @@ impl GpuDebugger {
                             // @group(0) @binding(1) var<storage, read_write> char_params: array<CharParams>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(2) var<storage, read_write> indirect: array<DrawIndirect>;
+                            // @group(0) @binding(2) var<storage, read_write> indirect: array<DispatchIndirect>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(3) var<storage,read_write> chars_array: array<Char>;
@@ -401,7 +411,7 @@ impl GpuDebugger {
                         vec![
                             &camera_buffer.as_entire_binding(),
                             &buffers.get(&"char_params".to_string()).unwrap().as_entire_binding(),
-                            &buffers.get(&"indirect_buffer".to_string()).unwrap().as_entire_binding(),
+                            &buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap().as_entire_binding(),
                             &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                         ]
                     ]
@@ -638,12 +648,14 @@ impl GpuDebugger {
 
         let mut current_char_index = 0;
 
-        let cp = CharParams{ iterator_start: 0,
+        println!("number of chars == {}", number_of_chars);
+
+        let cp = CharParams{ vertices_this_far: 0,
                              iterator_end: number_of_chars,
                              number_of_threads: 1024,
                              draw_index: 0,
                              max_points_per_char: 5000,
-                             max_number_of_vertices: self.max_number_of_vertices
+                             max_number_of_vertices: self.max_number_of_vertices - 500000 // TODO: ???
         };
 
         queue.write_buffer(
@@ -671,10 +683,37 @@ impl GpuDebugger {
             (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
         );
 
-        for (i, v) in pre_processor_result.iter().enumerate() {
-            println!("{:?} :: {:?}", i, v);
+        // for (i, v) in pre_processor_result.iter().enumerate() {
+        //     println!("{:?} :: {:?}", i, v);
+        // }
+
+        let pre_processor_dispatch = to_vec::<DispatchIndirect>(
+            &device,
+            &queue,
+            self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
+            0,
+            (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
+        );
+
+        let mut sum = 0;
+
+        for (i, v) in pre_processor_dispatch.iter().enumerate() {
+            // println!("{:?} :: {:?}", i, v);
+            sum = sum + v.x;
         }
 
+        // println!("sum == {}", sum);
+        // if (sum != 6400) { panic!("apuva"); }
+
+        let charparams_result = to_vec::<CharParams>(
+            &device,
+            &queue,
+            self.buffers.get(&"char_params".to_string()).unwrap(),
+            0,
+            (size_of::<CharParams>()) as wgpu::BufferAddress
+        );
+
+        println!("{:?}", charparams_result[0]);
 
         // let mut ccc = -1;
         loop { 
