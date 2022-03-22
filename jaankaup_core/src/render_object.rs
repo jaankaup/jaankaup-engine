@@ -77,6 +77,23 @@ impl ComputeObject {
         }
         pass.dispatch(x, y, z)
     }
+
+    pub fn dispatch_indirect(&self,
+                             bind_groups: &Vec<wgpu::BindGroup>,
+                             encoder: &mut wgpu::CommandEncoder,
+                             indirect_buffer: &wgpu::Buffer,
+                             offset: wgpu::BufferAddress,
+                             label: wgpu::Label) {
+
+        let mut pass = encoder.begin_compute_pass(
+            &wgpu::ComputePassDescriptor { label: label}
+        );
+        pass.set_pipeline(&self.pipeline);
+        for (e, bgs) in bind_groups.iter().enumerate() {
+            pass.set_bind_group(e as u32, &bgs, &[]);
+        }
+        pass.dispatch_indirect(indirect_buffer, offset);
+    }
 }
 
 pub struct RenderObject {
@@ -363,6 +380,7 @@ pub fn draw_indirect(
             pipeline: &wgpu::RenderPipeline,
             draw_buffer: &wgpu::Buffer,
             indirect_buffer: &wgpu::Buffer,
+            offset: wgpu::BufferAddress,
             clear: bool) {
 
     let mut render_pass = create_render_pass(
@@ -385,7 +403,7 @@ pub fn draw_indirect(
         draw_buffer.slice(..)
     );
     
-    render_pass.draw_indirect(indirect_buffer, 0);
+    render_pass.draw_indirect(indirect_buffer, offset);
 }
 
 pub fn draw(encoder: &mut wgpu::CommandEncoder,

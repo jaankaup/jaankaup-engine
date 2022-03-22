@@ -72,12 +72,13 @@ struct ArrowAabbParams{
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct CharParams{
-    vertices_this_far: u32,
+    vertices_so_far: u32,
     iterator_end: u32,
-    number_of_threads: u32,
     draw_index: u32, 
     max_points_per_char: u32,
     max_number_of_vertices: u32,
+    padding: [u32 ; 3],
+    dispatch_indirect_prefix_sum: [u32; 64],
 }
 
 impl_convert!{Arrow}
@@ -105,6 +106,7 @@ pub struct GpuDebugger {
     max_number_of_aabbs: u32,
     max_number_of_aabb_wires: u32,
     thread_count: u32,
+    histogram_dispatch_counter: Histogram,
 }
 
 impl GpuDebugger {
@@ -136,6 +138,8 @@ impl GpuDebugger {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         let histogram_draw_counts = Histogram::init(&device, &vec![0; 2]);
+
+        let histogram_dispatch_counter = Histogram::init(&device, &vec![0; 1]);
 
         // This must be given to the shaders that uses GpuDebugger.
         let histogram_element_counter = Histogram::init(&device, &vec![0; 4]);
@@ -176,12 +180,13 @@ impl GpuDebugger {
             "char_params".to_string(),
                 buffer_from_data::<CharParams>(
                     &device,
-                    &vec![CharParams{ vertices_this_far: 0,
+                    &vec![CharParams{ vertices_so_far: 0,
                                       iterator_end: 0,
-                                      number_of_threads: 256,
                                       draw_index: 0,
                                       max_points_per_char: 5000,
-                                      max_number_of_vertices: max_number_of_vertices}],
+                                      max_number_of_vertices: max_number_of_vertices,
+                                      padding: [1,2,3],
+                                      dispatch_indirect_prefix_sum: [0; 64]}],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     None
                 )
@@ -335,22 +340,17 @@ impl GpuDebugger {
                     Some("Numbers Compute object"),
                     &vec![
                         vec![
-                            // @group(0) @binding(0) var<uniform> camerauniform: Camera;
-                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+                            // @group(0) @binding(0) var<storage, read_write> indirect: array<DrawIndirect>;
+                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+                            
+                            // @group(0) @binding(1) var<storage, read_write> dispatch_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(1) var<uniform> arrow_aabb_params: VisualizationParams;
-                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
-
-                            // // @group(0) @binding(2) var<storage, read_write> counter: Counter;
-                            // create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
-                            // @group(0) @binding(2) var<storage, read_write> indirec: array<DrawIndirect>;
+                            // @group(0) @binding(1) var<storage,read_write> input: array<Char>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
-
-                            // @group(0) @binding(3) var<storage, read> counter: array<Arrow>;
+                            
+                            // @group(0) @binding(2) var<storage,read_write> output: array<VVVC>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
-
-                            // @group(0) @binding(4) var<storage,read_write> output: array<VertexBuffer>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
@@ -361,10 +361,8 @@ impl GpuDebugger {
                                       &compute_object_char.bind_group_layouts,
                                       &vec![
                                           vec![
-                                              &camera_buffer.as_entire_binding(),
-                                              &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
                                               &buffers.get(&"indirect_draw_buffer".to_string()).unwrap().as_entire_binding(),
-                                              // &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
+                                              &histogram_dispatch_counter.get_histogram_buffer().as_entire_binding(),
                                               &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                                               &buffers.get(&"output_render".to_string()).unwrap().as_entire_binding()
                                           ]
@@ -396,8 +394,11 @@ impl GpuDebugger {
                             // @group(0) @binding(2) var<storage, read_write> indirect: array<DispatchIndirect>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage,read_write> chars_array: array<Char>;
+                            // @group(0) @binding(3) var<storage, read_write> indirect: array<DrawIndirect>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage,read_write> chars_array: array<Char>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
@@ -412,11 +413,11 @@ impl GpuDebugger {
                             &camera_buffer.as_entire_binding(),
                             &buffers.get(&"char_params".to_string()).unwrap().as_entire_binding(),
                             &buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap().as_entire_binding(),
+                            &buffers.get(&"indirect_draw_buffer".to_string()).unwrap().as_entire_binding(),
                             &buffers.get(&"output_chars".to_string()).unwrap().as_entire_binding(),
                         ]
                     ]
         );
-
 
         ////////////////////////////////////////////////////
         ////               Compute arrow/aabb           ////
@@ -492,6 +493,7 @@ impl GpuDebugger {
             max_number_of_aabbs: max_number_of_aabbs,
             max_number_of_aabb_wires: max_number_of_aabb_wires,
             thread_count: thread_count,
+            histogram_dispatch_counter: histogram_dispatch_counter,
         }
     }
 
@@ -650,12 +652,13 @@ impl GpuDebugger {
 
         println!("number of chars == {}", number_of_chars);
 
-        let cp = CharParams{ vertices_this_far: 0,
-                             iterator_end: number_of_chars,
-                             number_of_threads: 1024,
+        let cp = CharParams{ vertices_so_far: 0,
+                             iterator_end: number_of_chars, 
                              draw_index: 0,
                              max_points_per_char: 5000,
-                             max_number_of_vertices: self.max_number_of_vertices - 500000 // TODO: ???
+                             max_number_of_vertices: self.max_number_of_vertices - 500000, // TODO: ???
+                             padding: [1,2,3],
+                             dispatch_indirect_prefix_sum: [0; 64],
         };
 
         queue.write_buffer(
@@ -664,47 +667,49 @@ impl GpuDebugger {
             bytemuck::cast_slice(&[cp])
         );
 
+        self.histogram_dispatch_counter.reset_all_cpu_version(queue, 0);
+
         let mut encoder_char_preprocessor = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("char preprocessor encoder") });
 
         self.compute_object_char_preprocessor.dispatch(
             &self.compute_bind_groups_char_preprocessor,
             &mut encoder_char_preprocessor,
-            // 1, 1, 1, Some("numbers dispatch")
             1, 1, 1, Some("char preprocessor dispatch")
         );
 
         queue.submit(Some(encoder_char_preprocessor.finish()));
 
-        let pre_processor_result = to_vec::<Char>(
-            &device,
-            &queue,
-            self.buffers.get(&"output_chars".to_string()).unwrap(),
-            0,
-            (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
-        );
+        // let pre_processor_result = to_vec::<Char>(
+        //     &device,
+        //     &queue,
+        //     self.buffers.get(&"output_chars".to_string()).unwrap(),
+        //     0,
+        //     (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
+        // );
 
         // for (i, v) in pre_processor_result.iter().enumerate() {
         //     println!("{:?} :: {:?}", i, v);
         // }
 
-        let pre_processor_dispatch = to_vec::<DispatchIndirect>(
-            &device,
-            &queue,
-            self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
-            0,
-            (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
-        );
+        // let pre_processor_dispatch = to_vec::<DispatchIndirect>(
+        //     &device,
+        //     &queue,
+        //     self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
+        //     0,
+        //     (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
+        // );
 
-        let mut sum = 0;
+        // let mut sum = 0;
 
-        for (i, v) in pre_processor_dispatch.iter().enumerate() {
-            // println!("{:?} :: {:?}", i, v);
-            sum = sum + v.x;
-        }
+        // for (i, v) in pre_processor_dispatch.iter().enumerate() {
+        //     // println!("{:?} :: {:?}", i, v);
+        //     sum = sum + v.x;
+        // }
 
         // println!("sum == {}", sum);
         // if (sum != 6400) { panic!("apuva"); }
 
+        // Get the number of indirect dispatches.
         let charparams_result = to_vec::<CharParams>(
             &device,
             &queue,
@@ -715,57 +720,100 @@ impl GpuDebugger {
 
         println!("{:?}", charparams_result[0]);
 
-        // let mut ccc = -1;
-        loop { 
-            // ccc = ccc + 1;
+        if charparams_result[0].vertices_so_far > 0 {
 
+            // Create point data from number elements and draw.
             let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
 
-            self.compute_object_char.dispatch(
-                &self.compute_bind_groups_char,
-                &mut encoder_char,
-                // 1, 1, 1, Some("numbers dispatch")
-                number_of_chars, 1, 1, Some("numbers dispatch")
-            );
+            for i in 0..(charparams_result[0].draw_index + 1) {
 
-            queue.submit(Some(encoder_char.finish()));
-
-            let counter = self.histogram_draw_counts.get_values(device, queue);
-            // self.draw_count_triangles = counter[0];
-            let draw_count_triangles = counter[0];
-
-            current_char_index = counter[1];
-
-            let mut encoder_char_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
-
-            draw(&mut encoder_char_rendering,
-                 &view,
-                 &depth_texture,
-                 &self.render_bind_groups_vvvc,
-                 &self.render_object_vvvc.pipeline,
-                 &self.buffers.get("output_render").unwrap(),
-                 0..draw_count_triangles.min(self.max_number_of_vertices * 2),
-                 *clear
-            );
-            queue.submit(Some(encoder_char_rendering.finish()));
-
-            self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
-
-            // There are still chars left.
-            if current_char_index != 0 && current_char_index != self.arrow_aabb_params.iterator_end_index - 1 {
-                self.arrow_aabb_params.iterator_start_index = current_char_index;
-                self.arrow_aabb_params.iterator_end_index = number_of_chars;
-                self.arrow_aabb_params.element_type = 0;
-                self.arrow_aabb_params.max_number_of_vertices = std::cmp::max((self.max_number_of_vertices * 2) as i32 - 500000, 0) as u32;
-
-                queue.write_buffer(
-                    &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-                    0,
-                    bytemuck::cast_slice(&[self.arrow_aabb_params])
+                self.compute_object_char.dispatch_indirect(
+                    &self.compute_bind_groups_char,
+                    &mut encoder_char,
+                    &self.buffers.get("indirect_dispatch_buffer").unwrap(),
+                    // i as wgpu::BufferAddress,
+                    (i * std::mem::size_of::<DispatchIndirect>() as u32) as wgpu::BufferAddress,
+                    Some("numbers dispatch")
                 );
 
+                draw_indirect(
+                     &mut encoder_char,
+                     &view,
+                     &depth_texture,
+                     &self.render_bind_groups_vvvc,
+                     &self.render_object_vvvc.pipeline,
+                     &self.buffers.get("output_render").unwrap(),
+                     &self.buffers.get("indirect_draw_buffer").unwrap(),
+                     (i * std::mem::size_of::<DrawIndirect>() as u32) as wgpu::BufferAddress,
+                     //i as wgpu::BufferAddress,
+                     *clear
+                );
+
+                // draw(&mut encoder_char_rendering,
+                //      &view,
+                //      &depth_texture,
+                //      &self.render_bind_groups_vvvc,
+                //      &self.render_object_vvvc.pipeline,
+                //      &self.buffers.get("output_render").unwrap(),
+                //      0..draw_count_triangles.min(self.max_number_of_vertices * 2),
+                //      *clear
+                // );
             }
-            else { break; }
+
+            queue.submit(Some(encoder_char.finish()));
         }
+
+        // let mut ccc = -1;
+        // loop { 
+        //     // ccc = ccc + 1;
+
+        //     let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+
+        //     self.compute_object_char.dispatch(
+        //         &self.compute_bind_groups_char,
+        //         &mut encoder_char,
+        //         // 1, 1, 1, Some("numbers dispatch")
+        //         number_of_chars, 1, 1, Some("numbers dispatch")
+        //     );
+
+        //     queue.submit(Some(encoder_char.finish()));
+
+        //     let counter = self.histogram_draw_counts.get_values(device, queue);
+        //     // self.draw_count_triangles = counter[0];
+        //     let draw_count_triangles = counter[0];
+
+        //     current_char_index = counter[1];
+
+        //     let mut encoder_char_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+
+        //     draw(&mut encoder_char_rendering,
+        //          &view,
+        //          &depth_texture,
+        //          &self.render_bind_groups_vvvc,
+        //          &self.render_object_vvvc.pipeline,
+        //          &self.buffers.get("output_render").unwrap(),
+        //          0..draw_count_triangles.min(self.max_number_of_vertices * 2),
+        //          *clear
+        //     );
+        //     queue.submit(Some(encoder_char_rendering.finish()));
+
+        //     self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
+
+        //     // There are still chars left.
+        //     if current_char_index != 0 && current_char_index != self.arrow_aabb_params.iterator_end_index - 1 {
+        //         self.arrow_aabb_params.iterator_start_index = current_char_index;
+        //         self.arrow_aabb_params.iterator_end_index = number_of_chars;
+        //         self.arrow_aabb_params.element_type = 0;
+        //         self.arrow_aabb_params.max_number_of_vertices = std::cmp::max((self.max_number_of_vertices * 2) as i32 - 500000, 0) as u32;
+
+        //         queue.write_buffer(
+        //             &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
+        //             0,
+        //             bytemuck::cast_slice(&[self.arrow_aabb_params])
+        //         );
+
+        //     }
+        //     else { break; }
+        // }
     }
 }

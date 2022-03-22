@@ -3,13 +3,22 @@ struct Camera {
     pos: vec4<f32>,
 };
 
+// struct CharParams{
+//     vertices_so_far: atomic<u32>,
+//     iterator_end: u32,
+//     number_of_threads: u32,
+//     draw_index: atomic<u32>, 
+//     max_points_per_char: u32,
+//     max_number_of_vertices: u32, // The maximum capacity of vexter buffer.
+// };
+
 struct CharParams{
     vertices_so_far: atomic<u32>,
-    iterator_end: u32,
-    number_of_threads: u32,
-    draw_index: atomic<u32>, 
+    iterator_end: u32, 
+    draw_index: u32, 
     max_points_per_char: u32,
-    max_number_of_vertices: u32, // The maximum capacity of vexter buffer.
+    max_number_of_vertices: u32,
+    dispatch_indirect_prefix_sum: array<atomic<u32>, 64>, // [u32; 64],
 };
 
 struct Char {
@@ -48,9 +57,11 @@ var<storage, read_write> char_params: array<CharParams>;
 
 @group(0) @binding(2)
 var<storage, read_write> indirect: array<DispatchIndirect>;
-//var<storage, read_write> indirect: array<DrawIndirect>;
 
 @group(0) @binding(3)
+var<storage, read_write> draw_indirect: array<DrawIndirect>;
+
+@group(0) @binding(4)
 var<storage,read_write> chars_array: array<Char>;
 
 var<workgroup> wg_total_vertice_count: atomic<u32>; // Is atomic necessery?
@@ -216,6 +227,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         wg_indirect_dispatchs[local_index].x = 0u;
         wg_indirect_dispatchs[local_index].y = 1u;
         wg_indirect_dispatchs[local_index].z = 1u;
+        draw_indirect[local_index].vertex_count = 0u;
     }
     workgroupBarrier();
 
