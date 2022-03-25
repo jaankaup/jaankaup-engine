@@ -277,7 +277,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             // Calculate the vertex count per char.
             let vertex_count_per_char = min(u32(f32(wg_char_params.max_points_per_char) / f32(dist)), char_params[0].max_points_per_char);
             set_points_per_char(vertex_count_per_char, &ch);
-            //set_points_per_char(vertex_count_per_char, &ch.auxiliary_data);
 
             // Calculate the total vertex count. 
             let total_number_of_chars = number_of_chars_data(ch.value, ch.vec_dim_count, ch.decimal_count);
@@ -286,15 +285,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             // Update the total vertice count.
             let vertices_so_far = atomicAdd(&(wg_char_params.vertices_so_far), total_number_of_chars * vertex_count_per_char);
 
-            // Calculate the actual vertex count.
-            //ch.point_count = total_number_of_chars * vertex_count_per_char;
-
             // Determine in which indirect draw group this element belongs to. 
-
             let draw_index = vertices_so_far / wg_char_params.max_number_of_vertices;
-            //++++ set_draw_index(draw_index, &ch.auxiliary_data); 
             set_draw_index(draw_index, &ch); 
-            // ch.draw_index = vertices_so_far / wg_char_params.max_number_of_vertices;
 
             // Update indirect dispatch x.
             atomicAdd(&wg_indirect_dispatchs[draw_index].x, 1u);
@@ -304,6 +297,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         }
 
         // Add some dummy padding values. The is necessery because we use bitonic sort. Avoid buffer overflow.
+        // Prefix scan is a better choice.
         if (global_index >= wg_char_params.iterator_end) {
              workgroup_chars[local_index] = DUMMY_CHAR;
         }
@@ -316,7 +310,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             // Scatter the data back to global memory.
             chars_array[global_index] = workgroup_chars[local_index];
         }
-
     }
 
     // Scatter indirect results.
@@ -326,18 +319,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // Finally update the final output parameters.
     if (local_index == 0u) {
-        // TODO: can this overflow?
+        // TODO: can this overflow? Implement prefix scan.
         wg_char_params.draw_index = wg_char_params.vertices_so_far / wg_char_params.max_number_of_vertices;
-        char_params[0] = wg_char_params; //.draw_index = wg_total_vertice_count / wg_char_params.max_number_of_vertices;
-        // char_params[0].vertices_so_far = wg_char_params.vertices_so_far;
+        char_params[0] = wg_char_params;
     }
-
-// struct CharParams{
-//     iterator_start: atomic<u32>,
-//     iterator_end: u32,
-//     number_of_threads: u32,
-//     draw_index: atomic<u32>, 
-//     max_points_per_char: u32,
-//     max_number_of_vertices: u32, // The maximum capacity of vexter buffer.
-// };
 }

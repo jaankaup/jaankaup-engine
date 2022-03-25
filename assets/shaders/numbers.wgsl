@@ -41,7 +41,9 @@ struct Char {
 };
 
 struct WorkGroupParams {
+    wg_char: Char,
     start_index: atomic<u32>,
+    char_id: u32,
 };
 
 struct PirateParams {
@@ -49,10 +51,9 @@ struct PirateParams {
 };
 
 var<workgroup> workgroup_params: WorkGroupParams; 
-var<workgroup> wg_char: Char;
+//var<workgroup> wg_char: Char;
 
 var<private> private_params: PirateParams; 
-
 
 // A struct for errors.
 // vertex_overflow: 0 :: OK, n :: amount of overflow.
@@ -101,17 +102,17 @@ fn get_draw_index(aux_data: u32) -> u32 {
     return (aux_data & 0xfc00000u) >> 22u;
 }
 
-fn set_points_per_char(v: u32, aux_data: ptr<function, u32>) {
-    *aux_data = (*aux_data & (!0x3FFFu)) | v;
-}
-
-fn set_number_of_chars(v: u32, aux_data: ptr<function, u32>) {
-    *aux_data = (*aux_data & (!0x3fc000u)) | (v << 14u);
-}
-
-fn set_draw_index(v: u32, aux_data: ptr<function, u32>) {
-    *aux_data = (*aux_data & (!0xfc00000u)) | (v << 22u);
-}
+// fn set_points_per_char(v: u32, aux_data: ptr<function, u32>) {
+//     *aux_data = (*aux_data & (!0x3FFFu)) | v;
+// }
+// 
+// fn set_number_of_chars(v: u32, aux_data: ptr<function, u32>) {
+//     *aux_data = (*aux_data & (!0x3fc000u)) | (v << 14u);
+// }
+// 
+// fn set_draw_index(v: u32, aux_data: ptr<function, u32>) {
+//     *aux_data = (*aux_data & (!0xfc00000u)) | (v << 22u);
+// }
 
 // FONT STUFF
 
@@ -530,7 +531,13 @@ fn create_char(char_index: u32,
         u32(bez_values[3].w * f32(num_points))
     );
 
-    let base_offset = atomicAdd(&workgroup_params.start_index, num_points);
+    if (private_params.this_id == 0u) {
+        //++ workgroup_params.start_index = atomicAdd(&workgroup_params.start_index, num_points);
+        workgroup_params.start_index = atomicAdd(&indirect[get_draw_index(workgroup_params.wg_char.auxiliary_data)].vertex_count, num_points);
+    }
+    workgroupBarrier();
+
+    let base_offset = workgroup_params.start_index;
 
     var start_offsets = vec4<u32>(
         base_offset,
@@ -794,15 +801,17 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     if (local_index == 0u) {
         let char_number = atomicAdd(&dispatch_counter[0], 1u);
-        wg_char = input[char_number]; 
-        workgroup_params.start_index =
-           atomicAdd(&indirect[get_draw_index(wg_char.auxiliary_data)].vertex_count,
-                     get_points_per_char(wg_char.auxiliary_data) * get_number_of_chars(wg_char.auxiliary_data));
+        workgroup_params.char_id = char_number;
+        workgroup_params.wg_char = input[char_number]; 
+        // workgroup_params.start_index =
+        //    atomicAdd(&indirect[get_draw_index(workgroup_params.wg_char.auxiliary_data)].vertex_count,
+        //              get_points_per_char(workgroup_params.wg_char.auxiliary_data) * get_number_of_chars(workgroup_params.wg_char.auxiliary_data));
     }
     workgroupBarrier();
 
-    // Load element. TODO: from hash array. TODO: use workgroup Char instead.
-    var ch = wg_char; // input[atomicAdd(&dispatch_counter[0], 1u)]; 
+    // Load element. TODO: from hash array. TODO: use workgroup Char instead?
+    var ch = input[workgroup_params.char_id]; 
+    // private_char = wg_char;
 
     // Store thread id.
     private_params.this_id = local_index;
@@ -824,8 +833,13 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // );
 
     //log_float(f32(get_number_of_chars(ch.auxiliary_data)),
-    log_float(f32(ch.value.x),
-              4u, //ch.decimal_count,
+    //log_float(f32(ch.value.x),
+
+    // WHY?
+    var decimals = 4u; //ch.decimal_count;
+
+    log_float(ch.value.x,
+              decimals, //workgroup_params.wg_char.decimal_count,
               &jooo,
               get_points_per_char(ch.auxiliary_data),
               ch.color,
