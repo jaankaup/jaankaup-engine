@@ -10,15 +10,61 @@ struct Arrow {
     size:  f32,
 };
 
+// vec_dim_count 
+//
+//  31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 9  8  7  6  5  4  3  2  1  0
+// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+// |  |  |  |  |d |d |d |d |d |d |n |n |n |n |n |n |n |n |pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc| 
+// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+// |-----------|------- d -------|--------- n -----------|----------------- pc --------------------|
+//
+//  0-13 [0..16384] points_per_char 
+// 14-21 [0..512]   number_of_chars
+// 22-27 [0..64]    draw_index
+//
+// mask points_per_char = 3FFF 
+// mask number_of_chars = 3fc000 ( >> 14) 
+// mask draw_index = fc00000 ( >> 22)
+//
+
 struct Char {
-    start_pos: vec3<f32>, // encode start.pos.w the decimal_count. TODO: something better.
+    start_pos: vec3<f32>,
     font_size: f32,
     value: vec4<f32>,
     vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32,
-    draw_index: u32,
-    point_count: u32,
+    decimal_count: u32,
+    auxiliary_data: u32,
 };
+
+// fn get_points_per_char(aux_data: u32) -> u32 {
+//     return aux_data & 0x3FFFu;
+// }
+// 
+// fn get_number_of_chars(aux_data: u32) -> u32 {
+//     return (aux_data & 0x3fc000u) >> 14u;
+// }
+// 
+// fn get_draw_index(aux_data: u32) -> u32 {
+//     return (aux_data & 0xfc00000u) >> 22u;
+// }
+// 
+// fn set_points_per_char(v: u32, ch: ptr<function, Char>) {
+//     (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0x3FFFu)) | v;
+// }
+// 
+// fn set_number_of_chars(v: u32, ch: ptr<function, Char>) {
+//     (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0x3fc000u)) | (v << 14u);
+// }
+// 
+// fn set_draw_index(v: u32, ch: ptr<function, Char>) {
+//     (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0xfc00000u)) | (v << 22u);
+// }
+
+fn udiv_up_safe32(x: u32, y: u32) -> u32 {
+    let tmp = (x + y - 1u) / y;
+    return select(tmp, 0u, y == 0u); 
+}
 
 struct ModF {
     fract: f32,
@@ -71,12 +117,13 @@ let THREAD_COUNT = 64u;
 
 //////// ModF ////////
 
-fn myTruncate(f: f32) -> f32 {
-    return select(f32( i32( floor(f) ) ), f32( i32( ceil(f) ) ), f < 0.0); 
-}
+// fn myTruncate(f: f32) -> f32 {
+//     return select(f32( i32( floor(f) ) ), f32( i32( ceil(f) ) ), f < 0.0); 
+// }
 
 fn my_modf(f: f32) -> ModF {
-    let iptr = myTruncate(f);
+    //let iptr = myTruncate(f);
+    let iptr = trunc(f);
     let fptr = f - iptr;
     return ModF (
         select(fptr, (-1.0)*fptr, f < 0.0),
@@ -216,15 +263,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             output_char[atomicAdd(&counter[0], 1u)] =  
             
                   Char (
-                      vec3<f32>(min_box.x,
+                      vec3<f32>(min_box.x * 3.0,
                                 min_box.y + f32(i) * 3.0,
                                 min_box.z + 2.0
                       ),
                       0.3,
-                      vec4<f32>(f32(global_id.x) * 3.0, 0.0, f32(global_id.x) * 100.0, 0.0),
-                      4u,
+                      vec4<f32>(f32(global_id.x) * 13.0 + 0.03, 0.0, f32(global_id.x) * 100.0, 0.0),
+                      1u,
                       rgba_u32(255u, 0u, 2550u, 255u),
-                      0u,
+                      4u,
                       0u
                   );
             }

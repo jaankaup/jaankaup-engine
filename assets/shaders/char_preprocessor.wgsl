@@ -22,13 +22,13 @@ struct CharParams{
 };
 
 struct Char {
-    start_pos: vec3<f32>, // encode start.pos.w the decimal_count. TODO: something better.
+    start_pos: vec3<f32>,
     font_size: f32,
     value: vec4<f32>,
-    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+    vec_dim_count: u32,
     color: u32,
-    draw_index: u32,
-    point_count: u32,
+    decimal_count: u32,
+    auxiliary_data: u32,
 };
 
 struct DrawIndirect {
@@ -86,6 +86,30 @@ let DUMMY_CHAR = Char(
     5000000u, // Big enough.
     0u,
 );
+
+fn get_points_per_char(aux_data: u32) -> u32 {
+    return aux_data & 0x3FFFu;
+}
+
+fn get_number_of_chars(aux_data: u32) -> u32 {
+    return (aux_data & 0x3fc000u) >> 14u;
+}
+
+fn get_draw_index(aux_data: u32) -> u32 {
+    return (aux_data & 0xfc00000u) >> 22u;
+}
+
+fn set_points_per_char(v: u32, ch: ptr<function, Char>) {
+    (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0x3FFFu)) | v;
+}
+
+fn set_number_of_chars(v: u32, ch: ptr<function, Char>) {
+    (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0x3fc000u)) | (v << 14u);
+}
+
+fn set_draw_index(v: u32, ch: ptr<function, Char>) {
+    (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0xfc00000u)) | (v << 22u);
+}
 
 fn udiv_up_safe32(x: u32, y: u32) -> u32 {
     let tmp = (x + y - 1u) / y;
@@ -199,7 +223,10 @@ fn bitonic(thread_index: u32) {
     let ixj = index ^ j;
     let a = workgroup_chars[index];
     let b = workgroup_chars[ixj];
-    if (ixj > index && (((index & k) == 0u && a.draw_index > b.draw_index) || ((index & k) != 0u && a.draw_index < b.draw_index)) ) {
+    let draw_index_a = get_draw_index(a.auxiliary_data);
+    let draw_index_b = get_draw_index(b.auxiliary_data);
+
+    if (ixj > index && (((index & k) == 0u && draw_index_a > draw_index_b) || ((index & k) != 0u && draw_index_a < draw_index_b)) ) {
             workgroup_chars[index] = b;
             workgroup_chars[ixj] = a;
     }
@@ -249,21 +276,28 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
             // Calculate the vertex count per char.
             let vertex_count_per_char = min(u32(f32(wg_char_params.max_points_per_char) / f32(dist)), char_params[0].max_points_per_char);
+            set_points_per_char(vertex_count_per_char, &ch);
+            //set_points_per_char(vertex_count_per_char, &ch.auxiliary_data);
 
             // Calculate the total vertex count. 
-            let total_number_of_chars = number_of_chars_data(ch.value, ch.vec_dim_count, 2u); // 2u, number of cedimals.
+            let total_number_of_chars = number_of_chars_data(ch.value, ch.vec_dim_count, ch.decimal_count);
+            set_number_of_chars(total_number_of_chars, &ch);
 
             // Update the total vertice count.
             let vertices_so_far = atomicAdd(&(wg_char_params.vertices_so_far), total_number_of_chars * vertex_count_per_char);
 
             // Calculate the actual vertex count.
-            ch.point_count = total_number_of_chars * vertex_count_per_char;
+            //ch.point_count = total_number_of_chars * vertex_count_per_char;
 
             // Determine in which indirect draw group this element belongs to. 
-            ch.draw_index = vertices_so_far / wg_char_params.max_number_of_vertices;
+
+            let draw_index = vertices_so_far / wg_char_params.max_number_of_vertices;
+            //++++ set_draw_index(draw_index, &ch.auxiliary_data); 
+            set_draw_index(draw_index, &ch); 
+            // ch.draw_index = vertices_so_far / wg_char_params.max_number_of_vertices;
 
             // Update indirect dispatch x.
-            atomicAdd(&wg_indirect_dispatchs[ch.draw_index].x, 1u);
+            atomicAdd(&wg_indirect_dispatchs[draw_index].x, 1u);
 
             // Copy data to workgroup memory.
             workgroup_chars[local_index] = ch;

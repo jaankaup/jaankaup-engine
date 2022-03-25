@@ -56,8 +56,12 @@ struct Char {
     value: [f32 ; 4],
     vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
     color: u32,
+    decimal_count: u32,
     draw_index: u32,
-    point_count: u32,
+    points_per_char: u32,
+    total_number_of_chars: u32,
+    future_usage: u32,
+    future_usage2: u32,
 }
 
 #[repr(C)]
@@ -650,7 +654,7 @@ impl GpuDebugger {
 
         let mut current_char_index = 0;
 
-        println!("number of chars == {}", number_of_chars);
+        // println!("number of chars == {}", number_of_chars);
 
         let cp = CharParams{ vertices_so_far: 0,
                              iterator_end: number_of_chars, 
@@ -731,7 +735,6 @@ impl GpuDebugger {
                     &self.compute_bind_groups_char,
                     &mut encoder_char,
                     &self.buffers.get("indirect_dispatch_buffer").unwrap(),
-                    // i as wgpu::BufferAddress,
                     (i * std::mem::size_of::<DispatchIndirect>() as u32) as wgpu::BufferAddress,
                     Some("numbers dispatch")
                 );
@@ -745,75 +748,10 @@ impl GpuDebugger {
                      &self.buffers.get("output_render").unwrap(),
                      &self.buffers.get("indirect_draw_buffer").unwrap(),
                      (i * std::mem::size_of::<DrawIndirect>() as u32) as wgpu::BufferAddress,
-                     //i as wgpu::BufferAddress,
                      *clear
                 );
-
-                // draw(&mut encoder_char_rendering,
-                //      &view,
-                //      &depth_texture,
-                //      &self.render_bind_groups_vvvc,
-                //      &self.render_object_vvvc.pipeline,
-                //      &self.buffers.get("output_render").unwrap(),
-                //      0..draw_count_triangles.min(self.max_number_of_vertices * 2),
-                //      *clear
-                // );
             }
-
             queue.submit(Some(encoder_char.finish()));
         }
-
-        // let mut ccc = -1;
-        // loop { 
-        //     // ccc = ccc + 1;
-
-        //     let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
-
-        //     self.compute_object_char.dispatch(
-        //         &self.compute_bind_groups_char,
-        //         &mut encoder_char,
-        //         // 1, 1, 1, Some("numbers dispatch")
-        //         number_of_chars, 1, 1, Some("numbers dispatch")
-        //     );
-
-        //     queue.submit(Some(encoder_char.finish()));
-
-        //     let counter = self.histogram_draw_counts.get_values(device, queue);
-        //     // self.draw_count_triangles = counter[0];
-        //     let draw_count_triangles = counter[0];
-
-        //     current_char_index = counter[1];
-
-        //     let mut encoder_char_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
-
-        //     draw(&mut encoder_char_rendering,
-        //          &view,
-        //          &depth_texture,
-        //          &self.render_bind_groups_vvvc,
-        //          &self.render_object_vvvc.pipeline,
-        //          &self.buffers.get("output_render").unwrap(),
-        //          0..draw_count_triangles.min(self.max_number_of_vertices * 2),
-        //          *clear
-        //     );
-        //     queue.submit(Some(encoder_char_rendering.finish()));
-
-        //     self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
-
-        //     // There are still chars left.
-        //     if current_char_index != 0 && current_char_index != self.arrow_aabb_params.iterator_end_index - 1 {
-        //         self.arrow_aabb_params.iterator_start_index = current_char_index;
-        //         self.arrow_aabb_params.iterator_end_index = number_of_chars;
-        //         self.arrow_aabb_params.element_type = 0;
-        //         self.arrow_aabb_params.max_number_of_vertices = std::cmp::max((self.max_number_of_vertices * 2) as i32 - 500000, 0) as u32;
-
-        //         queue.write_buffer(
-        //             &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
-        //             0,
-        //             bytemuck::cast_slice(&[self.arrow_aabb_params])
-        //         );
-
-        //     }
-        //     else { break; }
-        // }
     }
 }
