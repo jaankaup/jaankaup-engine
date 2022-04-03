@@ -110,7 +110,6 @@ pub struct GpuDebugger {
     compute_bind_groups_char_preprocessor: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     arrow_aabb_params: ArrowAabbParams,
-    histogram_draw_counts: Histogram,
     histogram_element_counter: Histogram,
     max_number_of_vertices: u32,
     max_number_of_chars: u32,
@@ -148,8 +147,6 @@ impl GpuDebugger {
                 ) -> Self {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
-
-        let histogram_draw_counts = Histogram::init(&device, &vec![0; 2]);
 
         let histogram_dispatch_counter = Histogram::init(&device, &vec![0; 1]);
 
@@ -450,20 +447,17 @@ impl GpuDebugger {
                             // @group(0) @binding(0) var<uniform> arrow_aabb_params: VisualizationParams;
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(1) var<storage, read_write> counter: Counter;
+                            // @group(0) @binding(1) var<storage, read> counter: array<Arrow>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(2) var<storage, read> counter: array<Arrow>;
+                            // @group(0) @binding(2) var<storage, read_write> aabbs: array<AABB>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage, read_write> aabbs: array<AABB>;
+                            // @group(0) @binding(3) var<storage, read_write> aabb_wires: array<AABB>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(4) var<storage, read_write> aabb_wires: array<AABB>;
+                            // @group(0) @binding(4) var<storage,read_write> output: array<Triangle>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
-
-                            // @group(0) @binding(5) var<storage,read_write> output: array<Triangle>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
         );
@@ -475,7 +469,6 @@ impl GpuDebugger {
                                       &vec![
                                           vec![
                                                &buffers.get(&"arrow_aabb_params".to_string()).unwrap().as_entire_binding(),
-                                               &histogram_draw_counts.get_histogram_buffer().as_entire_binding(),
                                                &buffers.get(&"output_arrows".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output_aabbs".to_string()).unwrap().as_entire_binding(),
                                                &buffers.get(&"output_aabb_wires".to_string()).unwrap().as_entire_binding(),
@@ -497,7 +490,6 @@ impl GpuDebugger {
             compute_bind_groups_char_preprocessor: compute_bind_groups_char_preprocessor,
             buffers: buffers,
             arrow_aabb_params: arrow_aabb_params,
-            histogram_draw_counts: histogram_draw_counts,
             histogram_element_counter: histogram_element_counter,
             max_number_of_vertices: max_number_of_vertices,
             max_number_of_chars: max_number_of_chars,
@@ -605,8 +597,6 @@ impl GpuDebugger {
 
                 queue.submit(Some(encoder_arrow_aabb.finish()));
 
-                let counter = self.histogram_draw_counts.get_values(device, queue);
-
                 let draw_count = number_of_elements * vertices_per_elem;
 
                 // println!("local_dispatch == {}", local_dispatch);
@@ -630,7 +620,6 @@ impl GpuDebugger {
                 items_to_process = items_to_process - number_of_elements; 
 
                 queue.submit(Some(encoder_arrow_rendering.finish()));
-                self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
 
                 self.arrow_aabb_params.iterator_start_index = self.arrow_aabb_params.iterator_end_index; // + items_to_process;
             } // for number_of_loop
@@ -658,8 +647,6 @@ impl GpuDebugger {
             0,
             bytemuck::cast_slice(&[self.arrow_aabb_params])
         );
-
-        self.histogram_draw_counts.reset_all_cpu_version(queue, 0);
 
         let mut current_char_index = 0;
 

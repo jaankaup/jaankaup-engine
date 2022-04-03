@@ -52,19 +52,19 @@ var<uniform> arrow_aabb_params: ArrowAabbParams;
 // var<storage, read_write> counter: array<atomic<u32>>;
 
 @group(0)
-@binding(2)
+@binding(1)
 var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
-@binding(3)
+@binding(2)
 var<storage, read_write> aabbs: array<AABB>;
 
 @group(0)
-@binding(4)
+@binding(3)
 var<storage, read_write> aabb_wires: array<AABB>;
 
 @group(0)
-@binding(5)
+@binding(4)
 var<storage,read_write> output: array<Triangle>;
 
 var<workgroup> thread_group_counter: u32 = 0; 
