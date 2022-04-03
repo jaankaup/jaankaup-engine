@@ -674,40 +674,40 @@ impl Application for Fmm {
         );
 
         // Compute interface.
-        // self.compute_object_fmm_triangle.dispatch(
-        //     &self.compute_bind_groups_fmm_triangle,
-        //     &mut encoder_command,
-        //     2036, 1, 1,
-        //     //udiv_up_safe32(1, thread_count), 1, 1,
-        //     //udiv_up_safe32(2036, thread_count), 1, 1,
-        //     // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-        //     Some("fmm triangle dispatch")
-        // );
+        self.compute_object_fmm_triangle.dispatch(
+            &self.compute_bind_groups_fmm_triangle,
+            &mut encoder_command,
+            2036, 1, 1,
+            //udiv_up_safe32(1, thread_count), 1, 1,
+            //udiv_up_safe32(2036, thread_count), 1, 1,
+            // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+            Some("fmm triangle dispatch")
+        );
 
         queue.submit(Some(encoder_command.finish()));
 
-       //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm triangle encoder") });
+       let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm triangle encoder") });
 
-       //++ queue.write_buffer(
-       //++     &self.buffers.get(&"fmm_params".to_string()).unwrap(),
-       //++     0,
-       //++     bytemuck::cast_slice(&[FmmParams {
-       //++                               fmm_global_dimension: [16, 16, 16],
-       //++                               visualize: 1,
-       //++                               fmm_inner_dimension: [4, 4, 4],
-       //++                               triangle_count: 2036 }
-       //++     ]));
+       queue.write_buffer(
+           &self.buffers.get(&"fmm_params".to_string()).unwrap(),
+           0,
+           bytemuck::cast_slice(&[FmmParams {
+                                     fmm_global_dimension: [16, 16, 16],
+                                     visualize: 1,
+                                     fmm_inner_dimension: [4, 4, 4],
+                                     triangle_count: 2036 }
+           ]));
 
 
-       //++ // Visualize.
-       //++ self.compute_object_fmm_triangle.dispatch(
-       //++     &self.compute_bind_groups_fmm_triangle,
-       //++     &mut encoder_command,
-       //++     (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-       //++     Some("fmm triangle dispatch")
-       //++ );
+       // Visualize.
+       self.compute_object_fmm_triangle.dispatch(
+           &self.compute_bind_groups_fmm_triangle,
+           &mut encoder_command,
+           (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+           Some("fmm triangle dispatch")
+       );
 
-       //++ queue.submit(Some(encoder_command.finish()));
+       queue.submit(Some(encoder_command.finish()));
 
         self.gpu_debugger.render(
                   &device,
@@ -801,7 +801,6 @@ impl Application for Fmm {
             0,
             bytemuck::cast_slice(&[self.fmm_prefix_params])
         );
-
 
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });

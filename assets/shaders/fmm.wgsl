@@ -256,40 +256,40 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 
 
-        let min_box = vec3<f32>(global_id) + vec3<f32>(6.0); 
-        let max_box = vec3<f32>(global_id) + vec3<f32>(6.5); 
+        //let min_box = vec3<f32>(global_id) + vec3<f32>(6.0); 
+        //let max_box = vec3<f32>(global_id) + vec3<f32>(6.5); 
 
-        output_arrow[atomicAdd(&counter[1], 1u)] =  
-              Arrow (
-                  vec4<f32>(f32(global_id.x), f32(global_id.y), f32(global_id.z), 0.0),
-                  vec4<f32>(f32(global_id.x), f32(global_id.y) + 4.0, f32(global_id.z), 0.0),
-                  rgba_u32(255u, 0u, 0u, 255u),
-                  0.5
-        );
+        //output_arrow[atomicAdd(&counter[1], 1u)] =  
+        //      Arrow (
+        //          vec4<f32>(f32(global_id.x), f32(global_id.y), f32(global_id.z), 0.0),
+        //          vec4<f32>(f32(global_id.x), f32(global_id.y) + 4.0, f32(global_id.z), 0.0),
+        //          rgba_u32(255u, 0u, 0u, 255u),
+        //          0.5
+        //);
 
-        output_aabb[atomicAdd(&counter[2], 1u)] =  
-              AABB (
-                  vec4<f32>(min_box.x,
-                            min_box.y,
-                            min_box.z,
-                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
-                  vec4<f32>(max_box.x,
-                            max_box.y, 
-                            max_box.z,
-                            1.0)
-        );
-        
-        output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
-              AABB (
-                  vec4<f32>(min_box.x,
-                            min_box.y + 3.0,
-                            min_box.z,
-                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
-                  vec4<f32>(max_box.x,
-                            max_box.y + 3.0, 
-                            max_box.z,
-                            0.1)
-        );
+        //output_aabb[atomicAdd(&counter[2], 1u)] =  
+        //      AABB (
+        //          vec4<f32>(min_box.x,
+        //                    min_box.y,
+        //                    min_box.z,
+        //                    f32(rgba_u32(255u, 0u, 2550u, 255u))),
+        //          vec4<f32>(max_box.x,
+        //                    max_box.y, 
+        //                    max_box.z,
+        //                    1.0)
+        //);
+        //
+        //output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+        //      AABB (
+        //          vec4<f32>(min_box.x,
+        //                    min_box.y + 3.0,
+        //                    min_box.z,
+        //                    f32(rgba_u32(255u, 0u, 2550u, 255u))),
+        //          vec4<f32>(max_box.x,
+        //                    max_box.y + 3.0, 
+        //                    max_box.z,
+        //                    0.1)
+        //);
 
         // for (var i: u32 = 0u ; i < 100u ; i = i + 1u ) {
 
