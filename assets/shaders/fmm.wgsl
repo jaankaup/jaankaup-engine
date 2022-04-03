@@ -263,13 +263,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             output_char[atomicAdd(&counter[0], 1u)] =  
             
                   Char (
-                      vec3<f32>(min_box.x * 3.0,
+                      vec3<f32>(min_box.x * 9.0,
                                 min_box.y + f32(i) * 3.0,
                                 min_box.z + 2.0
                       ),
                       0.3,
-                      vec4<f32>(f32(global_id.x) * 13.0 + 0.03, 0.0, f32(global_id.x) * 100.0, 0.0),
-                      1u,
+                      vec4<f32>(f32(global_id.x) * 13.0 + 0.03 - 15.0, 0.0, f32(global_id.x) * 100.0, 0.0),
+                      //vec4<f32>(f32(global_id.x) * 13.0 + 0.03 - 1145.0, 0.0, f32(global_id.x) * 100.0, 0.0),
+                      3u,
                       rgba_u32(255u, 0u, 2550u, 255u),
                       4u,
                       0u

@@ -83,8 +83,8 @@ let DUMMY_CHAR = Char(
     vec4<f32>(0.0, 0.0, 0.0, 0.0),
     0u,
     0u,
-    5000000u, // Big enough.
     0u,
+    0xfc00000u, // draw index 64.
 );
 
 fn get_points_per_char(aux_data: u32) -> u32 {
@@ -121,12 +121,11 @@ fn myTruncate(f: f32) -> f32 {
 }
 
 fn my_modf(f: f32) -> ModF {
-    let iptr = myTruncate(f);
+    let iptr = trunc(f);
     let fptr = f - iptr;
     return ModF (
         select(fptr, (-1.0)*fptr, f < 0.0),
         iptr
-        // copysign (isinf( f ) ? 0.0 : f - iptr, f)  
     );
 }
 
@@ -178,11 +177,10 @@ fn log10_u32(n: u32) -> u32 {
     return r;
 }
 
-// Calculates the number of digits + minus.
 fn number_of_chars_i32(n: i32) -> u32 {
 
     if (n == 0) { return 1u; }
-    return the_sign_of_i32(n) + log10_u32(abs_i32(n)) + 1u;
+    return the_sign_of_i32(n) + log10_u32(u32(abs(n))) + 1u;
 } 
 
 fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
@@ -198,7 +196,8 @@ fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
 // vec_dim_count == 3   (a , b , c)
 // vec_dim_count == 4   (a , b , c , d)
 // vec_dim_count == 5   undefined
-var<private> NumberOfExtraChars: array<u32, 5> = array<u32, 5>(0u, 0u, 3u, 4u, 5u);
+//var<private> NumberOfExtraChars: array<u32, 5> = array<u32, 5>(0u, 0u, 3u, 4u, 5u);
+var<private> NumberOfExtraChars: array<u32, 5> = array<u32, 5>(0u, 0u, 2u, 2u, 2u);
 
 // TODO: Instead of data, Element as reference.
 fn number_of_chars_data(data: vec4<f32>, vec_dim_count: u32, number_of_decimals: u32) -> u32 {
@@ -261,7 +260,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //let number_of_chunks = udiv_up_safe32(NUMBER_OF_THREADS, wg_char_params.iterator_end);
     let number_of_chunks = udiv_up_safe32(wg_char_params.iterator_end, NUMBER_OF_THREADS);
 
-    for (var i: u32 = 0u; i < number_of_chunks ; i = i + 1u) {
+    for (var i: u32 = 0u; i < number_of_chunks; i = i + 1u) {
         workgroupBarrier();
 
         let global_index = local_index + i * NUMBER_OF_THREADS;
@@ -286,6 +285,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             let vertices_so_far = atomicAdd(&(wg_char_params.vertices_so_far), total_number_of_chars * vertex_count_per_char);
 
             // Determine in which indirect draw group this element belongs to. 
+            //let draw_index = (vertices_so_far + total_number_of_chars * vertex_count_per_char) / wg_char_params.max_number_of_vertices;
             let draw_index = vertices_so_far / wg_char_params.max_number_of_vertices;
             set_draw_index(draw_index, &ch); 
 
@@ -297,13 +297,26 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         }
 
         // Add some dummy padding values. The is necessery because we use bitonic sort. Avoid buffer overflow.
-        // Prefix scan is a better choice.
+        // Prefix scan could be a better choice.
         if (global_index >= wg_char_params.iterator_end) {
              workgroup_chars[local_index] = DUMMY_CHAR;
         }
+        // if (global_index >= wg_char_params.iterator_end) {
+        //     workgroup_chars[local_index] = 
+        //         Char(
+        //            vec3<f32>(5.0, 0.0, 0.0),
+        //            0.0,
+        //            vec4<f32>(4.0, 0.0, 0.0, 0.0),
+        //            1u,
+        //            1u,
+        //            0xfc00000u, // draw index 64.
+        //            0u
+        //         );
+        // }
 
         // Sort data by draw index.
         bitonic(local_index);
+        workgroupBarrier();
  
         if (global_index < wg_char_params.iterator_end) {
 

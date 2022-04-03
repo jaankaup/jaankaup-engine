@@ -54,14 +54,22 @@ struct Char {
     start_pos: [f32 ; 3],
     font_size: f32,
     value: [f32 ; 4],
-    vec_dim_count: u32, // 1 => f32, 2 => vec3<f32>, 3 => vec3<f32>, 4 => vec4<f32>
+    vec_dim_count: u32,
     color: u32,
     decimal_count: u32,
-    draw_index: u32,
-    points_per_char: u32,
-    total_number_of_chars: u32,
-    future_usage: u32,
-    future_usage2: u32,
+    auxiliary_data: u32,
+}
+
+fn get_points_per_char(aux_data: u32) -> u32 {
+    aux_data & 0x3FFF
+}
+
+fn get_number_of_chars(aux_data: u32) -> u32 {
+    (aux_data & 0x3fc000) >> 14
+}
+
+fn get_draw_index(aux_data: u32) -> u32 {
+    (aux_data & 0xfc00000) >> 22
 }
 
 #[repr(C)]
@@ -350,10 +358,10 @@ impl GpuDebugger {
                             // @group(0) @binding(1) var<storage, read_write> dispatch_counter: array<atomic<u32>>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(1) var<storage,read_write> input: array<Char>;
+                            // @group(0) @binding(2) var<storage,read_write> input: array<Char>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                             
-                            // @group(0) @binding(2) var<storage,read_write> output: array<VVVC>;
+                            // @group(0) @binding(3) var<storage,read_write> output: array<VVVC>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ]
@@ -636,6 +644,7 @@ impl GpuDebugger {
         // TODO:
           
         let number_of_chars = elem_counter[0];
+        //++ println!("NUMBER_OF_CHARS == {}", number_of_chars); 
 
         self.arrow_aabb_params.iterator_start_index = 0;
         self.arrow_aabb_params.iterator_end_index = number_of_chars;
@@ -683,37 +692,47 @@ impl GpuDebugger {
 
         queue.submit(Some(encoder_char_preprocessor.finish()));
 
-        // let pre_processor_result = to_vec::<Char>(
-        //     &device,
-        //     &queue,
-        //     self.buffers.get(&"output_chars".to_string()).unwrap(),
-        //     0,
-        //     (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
-        // );
+        let pre_processor_result = to_vec::<Char>(
+            &device,
+            &queue,
+            self.buffers.get(&"output_chars".to_string()).unwrap(),
+            0,
+            (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
+        );
 
-        // for (i, v) in pre_processor_result.iter().enumerate() {
-        //     println!("{:?} :: {:?}", i, v);
-        // }
+        //++ let mut max_points_per_char = 0;
 
-        // let pre_processor_dispatch = to_vec::<DispatchIndirect>(
-        //     &device,
-        //     &queue,
-        //     self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
-        //     0,
-        //     (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
-        // );
+        //++ for (i, v) in pre_processor_result.iter().enumerate() {
+        //++     //println!("{:?} :: {:?}", i, v);
+        //++     println!("{:?} :: {:?}", i, v);
+        //++     let points_per_char = get_points_per_char(v.auxiliary_data);
+        //++     if points_per_char > max_points_per_char { max_points_per_char = points_per_char; }
+        //++     println!("points_per_char == {:?}", points_per_char);
+        //++     println!("get_number_of_chars == {:?}", get_number_of_chars(v.auxiliary_data));
+        //++     println!("get_draw_index == {:?}", get_draw_index(v.auxiliary_data));
+        //++ }
 
-        // let mut sum = 0;
+        //++ println!("MAX points_per_char == {:?}", max_points_per_char);
 
-        // for (i, v) in pre_processor_dispatch.iter().enumerate() {
-        //     // println!("{:?} :: {:?}", i, v);
-        //     sum = sum + v.x;
-        // }
+        //++ let pre_processor_dispatch = to_vec::<DispatchIndirect>(
+        //++     &device,
+        //++     &queue,
+        //++     self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
+        //++     0,
+        //++     (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
+        //++ );
 
-        // println!("sum == {}", sum);
-        // if (sum != 6400) { panic!("apuva"); }
+        //++ let mut sum = 0;
 
-        // Get the number of indirect dispatches.
+        //++ for (i, v) in pre_processor_dispatch.iter().enumerate() {
+        //++     println!("{:?} :: {:?}", i, v);
+        //++     sum = sum + v.x;
+        //++ }
+
+        //++ // println!("sum == {}", sum);
+        //++ // if (sum != 6400) { panic!("apuva"); }
+
+        //++ // Get the number of indirect dispatches.
         let charparams_result = to_vec::<CharParams>(
             &device,
             &queue,
@@ -722,8 +741,9 @@ impl GpuDebugger {
             (size_of::<CharParams>()) as wgpu::BufferAddress
         );
 
-        println!("{:?}", charparams_result[0]);
+        // println!("{:?}", charparams_result[0]);
 
+        //if 0 > 0 {
         if charparams_result[0].vertices_so_far > 0 {
 
             // Create point data from number elements and draw.
@@ -731,11 +751,13 @@ impl GpuDebugger {
 
             for i in 0..(charparams_result[0].draw_index + 1) {
 
+                // let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
                 self.compute_object_char.dispatch_indirect(
                     &self.compute_bind_groups_char,
                     &mut encoder_char,
                     &self.buffers.get("indirect_dispatch_buffer").unwrap(),
                     (i * std::mem::size_of::<DispatchIndirect>() as u32) as wgpu::BufferAddress,
+                    //i as wgpu::BufferAddress,
                     Some("numbers dispatch")
                 );
 
@@ -748,8 +770,10 @@ impl GpuDebugger {
                      &self.buffers.get("output_render").unwrap(),
                      &self.buffers.get("indirect_draw_buffer").unwrap(),
                      (i * std::mem::size_of::<DrawIndirect>() as u32) as wgpu::BufferAddress,
+                     //i as wgpu::BufferAddress,
                      *clear
                 );
+
             }
             queue.submit(Some(encoder_char.finish()));
         }

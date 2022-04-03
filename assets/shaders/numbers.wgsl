@@ -42,7 +42,7 @@ struct Char {
 
 struct WorkGroupParams {
     wg_char: Char,
-    start_index: atomic<u32>,
+    start_index: u32,
     char_id: u32,
 };
 
@@ -101,18 +101,6 @@ fn get_number_of_chars(aux_data: u32) -> u32 {
 fn get_draw_index(aux_data: u32) -> u32 {
     return (aux_data & 0xfc00000u) >> 22u;
 }
-
-// fn set_points_per_char(v: u32, aux_data: ptr<function, u32>) {
-//     *aux_data = (*aux_data & (!0x3FFFu)) | v;
-// }
-// 
-// fn set_number_of_chars(v: u32, aux_data: ptr<function, u32>) {
-//     *aux_data = (*aux_data & (!0x3fc000u)) | (v << 14u);
-// }
-// 
-// fn set_draw_index(v: u32, aux_data: ptr<function, u32>) {
-//     *aux_data = (*aux_data & (!0xfc00000u)) | (v << 22u);
-// }
 
 // FONT STUFF
 
@@ -337,113 +325,7 @@ var<private> bez_table: array<vec4<f32>, 164> = array<vec4<f32>, 164>(
     vec4<f32>(0.255, 0.044999998, 0.0, 0.0),
     vec4<f32>(0.255, 0.05, 0.0, 0.0),
 
-    // vec4<f32>(0.46, 0.17999999, 0.0, 0.030000001),
-    // vec4<f32>(0.41, 0.17, 0.0, 0.0),
-    // vec4<f32>(0.41, 0.11000001, 0.0, 0.0),
-    // vec4<f32>(0.41, 0.1, 0.0, 0.0),
-    // vec4<f32>(0.46, 0.17999999, 0.0, 0.030000001),
-    // vec4<f32>(0.51, 0.17, 0.0, 0.0),
-    // vec4<f32>(0.51, 0.11000001, 0.0, 0.0),
-    // vec4<f32>(0.51, 0.1, 0.0, 0.0),
-    // vec4<f32>(0.46, 0.020000001, 0.0, 0.030000001),
-    // vec4<f32>(0.41, 0.030000001, 0.0, 0.0),
-    // vec4<f32>(0.41, 0.089999996, 0.0, 0.0),
-    // vec4<f32>(0.41, 0.1, 0.0, 0.0),
-    // vec4<f32>(0.46, 0.020000001, 0.0, 0.030000001),
-    // vec4<f32>(0.51, 0.030000001, 0.0, 0.0),
-    // vec4<f32>(0.51, 0.089999996, 0.0, 0.0),
-    // vec4<f32>(0.51, 0.1, 0.0, 0.0)
 );
-
-// QUATERNION STUFF
-
-fn quaternion_id() -> Quaternion {
-    return Quaternion(1.0, 0.0, 0.0, 0.0);
-}
-
-fn quaternion_add(a: Quaternion, b: Quaternion) -> Quaternion {
-    return Quaternion(
-        a.w + b.w,
-        a.x + b.x,
-        a.y + b.y,
-        a.z + b.z
-    );
-}
-
-fn quaternion_mul(a: Quaternion, b: Quaternion) -> Quaternion {
-    return Quaternion(
-        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
-        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
-    );
-}
-
-fn quaternion_scale(q: Quaternion, s: f32) -> Quaternion {
-    return Quaternion(
-        q.w * s,
-        q.x * s, 
-        q.y * s, 
-        q.z * s 
-    );
-}
-
-fn quaternion_dot(a: Quaternion, b: Quaternion) -> f32 {
-    return a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z; 
-}
-
-fn quaternion_conjugate(q: Quaternion) -> Quaternion {
-    return Quaternion(
-         q.w,
-        -q.x,
-        -q.y,
-        -q.z
-    );
-}
-
-// n == 0?
-fn quaternion_normalize(q: Quaternion) -> Quaternion {
-    let n = sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w); 
-    return Quaternion(
-        q.w / n,
-        q.x / n,
-        q.y / n,
-        q.z / n
-    );
-} 
-
-fn rotate_vector(q: Quaternion, v: vec3<f32>) -> vec3<f32> {
-    let t = cross(vec3<f32>(q.x, q.y, q.z), v) * 2.0; 
-    return v + q.w * t + cross(vec3<f32>(q.x, q.y, q.z), t);
-}
-
-fn axis_angle(axis: vec3<f32>, angle: f32) -> Quaternion {
-    let half_angle = angle * 0.5;
-    let bl = axis * sin(half_angle);
-    return Quaternion(cos(half_angle), bl.x, bl.y, bl.z); 
-}
-
-fn rotation_from_to(a: vec3<f32>, b: vec3<f32>) -> Quaternion {
-
-    let v = cross(a,b);  
-
-    let a_len = length(a);
-    let b_len = length(b);
-
-    let w = sqrt(a_len * a_len * b_len * b_len) + dot(a,b);
-
-    if ( a.x == 1.0 && b.x == -1.0 && a.y == 0.0 && b.y == 0.0 && a.z == 0.0 && b.z == 0.0) { 
-        
-        var axis = cross(vec3<f32>(1.0, 0.0, 0.0), a);
-        if (length(axis) == 0.0) {
-            axis = cross(vec3<f32>(0.0, 1.0, 0.0), a);
-        }
-        axis = normalize(axis);
-        return axis_angle(axis, PI);
-    }
-     
-    return quaternion_normalize(Quaternion(w, v.x, v.y, v.z));
-}
 
 /**
  * [a1] from range min
@@ -492,8 +374,10 @@ fn bezier_4c(vertices_per_thread: u32,
         let mt2 = mt * mt;
         let mt3 = mt2 * mt;
         let result = c0.xyz * mt3 + c1.xyz * 3.0 * mt2*t + c2.xyz * 3.0 * mt*t2 + c3.xyz * t3;
-        output[start_offset + 64u * i + private_params.this_id] = VVVC(result, color);
-        // output[workgroup_params.start_index + 64u * i + thread_index] = VVVC(result, color);
+        let ind = 64u * i + private_params.this_id;
+        if (ind < total_num_points) {
+            output[start_offset + ind] = VVVC(result, color);
+        }
     }
 }
 
@@ -531,9 +415,10 @@ fn create_char(char_index: u32,
         u32(bez_values[3].w * f32(num_points))
     );
 
+    let actual_number_of_render_points = number_of_render_points[0] + number_of_render_points[1] + number_of_render_points[2] + number_of_render_points[3];
+
     if (private_params.this_id == 0u) {
-        //++ workgroup_params.start_index = atomicAdd(&workgroup_params.start_index, num_points);
-        workgroup_params.start_index = atomicAdd(&indirect[get_draw_index(workgroup_params.wg_char.auxiliary_data)].vertex_count, num_points);
+        workgroup_params.start_index = atomicAdd(&indirect[get_draw_index(workgroup_params.wg_char.auxiliary_data)].vertex_count, actual_number_of_render_points);
     }
     workgroupBarrier();
 
@@ -547,16 +432,11 @@ fn create_char(char_index: u32,
     );
 
     for (var i: u32 = 0u ; i < 4u ; i = i + 1u) {
-        if (indices[i] == 255u) { break; }
+        //++ if (indices[i] == 255u) { break; }
 
         // Create per thead workload (how many vertices to create and store).
-        //++ let chunks_per_thread = i32(udiv_up_32(count, 64u));
-        let chunks_per_thread = i32(udiv_up_32(number_of_render_points[i], 64u));
+        let vertices_per_thread = udiv_up_32(number_of_render_points[i], 64u);
 
-    	// Offset and chunk size (number of vertices to create and store).
-        let vertices_per_thread = select(u32(chunks_per_thread),
-    	                                 u32(max(chunks_per_thread - 1, 0)),
-    	                                 u32(max(chunks_per_thread - 1, 0)) * 64u + private_params.this_id >= number_of_render_points[i]);
         bezier_4c(
             vertices_per_thread,
             number_of_render_points[i],
@@ -575,14 +455,11 @@ fn myTruncate(f: f32) -> f32 {
 }
 
 fn my_modf(f: f32) -> ModF {
-    // let yhyy = trunc(f);
-    // let iptr = myTruncate(f);
     let iptr = trunc(f);
     let fptr = f - iptr;
     return ModF (
         select(fptr, (-1.0)*fptr, f < 0.0),
-        select(iptr, (-1.0)*iptr, f < 0.0),
-        // copysign (isinf( f ) ? 0.0 : f - iptr, f)  
+        iptr,
     );
 }
 
@@ -638,7 +515,8 @@ fn log10_u32(n: u32) -> u32 {
 fn number_of_chars_i32(n: i32) -> u32 {
 
     if (n == 0) { return 1u; }
-    return the_sign_of_i32(n) + log10_u32(abs_i32(n)) + 1u;
+    return the_sign_of_i32(n) + log10_u32(u32(abs(n))) + 1u;
+    //return the_sign_of_i32(n) + log10_u32(abs_i32(n)) + 1u;
 } 
 
 fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
@@ -661,20 +539,20 @@ fn log_number_new(
     }
 
     // Calculate the number of rendereable chars without minus.
-    let number_of_chars = number_of_chars_i32(n);
+    let number_of_chars = number_of_chars_i32(abs(n));
 
-    var temp_n = u32(n); 
-    var remainder = 0u;
+    var temp_n = u32(abs(n)); 
 
     for (var i: u32 = 0u; i < number_of_chars ; i = i + 1u) {
-        remainder = (temp_n / PowersOf10[number_of_chars - 1u - i]) * PowersOf10[number_of_chars - 1u - i];
-        create_char(temp_n / PowersOf10[number_of_chars - 1u - i],
+
+        var head = temp_n / PowersOf10[number_of_chars - 1u - i]; //temp_n - ((temp_n / 10u) * 10u);
+        head = head - ((head / 10u) * 10u);
+        create_char(head,
                     vertices_per_char,
                     *base_pos,
                     col,
                     font_size
         );
-        temp_n = temp_n - remainder;
         *base_pos = *base_pos + vec3<f32>(1.0, 0.0, 0.0) * font_size;
     }
 }
@@ -687,11 +565,9 @@ fn log_f32_fract(
     font_size: f32,
     number_of_decimals: u32) {
         
-        // var temp_f: f32 = f;
-
-        for (var i: u32 = 0u ; i < number_of_decimals; i = i + 1u) {
+        for (var i: u32 = 0u ; i < min(number_of_decimals,6u); i = i + 1u) {
  
-            // OVERFLOW RISK!
+            // OVERFLOW RISK! TODO: fix.
             var head = u32(round(f * f32(PowersOf10[i + 1u])));
             head = head - ((head / 10u) * 10u);
 
@@ -704,17 +580,11 @@ fn log_f32_fract(
             );
 
             *base_pos = *base_pos + vec3<f32>(1.0, 0.0, 0.0) * font_size;
-            //temp_f = temp_f - f32(head);
         }
 }
 
 fn log_float(f: f32, max_decimals: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 
-    // struct ModF {
-    //     fract: f32,
-    //     whole: f32,
-    // };
-  
     let m = my_modf(f);
     log_number_new(i32(m.whole), base_pos, total_vertex_count, col, font_size);
 
@@ -723,7 +593,24 @@ fn log_float(f: f32, max_decimals: u32, base_pos: ptr<function, vec3<f32>>, tota
     *base_pos = *base_pos + vec3<f32>(0.4, 0.0, 0.0) * font_size;
 
     log_f32_fract(abs(m.fract), base_pos, total_vertex_count, col, font_size, max_decimals);
+}
 
+fn log_vec3(v: vec3<f32>, max_decimals: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
+
+    create_char(11u, total_vertex_count, *base_pos, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    log_float(v.x, max_decimals, base_pos, total_vertex_count, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    log_float(v.y, max_decimals, base_pos, total_vertex_count, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    log_float(v.z, max_decimals, base_pos, total_vertex_count, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    create_char(12u, total_vertex_count, *base_pos, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.2, 0.0, 0.0) * font_size;
 }
 
 // fn log_vec4_f32(v: vec4<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
@@ -803,9 +690,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         let char_number = atomicAdd(&dispatch_counter[0], 1u);
         workgroup_params.char_id = char_number;
         workgroup_params.wg_char = input[char_number]; 
-        // workgroup_params.start_index =
-        //    atomicAdd(&indirect[get_draw_index(workgroup_params.wg_char.auxiliary_data)].vertex_count,
-        //              get_points_per_char(workgroup_params.wg_char.auxiliary_data) * get_number_of_chars(workgroup_params.wg_char.auxiliary_data));
     }
     workgroupBarrier();
 
@@ -818,28 +702,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     var jooo = ch.start_pos;
 
-    // create_char(1u,
-    //             ch.total_point_count,
-    //             ch.start_pos,
-    //             ch.color,
-    //             ch.font_size);
+    //log_float(ch.value.x,
+    //          decimals, //workgroup_params.wg_char.decimal_count,
+    //          &jooo,
+    //          get_points_per_char(ch.auxiliary_data),
+    //          ch.color,
+    //          ch.font_size);
 
-    // log_number_new(i32(ch.value.x),
-    // log_number_new(i32(ch.decimal_count),
-    //                &jooo,
-    //                get_points_per_char(ch.auxiliary_data),
-    //                ch.color,
-    //                ch.font_size
-    // );
-
-    //log_float(f32(get_number_of_chars(ch.auxiliary_data)),
-    //log_float(f32(ch.value.x),
-
-    // WHY?
-    var decimals = 4u; //ch.decimal_count;
-
-    log_float(ch.value.x,
-              decimals, //workgroup_params.wg_char.decimal_count,
+    log_vec3(ch.value.xyz,
+              workgroup_params.wg_char.decimal_count,
               &jooo,
               get_points_per_char(ch.auxiliary_data),
               ch.color,
