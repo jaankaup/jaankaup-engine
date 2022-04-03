@@ -648,121 +648,125 @@ impl GpuDebugger {
             bytemuck::cast_slice(&[self.arrow_aabb_params])
         );
 
-        let mut current_char_index = 0;
+        // This will crash if == 0. TODO: fix.
+        if number_of_chars > 0 {
 
-        // println!("number of chars == {}", number_of_chars);
+            let mut current_char_index = 0;
 
-        let cp = CharParams{ vertices_so_far: 0,
-                             iterator_end: number_of_chars, 
-                             draw_index: 0,
-                             max_points_per_char: 5000,
-                             max_number_of_vertices: self.max_number_of_vertices - 500000, // TODO: ???
-                             padding: [1,2,3],
-                             dispatch_indirect_prefix_sum: [0; 64],
-        };
+            // println!("number of chars == {}", number_of_chars);
 
-        queue.write_buffer(
-            &self.buffers.get(&"char_params".to_string()).unwrap(),
-            0,
-            bytemuck::cast_slice(&[cp])
-        );
+            let cp = CharParams{ vertices_so_far: 0,
+                                 iterator_end: number_of_chars, 
+                                 draw_index: 0,
+                                 max_points_per_char: 5000,
+                                 max_number_of_vertices: self.max_number_of_vertices - 500000, // TODO: ???
+                                 padding: [1,2,3],
+                                 dispatch_indirect_prefix_sum: [0; 64],
+            };
 
-        self.histogram_dispatch_counter.reset_all_cpu_version(queue, 0);
+            queue.write_buffer(
+                &self.buffers.get(&"char_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[cp])
+            );
 
-        let mut encoder_char_preprocessor = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("char preprocessor encoder") });
+            self.histogram_dispatch_counter.reset_all_cpu_version(queue, 0);
 
-        self.compute_object_char_preprocessor.dispatch(
-            &self.compute_bind_groups_char_preprocessor,
-            &mut encoder_char_preprocessor,
-            1, 1, 1, Some("char preprocessor dispatch")
-        );
+            let mut encoder_char_preprocessor = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("char preprocessor encoder") });
 
-        queue.submit(Some(encoder_char_preprocessor.finish()));
+            self.compute_object_char_preprocessor.dispatch(
+                &self.compute_bind_groups_char_preprocessor,
+                &mut encoder_char_preprocessor,
+                1, 1, 1, Some("char preprocessor dispatch")
+            );
 
-        let pre_processor_result = to_vec::<Char>(
-            &device,
-            &queue,
-            self.buffers.get(&"output_chars".to_string()).unwrap(),
-            0,
-            (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
-        );
+            queue.submit(Some(encoder_char_preprocessor.finish()));
 
-        //++ let mut max_points_per_char = 0;
+            let pre_processor_result = to_vec::<Char>(
+                &device,
+                &queue,
+                self.buffers.get(&"output_chars".to_string()).unwrap(),
+                0,
+                (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
+            );
 
-        //++ for (i, v) in pre_processor_result.iter().enumerate() {
-        //++     //println!("{:?} :: {:?}", i, v);
-        //++     println!("{:?} :: {:?}", i, v);
-        //++     let points_per_char = get_points_per_char(v.auxiliary_data);
-        //++     if points_per_char > max_points_per_char { max_points_per_char = points_per_char; }
-        //++     println!("points_per_char == {:?}", points_per_char);
-        //++     println!("get_number_of_chars == {:?}", get_number_of_chars(v.auxiliary_data));
-        //++     println!("get_draw_index == {:?}", get_draw_index(v.auxiliary_data));
-        //++ }
+            //++ let mut max_points_per_char = 0;
 
-        //++ println!("MAX points_per_char == {:?}", max_points_per_char);
+            //++ for (i, v) in pre_processor_result.iter().enumerate() {
+            //++     //println!("{:?} :: {:?}", i, v);
+            //++     println!("{:?} :: {:?}", i, v);
+            //++     let points_per_char = get_points_per_char(v.auxiliary_data);
+            //++     if points_per_char > max_points_per_char { max_points_per_char = points_per_char; }
+            //++     println!("points_per_char == {:?}", points_per_char);
+            //++     println!("get_number_of_chars == {:?}", get_number_of_chars(v.auxiliary_data));
+            //++     println!("get_draw_index == {:?}", get_draw_index(v.auxiliary_data));
+            //++ }
 
-        //++ let pre_processor_dispatch = to_vec::<DispatchIndirect>(
-        //++     &device,
-        //++     &queue,
-        //++     self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
-        //++     0,
-        //++     (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
-        //++ );
+            //++ println!("MAX points_per_char == {:?}", max_points_per_char);
 
-        //++ let mut sum = 0;
+            //++ let pre_processor_dispatch = to_vec::<DispatchIndirect>(
+            //++     &device,
+            //++     &queue,
+            //++     self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
+            //++     0,
+            //++     (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
+            //++ );
 
-        //++ for (i, v) in pre_processor_dispatch.iter().enumerate() {
-        //++     println!("{:?} :: {:?}", i, v);
-        //++     sum = sum + v.x;
-        //++ }
+            //++ let mut sum = 0;
 
-        //++ // println!("sum == {}", sum);
-        //++ // if (sum != 6400) { panic!("apuva"); }
+            //++ for (i, v) in pre_processor_dispatch.iter().enumerate() {
+            //++     println!("{:?} :: {:?}", i, v);
+            //++     sum = sum + v.x;
+            //++ }
 
-        //++ // Get the number of indirect dispatches.
-        let charparams_result = to_vec::<CharParams>(
-            &device,
-            &queue,
-            self.buffers.get(&"char_params".to_string()).unwrap(),
-            0,
-            (size_of::<CharParams>()) as wgpu::BufferAddress
-        );
+            //++ // println!("sum == {}", sum);
+            //++ // if (sum != 6400) { panic!("apuva"); }
 
-        // println!("{:?}", charparams_result[0]);
+            //++ // Get the number of indirect dispatches.
+            let charparams_result = to_vec::<CharParams>(
+                &device,
+                &queue,
+                self.buffers.get(&"char_params".to_string()).unwrap(),
+                0,
+                (size_of::<CharParams>()) as wgpu::BufferAddress
+            );
 
-        //if 0 > 0 {
-        if charparams_result[0].vertices_so_far > 0 {
+            // println!("{:?}", charparams_result[0]);
 
-            // Create point data from number elements and draw.
-            let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+            //if 0 > 0 {
+            if charparams_result[0].vertices_so_far > 0 {
 
-            for i in 0..(charparams_result[0].draw_index + 1) {
+                // Create point data from number elements and draw.
+                let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
 
-                // let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
-                self.compute_object_char.dispatch_indirect(
-                    &self.compute_bind_groups_char,
-                    &mut encoder_char,
-                    &self.buffers.get("indirect_dispatch_buffer").unwrap(),
-                    (i * std::mem::size_of::<DispatchIndirect>() as u32) as wgpu::BufferAddress,
-                    //i as wgpu::BufferAddress,
-                    Some("numbers dispatch")
-                );
+                for i in 0..(charparams_result[0].draw_index + 1) {
 
-                draw_indirect(
-                     &mut encoder_char,
-                     &view,
-                     &depth_texture,
-                     &self.render_bind_groups_vvvc,
-                     &self.render_object_vvvc.pipeline,
-                     &self.buffers.get("output_render").unwrap(),
-                     &self.buffers.get("indirect_draw_buffer").unwrap(),
-                     (i * std::mem::size_of::<DrawIndirect>() as u32) as wgpu::BufferAddress,
-                     //i as wgpu::BufferAddress,
-                     *clear
-                );
+                    // let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
+                    self.compute_object_char.dispatch_indirect(
+                        &self.compute_bind_groups_char,
+                        &mut encoder_char,
+                        &self.buffers.get("indirect_dispatch_buffer").unwrap(),
+                        (i * std::mem::size_of::<DispatchIndirect>() as u32) as wgpu::BufferAddress,
+                        //i as wgpu::BufferAddress,
+                        Some("numbers dispatch")
+                    );
 
+                    draw_indirect(
+                         &mut encoder_char,
+                         &view,
+                         &depth_texture,
+                         &self.render_bind_groups_vvvc,
+                         &self.render_object_vvvc.pipeline,
+                         &self.buffers.get("output_render").unwrap(),
+                         &self.buffers.get("indirect_draw_buffer").unwrap(),
+                         (i * std::mem::size_of::<DrawIndirect>() as u32) as wgpu::BufferAddress,
+                         //i as wgpu::BufferAddress,
+                         *clear
+                    );
+
+                }
+                queue.submit(Some(encoder_char.finish()));
             }
-            queue.submit(Some(encoder_char.finish()));
-        }
+        } // if
     }
 }

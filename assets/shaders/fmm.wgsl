@@ -71,6 +71,19 @@ struct ModF {
     whole: f32,
 };
 
+// FMM tags
+// 0 :: Far
+// 1 :: Band
+// 2 :: Band New
+// 3 :: Known
+// 4 :: Outside
+
+let FAR      = 0u;
+let BAND_NEW = 1u;
+let BAND     = 2u;
+let KNOWN    = 3u;
+let OUTSIDE  = 4u;
+
 struct FmmCell {
     tag: u32,
     value: f32,
@@ -223,6 +236,26 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         let min_box = vec3<f32>(global_id) + vec3<f32>(6.0); 
         let max_box = vec3<f32>(global_id) + vec3<f32>(6.5); 
 
@@ -258,24 +291,23 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                             0.1)
         );
 
-        for (var i: u32 = 0u ; i < 100u ; i = i + 1u ) {
+        // for (var i: u32 = 0u ; i < 100u ; i = i + 1u ) {
 
-            output_char[atomicAdd(&counter[0], 1u)] =  
-            
-                  Char (
-                      vec3<f32>(min_box.x * 9.0,
-                                min_box.y + f32(i) * 3.0,
-                                min_box.z + 2.0
-                      ),
-                      0.3,
-                      vec4<f32>(f32(global_id.x) * 13.0 + 0.03 - 15.0, 0.0, f32(global_id.x) * 100.0, 0.0),
-                      //vec4<f32>(f32(global_id.x) * 13.0 + 0.03 - 1145.0, 0.0, f32(global_id.x) * 100.0, 0.0),
-                      3u,
-                      rgba_u32(255u, 0u, 2550u, 255u),
-                      4u,
-                      0u
-                  );
-            }
+        //     output_char[atomicAdd(&counter[0], 1u)] =  
+        //     
+        //           Char (
+        //               vec3<f32>(min_box.x * 9.0,
+        //                         min_box.y + f32(i) * 3.0,
+        //                         min_box.z + 2.0
+        //               ),
+        //               0.3,
+        //               vec4<f32>(f32(global_id.x) * 13.0 + 0.03 - 15.0, 0.0, f32(global_id.x) * 100.0, 0.0),
+        //               3u,
+        //               rgba_u32(255u, 0u, 2550u, 255u),
+        //               4u,
+        //               0u
+        //           );
+        //     }
 
 
     // if (local_index == 0u) {
