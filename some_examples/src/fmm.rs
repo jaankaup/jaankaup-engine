@@ -670,7 +670,8 @@ impl Application for Fmm {
         self.compute_object_fmm.dispatch(
             &self.compute_bind_groups_fmm,
             &mut encoder_command,
-            1, 1, 1, Some("fmm dispatch")
+            (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1, Some("fmm dispatch")
+            // 1, 1, 1, Some("fmm dispatch")
         );
 
         // Compute interface.
@@ -700,14 +701,14 @@ impl Application for Fmm {
 
 
        // Visualize.
-       self.compute_object_fmm_triangle.dispatch(
-           &self.compute_bind_groups_fmm_triangle,
-           &mut encoder_command,
-           (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-           Some("fmm triangle dispatch")
-       );
+       // self.compute_object_fmm_triangle.dispatch(
+       //     &self.compute_bind_groups_fmm_triangle,
+       //     &mut encoder_command,
+       //     (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+       //     Some("fmm triangle dispatch")
+       // );
 
-       queue.submit(Some(encoder_command.finish()));
+       // queue.submit(Some(encoder_command.finish()));
 
         self.gpu_debugger.render(
                   &device,

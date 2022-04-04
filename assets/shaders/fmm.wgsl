@@ -90,7 +90,10 @@ struct FmmCell {
 };
 
 struct FmmParams {
-    blah: f32,
+    fmm_global_dimension: vec3<u32>, 
+    visualize: u32, // 0 -> no, 1 -> yes!
+    fmm_inner_dimension: vec3<u32>, 
+    triangle_count: u32,
 };
 
 @group(0)
@@ -237,6 +240,57 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
 
+    // Precondition. Interface is determined. (There should exists atleast one known point.)
+
+    // Generate the initial first active blocks.
+    
+
+    // 1. Load one active block.
+
+    // 2. Perform fmm.
+
+    // 3. Synchronization.
+
+    // 4. Reduction. 
+
+    // 5. Prefix sum if necessery.
+     
+    let color = f32(rgba_u32(222u, 0u, 150u, 255u));
+
+    if (global_id.x == 0u) {
+        output_aabb_wire[global_id.x] =  
+              AABB (
+                  vec4<f32>(0.0, 0.0, 0.0, color),
+                  vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
+              );
+        atomicAdd(&counter[3], 1u);
+    }
+
+    let cell = fmm_data[global_id.x];
+    let position = vec3<f32>(decode3Dmorton32(global_id.x)) * 0.25;
+
+    if (cell.tag == FAR) { return; }
+
+    var col = select(f32(rgba_u32(0u  , 255u, 0u, 255u)),
+                     f32(rgba_u32(0u, 255u,   0u, 255u)),
+                     cell.tag == KNOWN); 
+    output_aabb[atomicAdd(&counter[2], 1u)] =
+          AABB (
+              vec4<f32>(position - vec3<f32>(0.02), col),
+              vec4<f32>(position + vec3<f32>(0.02), 0.0),
+          );
+
+    output_char[atomicAdd(&counter[0], 1u)] =  
+        
+              Char (
+                  position.xyz + vec3<f32>(-0.018, 0.0, 0.022),
+                  0.01,
+                  vec4<f32>(f32(cell.value), 0.0, 0.0, 0.0),
+                  1u,
+                  rgba_u32(255u, 0u, 2550u, 255u),
+                  2u,
+                  0u
+              );
     
 
 

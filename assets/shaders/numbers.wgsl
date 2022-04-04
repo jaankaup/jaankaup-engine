@@ -708,13 +708,23 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //          get_points_per_char(ch.auxiliary_data),
     //          ch.color,
     //          ch.font_size);
+    if (ch.vec_dim_count == 1u) {
+       log_float(ch.value.x,
+                 workgroup_params.wg_char.decimal_count, //u32(the_start_position.w),
+                 &jooo,
+                 get_points_per_char(ch.auxiliary_data),
+                 ch.color,
+                 ch.font_size);
+    }
 
-    log_vec3(ch.value.xyz,
-              workgroup_params.wg_char.decimal_count,
-              &jooo,
-              get_points_per_char(ch.auxiliary_data),
-              ch.color,
-              ch.font_size);
+    if (ch.vec_dim_count == 3u) {
+        log_vec3(ch.value.xyz,
+                  workgroup_params.wg_char.decimal_count,
+                  &jooo,
+                  get_points_per_char(ch.auxiliary_data),
+                  ch.color,
+                  ch.font_size);
+    }
 
    //++ // Log f32.
    //++ if (the_char.vec_dim_count == 1u) {
