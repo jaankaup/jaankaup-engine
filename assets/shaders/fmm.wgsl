@@ -163,7 +163,6 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   return vec3<u32>(x, y, z);
 }
 
-
 ///////////////////////////
 ////// MORTON CODE   //////
 ///////////////////////////

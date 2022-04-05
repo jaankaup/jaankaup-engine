@@ -43,7 +43,7 @@ struct VertexOutput {
 
 // Ligth/material properties.
 let light_pos: vec3<f32> = vec3<f32>(20.0, 20.0, 20.0);
-let light_color: vec3<f32> = vec3<f32>(0.8, 0.3, 0.3);
+let light_color: vec3<f32> = vec3<f32>(1.0, 1.0, 1.0);
 let material_spec_color: vec3<f32> = vec3<f32>(0.5, 0.1, 0.1);
 let material_shininess: f32 = 55.0;
 let ambient_coeffience: f32 = 0.15;
@@ -52,7 +52,7 @@ let attentuation_factor: f32 = 0.000013;
 @stage(vertex)
 fn vs_main(@location(0) pos: vec4<f32>, @location(1) nor: vec4<f32>) -> VertexOutput {
 
-    let color: vec3<f32> = decode_color(u32(pos.w)).xyz;
+    let color: vec3<f32> = decode_color(bitcast<u32>(pos.w)).xyz;
 
     var light_dir: vec3<f32> = normalize(light_pos - pos.xyz);
     var diff_coeffient: f32 = max(0.0, dot(nor.xyz, light_dir));

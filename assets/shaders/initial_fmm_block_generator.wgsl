@@ -49,7 +49,7 @@ let THREAD_COUNT = 64u;
 @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
 
 // Debugging.
-@group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+@group(0) @binding(2) var<storage,read_write> counter: array<atomic<u32>>;
 @group(0) @binding(3) var<storage,read_write>  output_char: array<Char>;
 @group(0) @binding(4) var<storage,read_write>  output_arrow: array<Arrow>;
 @group(0) @binding(5) var<storage,read_write>  output_aabb: array<AABB>;
@@ -57,24 +57,11 @@ let THREAD_COUNT = 64u;
 
 struct PrivateParams {
     index: u32,
+    g_index: u32,
 };
 
 var<private> private_params: PrivateParams; 
 var<workgroup> temp_fmm_cells: array<FmmCell, THREAD_COUNT>; 
-
-fn reduce() {
-
-    for (var i: u32 = THREAD_COUNT / 2u; i > 0u ; i = i >> 1u) {
-
-        if (private_params.index < i) {
-
-            // Load data a.
-            
-
-            // Load data b.
-        }
-    }
-}
 
 ///////////////////////////
 ////// MORTON CODE   //////
@@ -115,6 +102,34 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
         get_third_bits32(m >> 1u),
         get_third_bits32(m >> 2u)
    );
+}
+
+fn reduce() {
+
+    for (var i: u32 = THREAD_COUNT / 2u; i > 0u ; i = i >> 1u) {
+
+        workgroupBarrier();
+        if (private_params.index < i) {
+
+            // Load data a.
+            let ptr_a = &temp_fmm_cells[private_params.index]; 
+
+            // Load data b.
+            let ptr_b = &temp_fmm_cells[private_params.index + i]; 
+
+            if (((*ptr_a).tag == BAND && (*ptr_b).tag == BAND && (*ptr_a).value > (*ptr_b).value) || ((*ptr_a).tag != BAND && (*ptr_b).tag == BAND)) {
+                *ptr_a = *ptr_b;
+            }
+            // Not working.
+            // *ptr_a = select(*ptr_a,
+            //                 *ptr_b,
+            //                 ((*ptr_a).tag == BAND && (*ptr_b).tag == BAND && (*ptr_a).value > (*ptr_b).value) || ((*ptr_a).tag != BAND && (*ptr_b).tag == BAND));
+        }
+    }
+}
+
+fn load_chunk_to_workgroup() {
+    fmm_data[private_params.index * private_params.g_index] = temp_fmm_cells[private_params.index]; 
 }
 
 @stage(compute)
