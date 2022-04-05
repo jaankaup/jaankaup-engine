@@ -137,6 +137,8 @@ struct Fmm {
     pub compute_bind_groups_fmm_triangle: Vec<wgpu::BindGroup>,
     pub compute_object_fmm_prefix_scan: ComputeObject,
     pub compute_bind_groups_fmm_prefix_scan: Vec<wgpu::BindGroup>,
+    pub compute_object_reduce: ComputeObject,
+    pub compute_bind_groups_reduce: Vec<wgpu::BindGroup>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
     pub keys: KeyboardManager,
@@ -607,6 +609,65 @@ impl Application for Fmm {
                 ]
         );
 
+        ////////////////////////////////////////////////////
+        ////               Reduce                       ////
+        ////////////////////////////////////////////////////
+
+        let compute_object_reduce =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("initial_fmm_block_generator.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/initial_fmm_block_generator.wgsl"))),
+                    
+                    }),
+                    Some("Reduce compute object"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<storage, read_write> fmm_data: array<FmmCell>;
+                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+                        ],
+                    ]
+        );
+
+        let compute_bind_groups_reduce =
+            create_bind_groups(
+                &configuration.device,
+                &compute_object_reduce.bind_group_layout_entries,
+                &compute_object_reduce.bind_group_layouts,
+                &vec![
+                    vec![
+                         &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
+                         &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ]
+                ]
+        );
+
         println!("Creating render bind groups.");
  
         Self {
@@ -622,6 +683,8 @@ impl Application for Fmm {
             compute_bind_groups_fmm_triangle: compute_bind_groups_fmm_triangle,
             compute_object_fmm_prefix_scan: compute_object_fmm_prefix_scan,
             compute_bind_groups_fmm_prefix_scan: compute_bind_groups_fmm_prefix_scan,
+            compute_object_reduce: compute_object_reduce,
+            compute_bind_groups_reduce: compute_bind_groups_reduce,
             buffers: buffers,
             camera: camera,
             keys: keys,

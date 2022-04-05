@@ -658,10 +658,10 @@ impl GpuDebugger {
             let cp = CharParams{ vertices_so_far: 0,
                                  iterator_end: number_of_chars, 
                                  draw_index: 0,
-                                 max_points_per_char: 5000,
+                                 max_points_per_char: 1000,
                                  max_number_of_vertices: self.max_number_of_vertices - 500000, // TODO: ???
                                  padding: [1,2,3],
-                                 dispatch_indirect_prefix_sum: [0; 64],
+                                 dispatch_indirect_prefix_sum: [0; 64], // TODO: not used.
             };
 
             queue.write_buffer(
