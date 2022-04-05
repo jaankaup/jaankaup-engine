@@ -159,6 +159,7 @@ struct Fmm {
     pub once: bool,
     pub fmm_prefix_params: FmmPrefixParams, 
     pub gpu_timer: Option<GpuTimer>,
+    pub fmm_visualization_params: FmmVisualizationParams,
 }
 
 impl Fmm {
@@ -212,6 +213,9 @@ impl Application for Fmm {
 
         let mut keys = KeyboardManager::init();
         keys.register_key(Key::P, 200.0);
+        keys.register_key(Key::Key1, 200.0);
+        keys.register_key(Key::Key2, 200.0);
+        keys.register_key(Key::Key3, 200.0);
 
         // vvvvnnnn
         let render_object_vvvvnnnn =
@@ -350,17 +354,19 @@ impl Application for Fmm {
             None)
         );
 
+        let fmm_visualization_params = 
+                 FmmVisualizationParams {
+                     fmm_global_dimension: [16, 16, 16],
+                     visualization_method: 1 | 2 | 4, // ???.
+                     fmm_inner_dimension: [4, 4, 4],
+                     future_usage: 0,
+        };
+
         buffers.insert(
             "fmm_visualization_params".to_string(),
             buffer_from_data::<FmmVisualizationParams>(
             &configuration.device,
-            &vec![
-                 FmmVisualizationParams {
-                     fmm_global_dimension: [16, 16, 16],
-                     visualization_method: 0, // ???.
-                     fmm_inner_dimension: [4, 4, 4],
-                     future_usage: 0,
-            }],
+            &vec![fmm_visualization_params],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None)
         );
@@ -803,6 +809,7 @@ impl Application for Fmm {
             once: once,
             fmm_prefix_params: fmm_prefix_params,
             gpu_timer: gpu_timer,
+            fmm_visualization_params: fmm_visualization_params,
         }
     }
 
@@ -929,6 +936,39 @@ impl Application for Fmm {
             self.draw_triangle_mesh = !self.draw_triangle_mesh;
         }
 
+        if self.keys.test_key(&Key::Key1, input) {
+            if (self.fmm_visualization_params.visualization_method & 1 != 0) {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 1;
+            }
+            else {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 1;
+            }
+        }
+
+        if self.keys.test_key(&Key::Key2, input) {
+            if (self.fmm_visualization_params.visualization_method & 2 != 0) {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 2;
+            }
+            else {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 2;
+            }
+        }
+
+        if self.keys.test_key(&Key::Key3, input) {
+            if (self.fmm_visualization_params.visualization_method & 4 != 0) {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 4;
+            }
+            else {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 4;
+            }
+        }
+        
+        queue.write_buffer(
+            &self.buffers.get(&"fmm_visualization_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.fmm_visualization_params])
+        );
+
         self.fmm_prefix_params.stage = 1;
 
         queue.write_buffer(
@@ -1007,7 +1047,7 @@ impl Application for Fmm {
 
         wgpu_timer_unwrapped.create_timestamp_data(&device, &queue);
 
-        wgpu_timer_unwrapped.print_data();
+        // wgpu_timer_unwrapped.print_data();
 
         wgpu_timer_unwrapped.reset();
         // let gpu_timer_result = wgpu_timer_unwrapped.get_data(); 

@@ -47,12 +47,12 @@ struct FmmBlock {
 
 struct FmmVisualizationParams {
     fmm_global_dimension: vec3<u32>, 
-    visualization_method: u32, // ???.
+    visualization_method: u32, // a bit mask. 1 :: far, 2 :: band, 4 :: known 
     fmm_inner_dimension: vec3<u32>, 
     future_usage: u32,
 };
 
-@group(0) @binding(0) var<uniform> fmm_params: FmmVisualizationParams;
+@group(0) @binding(0) var<uniform> fmm_visualization_params: FmmVisualizationParams;
 @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCell>;
 @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
 @group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
@@ -141,11 +141,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let color = bitcast<f32>(rgba_u32(222u, 0u, 150u, 255u));
 
+    // Visualize the global fmm domain aabb.
     if (global_id.x == 0u) {
         output_aabb_wire[global_id.x] =  
               AABB (
                   vec4<f32>(0.0, 0.0, 0.0, color),
-                  vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
+                  vec4<f32>(vec3<f32>(fmm_visualization_params.fmm_global_dimension), 0.1)
               );
         atomicAdd(&counter[3], 1u);
     }
@@ -158,12 +159,33 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let color_known = rgba_u32(0u, 255u, 0u, 255u);
     var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_known, color_far, 0u);  
 
-    //var col = colors[cell.tag]; 
-    var col = colors[3]; 
+    var col = colors[cell.tag]; 
+    //var col = colors[3]; 
 
-    output_aabb[atomicAdd(&counter[2], 1u)] =
-          AABB (
-              vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(col)),
-              vec4<f32>(position + vec3<f32>(0.008), 0.0),
-          );
+    // Visualize far points.
+    if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
+        output_aabb[atomicAdd(&counter[2], 1u)] =
+              AABB (
+                  vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(col)),
+                  vec4<f32>(position + vec3<f32>(0.008), 0.0),
+              );
+    }
+
+    // Visualize band points.
+    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
+        output_aabb[atomicAdd(&counter[2], 1u)] =
+              AABB (
+                  vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(col)),
+                  vec4<f32>(position + vec3<f32>(0.008), 0.0),
+              );
+    }
+
+    // Visualize known points.
+    if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
+        output_aabb[atomicAdd(&counter[2], 1u)] =
+              AABB (
+                  vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(col)),
+                  vec4<f32>(position + vec3<f32>(0.008), 0.0),
+              );
+    }
 }
