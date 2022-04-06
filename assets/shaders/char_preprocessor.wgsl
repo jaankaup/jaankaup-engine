@@ -68,14 +68,14 @@ var<workgroup> wg_total_vertice_count: atomic<u32>; // Is atomic necessery?
 
 var<workgroup> wg_char_params: CharParams;
 
-let NUMBER_OF_DRAW_INDIRECTS = 64u;
+let NUMBER_OF_DRAW_INDIRECTS = 1024u;
 let NUMBER_OF_THREADS = 1024u;
 
 // Temporary storage for elements.
 var<workgroup> workgroup_chars: array<Char, NUMBER_OF_THREADS>; 
 
-// The number of DispatchIndirects is 64.
-var<workgroup> wg_indirect_dispatchs: array<DispatchIndirect, 64>; 
+// The number of DispatchIndirects is 1024.
+var<workgroup> wg_indirect_dispatchs: array<DispatchIndirect, 1024>; 
 
 let DUMMY_CHAR = Char(
     vec3<f32>(0.0, 0.0, 0.0),
@@ -96,7 +96,7 @@ fn get_number_of_chars(aux_data: u32) -> u32 {
 }
 
 fn get_draw_index(aux_data: u32) -> u32 {
-    return (aux_data & 0xfc00000u) >> 22u;
+    return (aux_data & 0xffc00000u) >> 22u;
 }
 
 fn set_points_per_char(v: u32, ch: ptr<function, Char>) {
@@ -108,7 +108,7 @@ fn set_number_of_chars(v: u32, ch: ptr<function, Char>) {
 }
 
 fn set_draw_index(v: u32, ch: ptr<function, Char>) {
-    (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0xfc00000u)) | (v << 22u);
+    (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0xffc00000u)) | (v << 22u);
 }
 
 fn udiv_up_safe32(x: u32, y: u32) -> u32 {

@@ -47,7 +47,7 @@ struct FmmBlock {
 
 struct FmmVisualizationParams {
     fmm_global_dimension: vec3<u32>, 
-    visualization_method: u32, // a bit mask. 1 :: far, 2 :: band, 4 :: known 
+    visualization_method: u32, // a bit mask. 1 :: far, 2 :: band, 4 :: known, // 64 :: numbers
     fmm_inner_dimension: vec3<u32>, 
     future_usage: u32,
 };
@@ -133,6 +133,14 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
    );
 }
 
+fn visualize_cell(position: vec3<f32>, color: u32) {
+    output_aabb[atomicAdd(&counter[2], 1u)] =
+          AABB (
+              vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(color)),
+              vec4<f32>(position + vec3<f32>(0.008), 0.0),
+          );
+}
+
 @stage(compute)
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -152,40 +160,42 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
 
     let cell = fmm_data[global_id.x];
+    let speed = isotropic_data[global_id.x];
     let position = vec3<f32>(decode3Dmorton32(global_id.x)) * 0.25;
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
     let color_known = rgba_u32(0u, 255u, 0u, 255u);
     var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_known, color_far, 0u);  
+    //let colors_ptr = &colors;
 
-    var col = colors[cell.tag]; 
-    //var col = colors[3]; 
+    var col = colors[cell.tag];
+    let visualize_cell_aabb = (fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR ||
+                              (fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND ||
+                              (fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN;
+    if (visualize_cell_aabb) {
+        visualize_cell(position, col);
+        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 
-    // Visualize far points.
-    if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
-        output_aabb[atomicAdd(&counter[2], 1u)] =
-              AABB (
-                  vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(col)),
-                  vec4<f32>(position + vec3<f32>(0.008), 0.0),
-              );
+            output_char[atomicAdd(&counter[0], 1u)] =  
+                
+                Char (
+                    position.xyz + vec3<f32>(-0.007, 0.0, 0.008),
+                    0.001,
+                    vec4<f32>(f32(cell.value), 0.0, 0.0, 0.0),
+                    1u,
+                    rgba_u32(255u, 0u, 2550u, 255u),
+                    2u,
+                    0u
+                );
+         }
     }
 
-    // Visualize band points.
-    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
-        output_aabb[atomicAdd(&counter[2], 1u)] =
-              AABB (
-                  vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(col)),
-                  vec4<f32>(position + vec3<f32>(0.008), 0.0),
-              );
-    }
+    let ranged_color = mapRange(0.0, 100.0, 0.0, 255.0, speed);
+    let ranged_color_rgba = rgba_u32(u32(ranged_color), 10u, 0u, 255u);
 
-    // Visualize known points.
-    if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
-        output_aabb[atomicAdd(&counter[2], 1u)] =
-              AABB (
-                  vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(col)),
-                  vec4<f32>(position + vec3<f32>(0.008), 0.0),
-              );
+    // Visualize isotropic speed data.
+    if ((fmm_visualization_params.visualization_method & 8u) != 0u) {
+        visualize_cell(position, ranged_color_rgba);
     }
 }

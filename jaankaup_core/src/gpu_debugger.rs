@@ -169,7 +169,7 @@ impl GpuDebugger {
             "indirect_draw_buffer".to_string(),
                 buffer_from_data::<DrawIndirect>(
                     &device,
-                    &vec![DrawIndirect{ vertex_count: 0, instance_count: 1, base_vertex: 0, base_instance: 0, } ; 64],
+                    &vec![DrawIndirect{ vertex_count: 0, instance_count: 1, base_vertex: 0, base_instance: 0, } ; 1024],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDIRECT,
                     Some("Indirect draw buffer")
                 )
@@ -179,7 +179,7 @@ impl GpuDebugger {
             "indirect_dispatch_buffer".to_string(),
                 buffer_from_data::<DispatchIndirect>(
                     &device,
-                    &vec![DispatchIndirect{ x: 0, y: 0, z: 0, } ; 64],
+                    &vec![DispatchIndirect{ x: 0, y: 0, z: 0, } ; 1024],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::INDIRECT,
                     Some("Indirect dispatch buffer")
                 )
@@ -192,7 +192,7 @@ impl GpuDebugger {
                     &vec![CharParams{ vertices_so_far: 0,
                                       iterator_end: 0,
                                       draw_index: 0,
-                                      max_points_per_char: 5000,
+                                      max_points_per_char: 500,
                                       max_number_of_vertices: max_number_of_vertices,
                                       padding: [1,2,3],
                                       dispatch_indirect_prefix_sum: [0; 64]}],
@@ -633,7 +633,7 @@ impl GpuDebugger {
         // TODO:
           
         let number_of_chars = elem_counter[0];
-        //++ println!("NUMBER_OF_CHARS == {}", number_of_chars); 
+        // println!("NUMBER_OF_CHARS == {}", number_of_chars); 
 
         self.arrow_aabb_params.iterator_start_index = 0;
         self.arrow_aabb_params.iterator_end_index = number_of_chars;
@@ -682,13 +682,15 @@ impl GpuDebugger {
 
             queue.submit(Some(encoder_char_preprocessor.finish()));
 
-            let pre_processor_result = to_vec::<Char>(
-                &device,
-                &queue,
-                self.buffers.get(&"output_chars".to_string()).unwrap(),
-                0,
-                (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
-            );
+            // let pre_processor_result = to_vec::<Char>(
+            //     &device,
+            //     &queue,
+            //     self.buffers.get(&"output_chars".to_string()).unwrap(),
+            //     0,
+            //     (size_of::<Char>()) as wgpu::BufferAddress * (number_of_chars as u64)
+            // );
+
+            // println!("{:?}", pre_processor_result);
 
             //++ let mut max_points_per_char = 0;
 
@@ -703,23 +705,24 @@ impl GpuDebugger {
             //++ }
 
             //++ println!("MAX points_per_char == {:?}", max_points_per_char);
+            //
 
-            //++ let pre_processor_dispatch = to_vec::<DispatchIndirect>(
-            //++     &device,
-            //++     &queue,
-            //++     self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
-            //++     0,
-            //++     (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 64
-            //++ );
+            // let pre_processor_dispatch = to_vec::<DispatchIndirect>(
+            //     &device,
+            //     &queue,
+            //     self.buffers.get(&"indirect_dispatch_buffer".to_string()).unwrap(),
+            //     0,
+            //     (size_of::<DispatchIndirect>()) as wgpu::BufferAddress * 1024
+            // );
 
-            //++ let mut sum = 0;
+            // let mut sum = 0;
 
-            //++ for (i, v) in pre_processor_dispatch.iter().enumerate() {
-            //++     println!("{:?} :: {:?}", i, v);
-            //++     sum = sum + v.x;
-            //++ }
+            // for (i, v) in pre_processor_dispatch.iter().enumerate() {
+            //     println!("{:?} :: {:?}", i, v);
+            //     sum = sum + v.x;
+            // }
 
-            //++ // println!("sum == {}", sum);
+            // println!("sum == {}", sum);
             //++ // if (sum != 6400) { panic!("apuva"); }
 
             //++ // Get the number of indirect dispatches.
@@ -763,7 +766,6 @@ impl GpuDebugger {
                          //i as wgpu::BufferAddress,
                          *clear
                     );
-
                 }
                 queue.submit(Some(encoder_char.finish()));
             }

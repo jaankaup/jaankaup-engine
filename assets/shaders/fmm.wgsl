@@ -14,18 +14,17 @@ struct Arrow {
 //
 //  31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 9  8  7  6  5  4  3  2  1  0
 // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-// |  |  |  |  |d |d |d |d |d |d |n |n |n |n |n |n |n |n |pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc| 
+// |d |d |d |d |d |d |d |d |d |d |n |n |n |n |n |n |n |n |pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc|pc| 
 // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 // |-----------|------- d -------|--------- n -----------|----------------- pc --------------------|
 //
 //  0-13 [0..16384] points_per_char 
 // 14-21 [0..512]   number_of_chars
-// 22-27 [0..64]    draw_index
+// 22-31 [0..1024]    draw_index
 //
 // mask points_per_char = 3FFF 
 // mask number_of_chars = 3fc000 ( >> 14) 
-// mask draw_index = fc00000 ( >> 22)
-//
+// mask draw_index = ffc00000 ( >> 22)
 
 struct Char {
     start_pos: vec3<f32>,
@@ -46,7 +45,7 @@ struct Char {
 // }
 // 
 // fn get_draw_index(aux_data: u32) -> u32 {
-//     return (aux_data & 0xfc00000u) >> 22u;
+//     return (aux_data & 0xffc00000u) >> 22u;
 // }
 // 
 // fn set_points_per_char(v: u32, ch: ptr<function, Char>) {
@@ -58,7 +57,7 @@ struct Char {
 // }
 // 
 // fn set_draw_index(v: u32, ch: ptr<function, Char>) {
-//     (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0xfc00000u)) | (v << 22u);
+//     (*ch).auxiliary_data = ((*ch).auxiliary_data & (!0xffc00000u)) | (v << 22u);
 // }
 
 fn udiv_up_safe32(x: u32, y: u32) -> u32 {

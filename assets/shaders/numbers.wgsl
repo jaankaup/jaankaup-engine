@@ -99,7 +99,7 @@ fn get_number_of_chars(aux_data: u32) -> u32 {
 }
 
 fn get_draw_index(aux_data: u32) -> u32 {
-    return (aux_data & 0xfc00000u) >> 22u;
+    return (aux_data & 0xffc00000u) >> 22u;
 }
 
 // FONT STUFF

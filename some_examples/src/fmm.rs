@@ -42,7 +42,7 @@ pub use ev::VirtualKeyCode as Key;
 const MAX_NUMBERS_OF_ARROWS:     usize = 40960;
 const MAX_NUMBERS_OF_AABBS:      usize = 262144;
 const MAX_NUMBERS_OF_AABB_WIRES: usize = 40960;
-const MAX_NUMBERS_OF_CHARS:      usize = 40960;
+const MAX_NUMBERS_OF_CHARS:      usize = 262144;
 
 // FMM global dimensions.
 const FMM_GLOBAL_X: usize = 16; 
@@ -216,6 +216,9 @@ impl Application for Fmm {
         keys.register_key(Key::Key1, 200.0);
         keys.register_key(Key::Key2, 200.0);
         keys.register_key(Key::Key3, 200.0);
+        keys.register_key(Key::Key4, 200.0);
+        keys.register_key(Key::Key0, 200.0);
+        keys.register_key(Key::N, 200.0);
 
         // vvvvnnnn
         let render_object_vvvvnnnn =
@@ -961,6 +964,25 @@ impl Application for Fmm {
             else {
                 self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 4;
             }
+        }
+        if self.keys.test_key(&Key::Key4, input) {
+            if (self.fmm_visualization_params.visualization_method & 8 != 0) {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 8;
+            }
+            else {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 4;
+            }
+        }
+        if self.keys.test_key(&Key::N, input) {
+            if (self.fmm_visualization_params.visualization_method & 64 != 0) {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 64;
+            }
+            else {
+                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 64;
+            }
+        }
+        if self.keys.test_key(&Key::Key0, input) {
+            self.fmm_visualization_params.visualization_method = 0;
         }
         
         queue.write_buffer(
