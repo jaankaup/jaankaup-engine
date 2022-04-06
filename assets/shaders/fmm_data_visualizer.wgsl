@@ -92,6 +92,110 @@ fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
 //   return vec4<f32>(r,g,b,a);
 // }
 
+struct ModF {
+    fract: f32,
+    whole: f32,
+};
+
+///////////////////////////
+////// CHAR COUNT    //////
+///////////////////////////
+
+fn myTruncate(f: f32) -> f32 {
+    return select(f32( i32( floor(f) ) ), f32( i32( ceil(f) ) ), f < 0.0); 
+}
+
+fn my_modf(f: f32) -> ModF {
+    let iptr = trunc(f);
+    let fptr = f - iptr;
+    return ModF (
+        select(fptr, (-1.0)*fptr, f < 0.0),
+        iptr
+    );
+}
+
+/// if the given integer is < 0, return 0. Otherwise 1 is returned.
+fn the_sign_of_i32(n: i32) -> u32 {
+    return (u32(n) >> 31u);
+    //return 1u ^ (u32(n) >> 31u);
+}
+
+fn abs_i32(n: i32) -> u32 {
+    let mask = u32(n) >> 31u;
+    return (u32(n) + mask) ^ mask;
+}
+
+fn log2_u32(n: u32) -> u32 {
+
+    var v = n;
+    var r = (u32((v > 0xFFFFu))) << 4u;
+    var shift = 0u;
+
+    v  = v >> r;
+    shift = (u32((v > 0xFFu))) << 3u;
+
+    v = v >> shift;
+    r = r | shift;
+
+    shift = (u32(v > 0xFu)) << 2u;
+    v = v >> shift;
+    r = r | shift;
+
+    shift = (u32(v > 0x3u)) << 1u;
+    v = v >> shift;
+    r = r | shift;
+    r = r | (v >> 1u);
+    return r;
+}
+
+var<private> PowersOf10: array<u32, 10> = array<u32, 10>(1u, 10u, 100u, 1000u, 10000u, 100000u, 1000000u, 10000000u, 100000000u, 1000000000u);
+
+// NOT defined if u == 0u.
+fn log10_u32(n: u32) -> u32 {
+    
+    var v = n;
+    var r: u32;
+    var t: u32;
+    
+    t = (log2_u32(v) + 1u) * 1233u >> 12u;
+    r = t - u32(v < PowersOf10[t]);
+    return r;
+}
+
+fn number_of_chars_i32(n: i32) -> u32 {
+
+    if (n == 0) { return 1u; }
+    return the_sign_of_i32(n) + log10_u32(u32(abs(n))) + 1u;
+} 
+
+fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
+
+    let m = my_modf(f);
+    return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u;
+}
+
+// dots, brachets
+// vec_dim_count == 0   _  not used
+// vec_dim_count == 1   a
+// vec_dim_count == 2   (a , b)
+// vec_dim_count == 3   (a , b , c)
+// vec_dim_count == 4   (a , b , c , d)
+// vec_dim_count == 5   undefined
+//var<private> NumberOfExtraChars: array<u32, 5> = array<u32, 5>(0u, 0u, 3u, 4u, 5u);
+var<private> NumberOfExtraChars: array<u32, 5> = array<u32, 5>(0u, 0u, 2u, 2u, 2u);
+
+// TODO: Instead of data, Element as reference.
+fn number_of_chars_data(data: vec4<f32>, vec_dim_count: u32, number_of_decimals: u32) -> u32 {
+    
+    // Calculate all possible char counts to avoid branches.
+    let a = number_of_chars_f32(data.x, number_of_decimals) * u32(vec_dim_count >= 1u);
+    let b = number_of_chars_f32(data.y, number_of_decimals) * u32(vec_dim_count >= 2u);
+    let c = number_of_chars_f32(data.z, number_of_decimals) * u32(vec_dim_count >= 3u);
+    let d = number_of_chars_f32(data.w, number_of_decimals) * u32(vec_dim_count >= 4u);
+
+    return a + b + c + d + NumberOfExtraChars[vec_dim_count]; 
+}
+
 ///////////////////////////
 ////// MORTON CODE   //////
 ///////////////////////////
@@ -136,8 +240,8 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
 fn visualize_cell(position: vec3<f32>, color: u32) {
     output_aabb[atomicAdd(&counter[2], 1u)] =
           AABB (
-              vec4<f32>(position - vec3<f32>(0.008), bitcast<f32>(color)),
-              vec4<f32>(position + vec3<f32>(0.008), 0.0),
+              vec4<f32>(position - vec3<f32>(0.016), bitcast<f32>(color)),
+              vec4<f32>(position + vec3<f32>(0.016), 0.0),
           );
 }
 
@@ -161,7 +265,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let cell = fmm_data[global_id.x];
     let speed = isotropic_data[global_id.x];
-    let position = vec3<f32>(decode3Dmorton32(global_id.x)) * 0.25;
+    var position = vec3<f32>(decode3Dmorton32(global_id.x)) * 0.25;
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
@@ -170,25 +274,49 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //let colors_ptr = &colors;
 
     var col = colors[cell.tag];
-    let visualize_cell_aabb = (fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR ||
-                              (fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND ||
-                              (fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN;
-    if (visualize_cell_aabb) {
+
+    // TODO: spaces!
+    let value = vec4<f32>(f32(cell.value), 0.0, 0.0, 0.0);
+    let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
+    let font_size = 0.002;
+    let element_position = position - vec3<f32>(f32(total_number_of_chars) * font_size * 0.5, 0.0, -0.016); 
+    let renderable_element = Char (
+                    element_position,
+                    font_size,
+                    value,
+                    1u,
+                    col,
+                    2u,
+                    0u
+    );
+
+
+    // let visualize_cell_aabb = (fmm_visualization_params.visualization_method & 1u) != 0u || cell.tag == FAR ||
+    //                           (fmm_visualization_params.visualization_method & 2u) != 0u || cell.tag == BAND ||
+    //                           (fmm_visualization_params.visualization_method & 4u) != 0u || cell.tag == KNOWN;
+
+    if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
+
         visualize_cell(position, col);
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 
-            output_char[atomicAdd(&counter[0], 1u)] =  
-                
-                Char (
-                    position.xyz + vec3<f32>(-0.007, 0.0, 0.008),
-                    0.001,
-                    vec4<f32>(f32(cell.value), 0.0, 0.0, 0.0),
-                    1u,
-                    rgba_u32(255u, 0u, 2550u, 255u),
-                    2u,
-                    0u
-                );
+            output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
          }
+    }
+    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
+        visualize_cell(position, col);
+        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+
+            output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+        }
+    }
+
+    if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
+        visualize_cell(position, col);
+        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+
+            output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+        }
     }
 
     let ranged_color = mapRange(0.0, 100.0, 0.0, 255.0, speed);
@@ -197,5 +325,19 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // Visualize isotropic speed data.
     if ((fmm_visualization_params.visualization_method & 8u) != 0u) {
         visualize_cell(position, ranged_color_rgba);
+        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+
+            output_char[atomicAdd(&counter[0], 1u)] =  
+                
+                Char (
+                    position.xyz + vec3<f32>(-0.015, 0.0, 0.016),
+                    0.002,
+                    vec4<f32>(speed, 0.0, 0.0, 0.0),
+                    1u,
+                    rgba_u32(255u, 0u, 2550u, 255u),
+                    2u,
+                    0u
+                );
+         }
     }
 }

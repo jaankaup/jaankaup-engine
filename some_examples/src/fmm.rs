@@ -28,7 +28,10 @@ use jaankaup_core::common_functions::{
     encode_rgba_u32,
     udiv_up_safe32,
     create_uniform_bindgroup_layout,
-    create_buffer_bindgroup_layout
+    create_buffer_bindgroup_layout,
+    encode3Dmorton32,
+    set_bit_to,
+    get_bit
 };
 // use jaankaup_algorithms::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
@@ -37,6 +40,12 @@ use jaankaup_core::cgmath::Vector4 as Vec4;
 
 use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
+
+const FAR: u32      = 0;
+const BAND_NEW: u32 = 1;
+const BAND: u32     = 2;
+const KNOWN: u32    = 3;
+const OUTSIDE: u32  = 4;
 
 // TODO: add to fmm params.
 const MAX_NUMBERS_OF_ARROWS:     usize = 40960;
@@ -164,6 +173,26 @@ struct Fmm {
 
 impl Fmm {
 
+    fn addSeed(&self, queue: &wgpu::Queue, position: [u32; 3]) {
+
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(position[0] < (FMM_GLOBAL_X * FMM_INNER_X).try_into().unwrap() && 
+                          position[1] < (FMM_GLOBAL_Y * FMM_INNER_Y).try_into().unwrap() &&
+                          position[2] < (FMM_GLOBAL_Z * FMM_INNER_Z).try_into().unwrap(),
+                          "seed is out of computational domain."); 
+        }
+
+        let fmm_index = encode3Dmorton32(position[0], position[1], position[2]); 
+
+        queue.write_buffer(
+            &self.buffers.get(&"fmm_data".to_string()).unwrap(),
+            std::mem::size_of::<FmmCell>() as u64 * fmm_index as u64,
+            bytemuck::cast_slice(&[FmmCell {
+                                      tag: KNOWN,
+                                      value: 0.0,
+            }]));
+    }
 }
 
 //#[allow(unused_variables)]
@@ -196,7 +225,7 @@ impl Application for Fmm {
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.02);
+        camera.set_movement_sensitivity(0.002);
 
         // gpu debugger.
         let gpu_debugger = GpuDebugger::Init(
@@ -940,46 +969,26 @@ impl Application for Fmm {
         }
 
         if self.keys.test_key(&Key::Key1, input) {
-            if (self.fmm_visualization_params.visualization_method & 1 != 0) {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 1;
-            }
-            else {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 1;
-            }
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 0) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 0, bit);
         }
 
         if self.keys.test_key(&Key::Key2, input) {
-            if (self.fmm_visualization_params.visualization_method & 2 != 0) {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 2;
-            }
-            else {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 2;
-            }
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 1) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 1, bit);
         }
 
         if self.keys.test_key(&Key::Key3, input) {
-            if (self.fmm_visualization_params.visualization_method & 4 != 0) {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 4;
-            }
-            else {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 4;
-            }
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 2) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 2, bit);
         }
         if self.keys.test_key(&Key::Key4, input) {
-            if (self.fmm_visualization_params.visualization_method & 8 != 0) {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 8;
-            }
-            else {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 4;
-            }
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 3) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 3, bit);
         }
         if self.keys.test_key(&Key::N, input) {
-            if (self.fmm_visualization_params.visualization_method & 64 != 0) {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method - 64;
-            }
-            else {
-                self.fmm_visualization_params.visualization_method = self.fmm_visualization_params.visualization_method + 64;
-            }
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 6) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 6, bit);
         }
         if self.keys.test_key(&Key::Key0, input) {
             self.fmm_visualization_params.visualization_method = 0;
@@ -1115,11 +1124,13 @@ impl Application for Fmm {
             for i in 0..128 {
                 println!("{:?} == {:?}", i, result[i]);
             }
+            self.addSeed(queue, [5,6,7]);
             self.once = !self.once;
         }
         //println!("{:?}", result);
     }
 }
+
 
 fn main() {
     
