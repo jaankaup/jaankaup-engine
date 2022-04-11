@@ -291,10 +291,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     );
 
 
-    // let visualize_cell_aabb = (fmm_visualization_params.visualization_method & 1u) != 0u || cell.tag == FAR ||
-    //                           (fmm_visualization_params.visualization_method & 2u) != 0u || cell.tag == BAND ||
-    //                           (fmm_visualization_params.visualization_method & 4u) != 0u || cell.tag == KNOWN;
-
     if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
 
         visualize_cell(position, col);
@@ -330,8 +326,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             output_char[atomicAdd(&counter[0], 1u)] =  
                 
                 Char (
-                    position.xyz + vec3<f32>(-0.015, 0.0, 0.016),
-                    0.002,
+                    element_position,
+                    font_size,
                     vec4<f32>(speed, 0.0, 0.0, 0.0),
                     1u,
                     rgba_u32(255u, 0u, 2550u, 255u),

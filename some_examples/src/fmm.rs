@@ -160,6 +160,8 @@ struct Fmm {
     pub compute_bind_groups_reduce: Vec<wgpu::BindGroup>,
     pub compute_object_fmm_visualizer: ComputeObject,
     pub compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
+    pub compute_object_initial_band_points: ComputeObject,
+    pub compute_bind_groups_initial_band_points: Vec<wgpu::BindGroup>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
     pub keys: KeyboardManager,
@@ -184,6 +186,9 @@ impl Fmm {
         }
 
         let fmm_index = encode3Dmorton32(position[0], position[1], position[2]); 
+        println!("position == {:?}", position);
+        println!("fmm_index == {}", fmm_index);
+        println!("blsh == {}", std::mem::size_of::<FmmCell>() as u64 * fmm_index as u64);
 
         queue.write_buffer(
             &self.buffers.get(&"fmm_data".to_string()).unwrap(),
@@ -736,7 +741,6 @@ impl Application for Fmm {
                 &vec![
                     vec![
                          &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
-                         &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
                          &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
@@ -814,6 +818,65 @@ impl Application for Fmm {
                 ]
         );
 
+        ////////////////////////////////////////////////////
+        ////               Initial band points          ////
+        ////////////////////////////////////////////////////
+
+        let compute_object_initial_band_points =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("initial_band_points.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/initial_band_points.wgsl"))),
+                    
+                    }),
+                    Some("Initial band points compute object"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<storage, read_write> fmm_data: array<FmmCell>;
+                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+                        ],
+                    ]
+        );
+
+        let compute_bind_groups_initial_band_points =
+            create_bind_groups(
+                &configuration.device,
+                &compute_object_initial_band_points.bind_group_layout_entries,
+                &compute_object_initial_band_points.bind_group_layouts,
+                &vec![
+                    vec![
+                         &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
+                         &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ]
+                ]
+        );
+
         println!("Creating render bind groups.");
  
         Self {
@@ -833,6 +896,8 @@ impl Application for Fmm {
             compute_bind_groups_reduce: compute_bind_groups_reduce,
             compute_object_fmm_visualizer: compute_object_fmm_visualizer,
             compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
+            compute_object_initial_band_points: compute_object_initial_band_points,
+            compute_bind_groups_initial_band_points: compute_bind_groups_initial_band_points,
             buffers: buffers,
             camera: camera,
             keys: keys,
@@ -897,16 +962,24 @@ impl Application for Fmm {
             Some("fmm triangle dispatch")
         );
 
+        // Compute interface.
+        self.compute_object_initial_band_points.dispatch(
+            &self.compute_bind_groups_initial_band_points,
+            &mut encoder_command,
+            256, 1, 1,
+            Some("initial band points dispatch")
+        );
+
         queue.submit(Some(encoder_command.finish()));
 
-       let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm triangle encoder") });
+       // let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm triangle encoder") });
 
        queue.write_buffer(
            &self.buffers.get(&"fmm_params".to_string()).unwrap(),
            0,
            bytemuck::cast_slice(&[FmmParams {
                                      fmm_global_dimension: [16, 16, 16],
-                                     generation_method: 1,
+                                     generation_method: 0,
                                      fmm_inner_dimension: [4, 4, 4],
                                      triangle_count: 2036 }
            ]));

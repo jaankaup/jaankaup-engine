@@ -613,6 +613,27 @@ fn log_vec3(v: vec3<f32>, max_decimals: u32, base_pos: ptr<function, vec3<f32>>,
     *base_pos = *base_pos + vec3<f32>(0.2, 0.0, 0.0) * font_size;
 }
 
+fn log_vec4(v: vec4<f32>, max_decimals: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
+
+    create_char(11u, total_vertex_count, *base_pos, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    log_float(v.x, max_decimals, base_pos, total_vertex_count, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    log_float(v.y, max_decimals, base_pos, total_vertex_count, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    log_float(v.z, max_decimals, base_pos, total_vertex_count, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    log_float(v.w, max_decimals, base_pos, total_vertex_count, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.5, 0.0, 0.0) * font_size;
+
+    create_char(12u, total_vertex_count, *base_pos, col, font_size);
+    *base_pos = *base_pos + vec3<f32>(0.2, 0.0, 0.0) * font_size;
+}
+
 // fn log_vec4_f32(v: vec4<f32>, max_decimals: u32, thread_index: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 // 
 //     // TODO: create_dot function for this.
@@ -719,6 +740,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     if (ch.vec_dim_count == 3u) {
         log_vec3(ch.value.xyz,
+                  workgroup_params.wg_char.decimal_count,
+                  &jooo,
+                  get_points_per_char(ch.auxiliary_data),
+                  ch.color,
+                  ch.font_size);
+    }
+
+    if (ch.vec_dim_count == 4u) {
+        log_vec4(ch.value,
                   workgroup_params.wg_char.decimal_count,
                   &jooo,
                   get_points_per_char(ch.auxiliary_data),

@@ -43,6 +43,13 @@ struct Triangle {
     c: Vertex,
 };
 
+struct FmmParams {
+    fmm_global_dimension: vec3<u32>, 
+    generation_method: u32, // 0 -> generate speed information, 1 -> generate fmm interface
+    fmm_inner_dimension: vec3<u32>, 
+    triangle_count: u32,
+};
+
 struct Char {
     start_pos: vec4<f32>,
     value: vec4<f32>,
@@ -125,7 +132,6 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   x  = x - y * dim_x;
   return vec3<u32>(x, y, z);
 }
-
 
 ///////////////////////////
 ////// MORTON CODE   //////

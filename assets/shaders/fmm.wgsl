@@ -90,7 +90,7 @@ struct FmmCell {
 
 struct FmmParams {
     fmm_global_dimension: vec3<u32>, 
-    visualize: u32, // 0 -> no, 1 -> yes!
+    generation_method: u32, // 0 -> generate speed information, 1 -> generate fmm interface
     fmm_inner_dimension: vec3<u32>, 
     triangle_count: u32,
 };
