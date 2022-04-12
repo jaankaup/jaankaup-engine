@@ -72,7 +72,7 @@ let light_color: vec3<f32> = vec3<f32>(0.8, 0.3, 0.3);
 let material_spec_color: vec3<f32> = vec3<f32>(0.5, 0.1, 0.1);
 let material_shininess: f32 = 55.0;
 let ambient_coeffience: f32 = 0.15;
-let attentuation_factor: f32 = 0.0013;
+let attentuation_factor: f32 = 0.000013;
 
 @stage(fragment)
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {

@@ -763,7 +763,6 @@ impl GpuDebugger {
                          &self.buffers.get("output_render").unwrap(),
                          &self.buffers.get("indirect_draw_buffer").unwrap(),
                          (i * std::mem::size_of::<DrawIndirect>() as u32) as wgpu::BufferAddress,
-                         //i as wgpu::BufferAddress,
                          *clear
                     );
                 }
