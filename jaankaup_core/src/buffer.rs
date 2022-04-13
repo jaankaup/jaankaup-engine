@@ -29,20 +29,16 @@ pub fn buffer_from_data<T: Pod>(
         )
 }
 
-/// Copy the content of the buffer into a vector. TODO: add range for reading buffer.
-/// TODO: give res vector as parameter.
-/// TODO: add _src_offset
-//++ pub fn to_vec<T: Convert2Vec>(
+/// Copy the content of the buffer into a vector.
 pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     buffer: &wgpu::Buffer,
     _src_offset: wgpu::BufferAddress,
     copy_size: wgpu::BufferAddress,
-    spawner: &Spawner, 
+    _spawner: &Spawner, 
     ) -> Vec<T> {
 
-        //log::info!("Creating staging buffer");
     // TODO: Recycle staging buffers.
     let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
@@ -61,6 +57,7 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     let _ = buffer_slice.map_async(wgpu::MapMode::Read);
     device.poll(wgpu::Maintain::Wait);
 
+    // Wasm version crashes: DOMException.getMappedRange: Buffer not mapped. 
     let data = buffer_slice.get_mapped_range().to_vec();
     res = Convert2Vec::convert(&data);
     drop(data);

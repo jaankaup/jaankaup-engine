@@ -117,47 +117,6 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
    );
 }
 
-//++ ///////////////////////////
-//++ ////// MORTON CODE   //////
-//++ ///////////////////////////
-//++ 
-//++ fn encode3Dmorton32(ptr: ptr<function, vec3<u32>>) -> u32 {
-//++     var x_temp = ((*ptr).x | ((*ptr).x << 16u)) & 0x030000FFu;
-//++         x_temp = (x_temp   | (x_temp   <<  8u)) & 0x0300F00Fu;
-//++         x_temp = (x_temp   | (x_temp   <<  4u)) & 0x030C30C3u;
-//++         x_temp = (x_temp   | (x_temp   <<  2u)) & 0x09249249u;
-//++ 
-//++     var y_temp = ((*ptr).y | ((*ptr).y << 16u)) & 0x030000FFu;
-//++         y_temp = (y_temp   | (y_temp   <<  8u)) & 0x0300F00Fu;
-//++         y_temp = (y_temp   | (y_temp   <<  4u)) & 0x030C30C3u;
-//++         y_temp = (y_temp   | (y_temp   <<  2u)) & 0x09249249u;
-//++ 
-//++     var z_temp = ((*ptr).z | ((*ptr).z << 16u)) & 0x030000FFu;
-//++         z_temp = (z_temp   | (z_temp   <<  8u)) & 0x0300F00Fu;
-//++         z_temp = (z_temp   | (z_temp   <<  4u)) & 0x030C30C3u;
-//++         z_temp = (z_temp   | (z_temp   <<  2u)) & 0x09249249u;
-//++ 
-//++     return x_temp | (y_temp << 1u) | (z_temp << 2u);
-//++ }
-//++ 
-//++ fn get_third_bits32(m: u32) -> u32 {
-//++     var x = m & 0x9249249u;
-//++     x = (x ^ (x >> 2u))  & 0x30c30c3u;
-//++     x = (x ^ (x >> 4u))  & 0x0300f00fu;
-//++     x = (x ^ (x >> 8u))  & 0x30000ffu;
-//++     x = (x ^ (x >> 16u)) & 0x000003ffu;
-//++ 
-//++     return x;
-//++ }
-//++ 
-//++ fn decode3Dmorton32(m: u32) -> vec3<u32> {
-//++     return vec3<u32>(
-//++         get_third_bits32(m),
-//++         get_third_bits32(m >> 1u),
-//++         get_third_bits32(m >> 2u)
-//++    );
-//++ }
-
 fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
     return ((*coord).x >= 0 && (*coord).x < 64) &&
            ((*coord).y >= 0 && (*coord).y < 64) &&
