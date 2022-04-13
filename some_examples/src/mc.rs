@@ -6,6 +6,7 @@ use jaankaup_core::template::{
         WGPUConfiguration,
         Application,
         BasicLoop,
+        Spawner,
 };
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups, draw, draw_indirect, DrawIndirect};
 use jaankaup_core::input::*;
@@ -389,7 +390,8 @@ impl Application for McApp {
               device: &wgpu::Device,
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
-              sc_desc: &wgpu::SurfaceConfiguration) {
+              sc_desc: &wgpu::SurfaceConfiguration,
+              spawner: &Spawner) {
 
         self.screen.acquire_screen_texture(
             &device,
@@ -452,7 +454,7 @@ impl Application for McApp {
     }
 
     #[allow(unused)]
-    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
+    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
         self.camera.update_from_input(&queue, &input);
 
         // if !self.update { return; }

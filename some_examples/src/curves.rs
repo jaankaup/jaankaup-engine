@@ -492,7 +492,7 @@ impl Application for DebugVisualizator {
     }
 
     #[allow(unused)]
-    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
+    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
         self.camera.update_from_input(&queue, &input);
 
         if self.keys.test_key(&Key::L, input) {

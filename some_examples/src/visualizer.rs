@@ -6,6 +6,7 @@ use jaankaup_core::template::{
         WGPUConfiguration,
         Application,
         BasicLoop,
+        Spawner,
 };
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
@@ -19,7 +20,7 @@ use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
 use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_algorithms::histogram::Histogram;
+use jaankaup_core::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 
 use winit::event as ev;
@@ -497,7 +498,8 @@ impl Application for DebugVisualizator {
               device: &wgpu::Device,
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
-              sc_desc: &wgpu::SurfaceConfiguration) {
+              sc_desc: &wgpu::SurfaceConfiguration,
+              spawner: &Spawner) {
 
         // Prepare screen for rendering.
         self.screen.acquire_screen_texture(
@@ -530,7 +532,7 @@ impl Application for DebugVisualizator {
             // Submit compute.
             queue.submit(Some(encoder_command.finish()));
 
-            let counter = self.histogram.get_values(device, queue);
+            let counter = self.histogram.get_values(device, queue, spawner);
             self.draw_count_points = counter[0];
             
             let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
@@ -543,7 +545,7 @@ impl Application for DebugVisualizator {
 
             queue.submit(Some(encoder_command.finish()));
 
-            let counter2 = self.histogram.get_values(device, queue);
+            let counter2 = self.histogram.get_values(device, queue, spawner);
             self.draw_count_triangles = counter2[0];
 
             //println!("self.draw_count  == {}", self.draw_count); 

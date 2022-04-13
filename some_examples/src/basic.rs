@@ -5,6 +5,7 @@ use jaankaup_core::template::{
         WGPUConfiguration,
         Application,
         BasicLoop,
+        Spawner,
 };
 //use jaankaup_core::misc::Convert2Vec;
 //use jaankaup_core::impl_convert;
@@ -210,7 +211,8 @@ impl Application for BasicApp {
               device: &wgpu::Device,
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
-              sc_desc: &wgpu::SurfaceConfiguration) {
+              sc_desc: &wgpu::SurfaceConfiguration,
+              spawner: &Spawner) {
 
         self.screen.acquire_screen_texture(
             &device,
@@ -250,7 +252,7 @@ impl Application for BasicApp {
         self.camera.resize(sc_desc.width as f32, sc_desc.height as f32);
     }
 
-    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
+    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
         self.camera.update_from_input(&queue, &input);
     }
 }

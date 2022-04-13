@@ -7,6 +7,7 @@ use jaankaup_core::template::{
         WGPUConfiguration,
         Application,
         BasicLoop,
+        Spawner,
 };
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
@@ -914,7 +915,8 @@ impl Application for Fmm {
               device: &wgpu::Device,
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
-              sc_desc: &wgpu::SurfaceConfiguration) {
+              sc_desc: &wgpu::SurfaceConfiguration,
+              spawner: &Spawner) {
 
         // println!("acquiring screen texture.");
 
@@ -999,7 +1001,8 @@ impl Application for Fmm {
                   &queue,
                   &view,
                   self.screen.depth_texture.as_ref().unwrap(),
-                  &mut clear
+                  &mut clear,
+                  spawner
         );
         self.gpu_debugger.reset_element_counters(&queue);
 
@@ -1034,7 +1037,7 @@ impl Application for Fmm {
     }
 
     #[allow(unused)]
-    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
+    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
         self.camera.update_from_input(&queue, &input);
 
         if self.keys.test_key(&Key::P, input) { 
@@ -1149,7 +1152,7 @@ impl Application for Fmm {
 
         queue.submit(Some(encoder_command.finish()));
 
-        wgpu_timer_unwrapped.create_timestamp_data(&device, &queue);
+        wgpu_timer_unwrapped.create_timestamp_data(&device, &queue, spawner);
 
         // wgpu_timer_unwrapped.print_data();
 
@@ -1182,7 +1185,8 @@ impl Application for Fmm {
             &queue,
             &self.buffers.get(&"filtered_blocks".to_string()).unwrap(),
             0,
-            (size_of::<FmmBlock>() * 128) as wgpu::BufferAddress
+            (size_of::<FmmBlock>() * 128) as wgpu::BufferAddress,
+            spawner
         );
 
         // let result =  to_vec::<u32>(
