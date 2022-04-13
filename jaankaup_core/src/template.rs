@@ -26,7 +26,8 @@ pub trait Application: Sized + 'static {
               queue: &mut wgpu::Queue,
               //swap_chain: &mut wgpu::SwapChain,
               surface: &wgpu::Surface,
-              sc_desc: &wgpu::SurfaceConfiguration);
+              sc_desc: &wgpu::SurfaceConfiguration,
+              spawner: &Spawner);
 
     /// A function that handles inputs.
     fn input(&mut self, queue: &wgpu::Queue, input_cache: &InputCache);
@@ -184,7 +185,7 @@ impl Loop for BasicLoop {
                 }
             }
             Event::RedrawRequested(_) => {
-                application.render(&device, &mut queue /* &mut swap_chain */, &surface, &sc_desc);
+                application.render(&device, &mut queue /* &mut swap_chain */, &surface, &sc_desc, &spawner);
             }
             _ => { } // Any other events
         } // match event

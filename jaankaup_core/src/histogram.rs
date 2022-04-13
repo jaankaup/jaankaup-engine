@@ -1,5 +1,6 @@
 // use jaankaup_core::wgpu;
 use crate::buffer::{buffer_from_data, to_vec};
+use crate::template::Spawner;
 
 /// Histogram struct for GPU purposes. 
 pub struct Histogram {
@@ -27,13 +28,14 @@ impl Histogram {
     }
 
     /// TODO: implement wasm version! 
-    pub fn get_values(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Vec<u32> {
+    pub fn get_values(&self, device: &wgpu::Device, queue: &wgpu::Queue, spawner: &Spawner) -> Vec<u32> {
 
         let result = to_vec::<u32>(&device,
                                    &queue,
                                    &self.histogram,
                                    0 as wgpu::BufferAddress,
-                                   (std::mem::size_of::<u32>() * self.data.len()) as wgpu::BufferAddress);
+                                   (std::mem::size_of::<u32>() * self.data.len()) as wgpu::BufferAddress,
+                                   spawner);
         result
     }
     

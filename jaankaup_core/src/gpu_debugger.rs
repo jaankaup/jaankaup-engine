@@ -1,4 +1,5 @@
 use crate::texture::Texture;
+use crate::template::Spawner;
 use std::mem::size_of;
 use crate::render_object::{RenderObject, ComputeObject, create_bind_groups,draw, draw_indirect, DrawIndirect, DispatchIndirect};
 use std::borrow::Cow;
@@ -516,10 +517,11 @@ impl GpuDebugger {
                   queue: &wgpu::Queue,
                   view: &wgpu::TextureView,
                   depth_texture: &Texture,
-                  clear: &mut bool) {
+                  clear: &mut bool,
+                  spawner: &Spawner) {
 
         // Get the total number of elements.
-        let elem_counter = self.histogram_element_counter.get_values(device, queue);
+        let elem_counter = self.histogram_element_counter.get_values(device, queue, spawner);
 
         let total_number_of_arrows = elem_counter[1];
         let total_number_of_aabbs = elem_counter[2];
@@ -731,7 +733,8 @@ impl GpuDebugger {
                 &queue,
                 self.buffers.get(&"char_params".to_string()).unwrap(),
                 0,
-                (size_of::<CharParams>()) as wgpu::BufferAddress
+                (size_of::<CharParams>()) as wgpu::BufferAddress,
+                spawner,
             );
 
             // println!("{:?}", charparams_result[0]);

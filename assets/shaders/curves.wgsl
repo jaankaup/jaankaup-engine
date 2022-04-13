@@ -574,7 +574,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
     let q = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
     let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length;
 
-    let c = f32(arr.color);
+    let c = bitcast<f32>(arr.color);
 
     var positions = array<vec4<f32>, 8>(
         vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz), c),
@@ -814,6 +814,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         Arrow (
     	    5.0 * vec4<f32>(f32(curve_coord.x), f32(curve_coord.y), f32(curve_coord.z), 0.0),
     	    5.0 * vec4<f32>(f32(curve_coord_n.x), f32(curve_coord_n.y), f32(curve_coord_n.z), 0.0),
+    	    //rgba_u32(255u, 0u, 0u, 255u),
     	    rgba_u32(u32(255u- u32(c)), 0u, u32(c), 255u),
     	    visualization_params.arrow_size,
         ),

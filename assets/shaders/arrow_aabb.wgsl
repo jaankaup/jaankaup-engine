@@ -387,7 +387,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32, start_index: u32) {
     let q = rotation_from_to(vec3<f32>(1.0, 0.0, 0.0), direction);
     let the_pos = arr.start_pos.xyz + rotate_vector(q, vec3<f32>(1.0, 0.0, 0.0)) * 0.5 * array_length;
 
-    let c = f32(arr.color);
+    let c = bit_cast<f32>(arr.color);
 
     var positions = array<vec4<f32>, 8>(
         vec4<f32>(the_pos - 0.5 * head_size * direction + rotate_vector(q, aabb.min.xyz), c),
