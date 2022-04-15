@@ -67,6 +67,7 @@ struct ModF {
 struct FmmCell {
     tag: u32,
     value: f32,
+    queue_value: u32,
 };
 
 struct FmmParams {
@@ -307,7 +308,7 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
                 if (dist < 0.25 && dist < cell.value) {
 
                    // Is this safe. Do we need atomic operations?
-                   fmm_data[actual_index] = FmmCell(KNOWN, dist);
+                   fmm_data[actual_index] = FmmCell(KNOWN, dist, 0u);
                 }
         }
 

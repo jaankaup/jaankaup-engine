@@ -36,9 +36,9 @@ let KNOWN    = 3u;
 let OUTSIDE  = 4u;
 
 struct FmmCell {
-    value: f32,
     tag: u32,
-    // queue_value: atomic<u32>,
+    value: f32,
+    queue_value: atomic<u32>,
 };
 
 struct FmmBlock {
@@ -46,10 +46,11 @@ struct FmmBlock {
     band_points_count: u32,
 };
 
-let THREAD_COUNT = 1024u;
+let THREAD_COUNT: u32 = 1024u;
+let NEIGHBORS: u32 = 6144u;
 
-var<workgroup> neighbor_cells: array<FmmCell, THREAD_COUNT * 6u>;
-var<workgroup> neighbor_cell_indices: array<FmmCell, THREAD_COUNT * 6u>;
+//var<workgroup> neighbor_cells: array<FmmCell, THREAD_COUNT * 6u>;
+var<workgroup> neighbor_cell_indices: array<FmmCell, NEIGHBORS>;
 var<workgroup> neighbor_cells_counter: atomic<u32>;
 var<workgroup> known_points_counter: atomic<u32>;
 
@@ -131,21 +132,66 @@ fn isInside2(x: i32, y: i32, z: i32) -> bool {
 
 fn load_neighbors(coord: vec3<u32>) {
 
-    // Do not load from outside the computational domain.
+    // TODO: Do not load from outside the computational domain.
+    // TODO: Implement cached loads/saves. 
    
-    //++ var neighbor_0_coord = vec3<i32>(coord) + vec3<i32>(1, 0, 0);
-    //++ var neighbor_1_coord = vec3<i32>(coord) - vec3<i32>(1, 0, 0);
-    //++ var neighbor_2_coord = vec3<i32>(coord) + vec3<i32>(0, 1, 0);
-    //++ var neighbor_3_coord = vec3<i32>(coord) - vec3<i32>(0, 1, 0);
-    //++ var neighbor_4_coord = vec3<i32>(coord) + vec3<i32>(0, 0, 1);
-    //++ var neighbor_5_coord = vec3<i32>(coord) - vec3<i32>(0, 0, 1);
+    var neighbor_0_coord = vec3<i32>(coord) + vec3<i32>(1, 0, 0);
+    var neighbor_1_coord = vec3<i32>(coord) - vec3<i32>(1, 0, 0);
+    var neighbor_2_coord = vec3<i32>(coord) + vec3<i32>(0, 1, 0);
+    var neighbor_3_coord = vec3<i32>(coord) - vec3<i32>(0, 1, 0);
+    var neighbor_4_coord = vec3<i32>(coord) + vec3<i32>(0, 0, 1);
+    var neighbor_5_coord = vec3<i32>(coord) - vec3<i32>(0, 0, 1);
 
-    //++ var neighbor_0_coord_u32 = coord + vec3<u32>(1u, 0u, 0u);
-    //++ var neighbor_1_coord_u32 = coord - vec3<u32>(1u, 0u, 0u);
-    //++ var neighbor_2_coord_u32 = coord + vec3<u32>(0u, 1u, 0u);
-    //++ var neighbor_3_coord_u32 = coord - vec3<u32>(0u, 1u, 0u);
-    //++ var neighbor_4_coord_u32 = coord + vec3<u32>(0u, 0u, 1u);
-    //++ var neighbor_5_coord_u32 = coord - vec3<u32>(0u, 0u, 1u);
+    var neighbor_0_coord_u32 = coord + vec3<u32>(1u, 0u, 0u);
+    var neighbor_1_coord_u32 = coord - vec3<u32>(1u, 0u, 0u);
+    var neighbor_2_coord_u32 = coord + vec3<u32>(0u, 1u, 0u);
+    var neighbor_3_coord_u32 = coord - vec3<u32>(0u, 1u, 0u);
+    var neighbor_4_coord_u32 = coord + vec3<u32>(0u, 0u, 1u);
+    var neighbor_5_coord_u32 = coord - vec3<u32>(0u, 0u, 1u);
+
+    var cell_index0 = encode3Dmorton32(neighbor_0_coord_u32.x, neighbor_0_coord_u32.y, neighbor_0_coord_u32.z);
+    var cell_index1 = encode3Dmorton32(neighbor_1_coord_u32.x, neighbor_1_coord_u32.y, neighbor_1_coord_u32.z);
+    var cell_index2 = encode3Dmorton32(neighbor_2_coord_u32.x, neighbor_2_coord_u32.y, neighbor_2_coord_u32.z);
+    var cell_index3 = encode3Dmorton32(neighbor_3_coord_u32.x, neighbor_3_coord_u32.y, neighbor_3_coord_u32.z);
+    var cell_index4 = encode3Dmorton32(neighbor_4_coord_u32.x, neighbor_4_coord_u32.y, neighbor_4_coord_u32.z);
+    var cell_index5 = encode3Dmorton32(neighbor_5_coord_u32.x, neighbor_5_coord_u32.y, neighbor_5_coord_u32.z);
+
+    // TODO: fmm_data[262144] == Outside Cell
+    cell_index0 = select(0u, cell_index0, cell_index0 < 262144u);
+    cell_index1 = select(0u, cell_index1, cell_index1 < 262144u);
+    cell_index2 = select(0u, cell_index2, cell_index2 < 262144u);
+    cell_index3 = select(0u, cell_index3, cell_index3 < 262144u);
+    cell_index4 = select(0u, cell_index4, cell_index4 < 262144u);
+    cell_index5 = select(0u, cell_index5, cell_index5 < 262144u);
+
+    // TODO: do not access the data outside buffer range.
+    var neighbor_cell0 = fmm_data[cell_index0];
+    var neighbor_cell1 = fmm_data[cell_index1];
+    var neighbor_cell2 = fmm_data[cell_index2];
+    var neighbor_cell3 = fmm_data[cell_index3];
+    var neighbor_cell4 = fmm_data[cell_index4];
+    var neighbor_cell5 = fmm_data[cell_index5];
+
+    // fmm_data[cell_index0] = FmmCell(1.0, BAND, 0u);
+    // fmm_data[cell_index1] = FmmCell(1.0, BAND, 0u);
+    // fmm_data[cell_index2] = FmmCell(1.0, BAND, 0u);
+    // fmm_data[cell_index3] = FmmCell(1.0, BAND, 0u);
+    // fmm_data[cell_index4] = FmmCell(1.0, BAND, 0u);
+    // fmm_data[cell_index5] = FmmCell(1.0, BAND, 0u);
+
+    // if (neighbor_cell0.tag == KNOWN) { fmm_data[cell_index0].tag = BAND; } // fmm_data[neighbor_cell_indices[0 + j*6u]] = neighbor_cells[0 + j*6u]; }
+    // if (neighbor_cell1.tag == KNOWN) { fmm_data[cell_index1].tag = BAND; } // fmm_data[neighbor_cell_indices[1 + j*6u]] = neighbor_cells[1 + j*6u]; }
+    // if (neighbor_cell2.tag == KNOWN) { fmm_data[cell_index2].tag = BAND; } // fmm_data[neighbor_cell_indices[2 + j*6u]] = neighbor_cells[2 + j*6u]; }
+    // if (neighbor_cell3.tag == KNOWN) { fmm_data[cell_index3].tag = BAND; } // fmm_data[neighbor_cell_indices[3 + j*6u]] = neighbor_cells[3 + j*6u]; }
+    // if (neighbor_cell4.tag == KNOWN) { fmm_data[cell_index4].tag = BAND; } // fmm_data[neighbor_cell_indices[4 + j*6u]] = neighbor_cells[4 + j*6u]; }
+    // if (neighbor_cell5.tag == KNOWN) { fmm_data[cell_index5].tag = BAND; } // fmm_data[neighbor_cell_indices[5 + j*6u]] = neighbor_cells[5 + j*6u]; }
+
+    if (isInside(&neighbor_0_coord) && neighbor_cell0.tag != KNOWN) { fmm_data[cell_index0].tag = BAND; } // fmm_data[neighbor_cell_indices[0 + j*6u]] = neighbor_cells[0 + j*6u]; }
+    if (isInside(&neighbor_1_coord) && neighbor_cell1.tag != KNOWN) { fmm_data[cell_index1].tag = BAND; } // fmm_data[neighbor_cell_indices[1 + j*6u]] = neighbor_cells[1 + j*6u]; }
+    if (isInside(&neighbor_2_coord) && neighbor_cell2.tag != KNOWN) { fmm_data[cell_index2].tag = BAND; } // fmm_data[neighbor_cell_indices[2 + j*6u]] = neighbor_cells[2 + j*6u]; }
+    if (isInside(&neighbor_3_coord) && neighbor_cell3.tag != KNOWN) { fmm_data[cell_index3].tag = BAND; } // fmm_data[neighbor_cell_indices[3 + j*6u]] = neighbor_cells[3 + j*6u]; }
+    if (isInside(&neighbor_4_coord) && neighbor_cell4.tag != KNOWN) { fmm_data[cell_index4].tag = BAND; } // fmm_data[neighbor_cell_indices[4 + j*6u]] = neighbor_cells[4 + j*6u]; }
+    if (isInside(&neighbor_5_coord) && neighbor_cell5.tag != KNOWN) { fmm_data[cell_index5].tag = BAND; } // fmm_data[neighbor_cell_indices[5 + j*6u]] = neighbor_cells[5 + j*6u]; }
 
     //++ // var<workgroup> neighbor_cells: array<FmmCell, THREAD_COUNT * 6u>;
     //++ // var<workgroup> neighbor_cell_indices: array<FmmCell, THREAD_COUNT * 6u>;
@@ -298,7 +344,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         //         0u
         //     );
         load_neighbors(this_coordinate_u32);
-        create_adjacend_band();
+        //++ create_adjacend_band();
     }
     // load_neighbors(&this_coordinate_u32);
 }

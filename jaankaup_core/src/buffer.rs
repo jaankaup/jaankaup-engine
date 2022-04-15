@@ -36,7 +36,7 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     buffer: &wgpu::Buffer,
     _src_offset: wgpu::BufferAddress,
     copy_size: wgpu::BufferAddress,
-    _spawner: &Spawner, 
+    _spawner: &Spawner,
     ) -> Vec<T> {
 
     // TODO: Recycle staging buffers.
@@ -57,7 +57,7 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     let _ = buffer_slice.map_async(wgpu::MapMode::Read);
     device.poll(wgpu::Maintain::Wait);
 
-    // Wasm version crashes: DOMException.getMappedRange: Buffer not mapped. 
+    // Wasm version crashes: DOMException.getMappedRange: Buffer not mapped.
     let data = buffer_slice.get_mapped_range().to_vec();
     res = Convert2Vec::convert(&data);
     drop(data);

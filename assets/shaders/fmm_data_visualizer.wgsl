@@ -38,6 +38,7 @@ let OUTSIDE  = 4u;
 struct FmmCell {
     tag: u32,
     value: f32,
+    queue_value: u32,
 };
 
 struct FmmBlock {

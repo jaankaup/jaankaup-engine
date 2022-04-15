@@ -89,6 +89,7 @@ struct FmmVisualizationParams {
 struct FmmCell {
     tag: u32,
     value: f32,
+    queue_value: u32,
 }
 
 #[repr(C)]
@@ -197,6 +198,7 @@ impl Fmm {
             bytemuck::cast_slice(&[FmmCell {
                                       tag: KNOWN,
                                       value: 0.0,
+                                      queue_value: 0,
             }]));
     }
 }
@@ -451,7 +453,7 @@ impl Application for Fmm {
             "fmm_data".to_string(),
             buffer_from_data::<FmmCell>(
             &configuration.device,
-            &vec![FmmCell { tag: 0, value: 1000000.0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+            &vec![FmmCell { tag: 0, value: 1000000.0, queue_value: 0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             Some("fmm data buffer.")
             )
