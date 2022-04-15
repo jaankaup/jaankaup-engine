@@ -65,13 +65,14 @@ var<workgroup> known_points_counter: atomic<u32>;
 
 @group(0) @binding(0) var<storage, read_write> fmm_data: array<FmmCell>;
 @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+@group(0) @binding(2) var<storage, read_write> syncronization_data: array<FmmCell>;
 
 // Debugging.
-@group(0) @binding(2) var<storage,read_write> counter: array<atomic<u32>>;
-@group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
-@group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
-@group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
-@group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
+@group(0) @binding(3) var<storage,read_write> counter: array<atomic<u32>>;
+@group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
+@group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
+@group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
+@group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 // Encode "rgba" to u32.
 fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {

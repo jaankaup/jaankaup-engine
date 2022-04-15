@@ -380,6 +380,18 @@ impl Application for Fmm {
             None)
         );
 
+        // TODO: remove this buffer and create a common temp data buffer. Check the size of this
+        // buffer. The size of this buffer might be too small.
+        buffers.insert(
+            "synchronization_data".to_string(),
+            buffer_from_data::<FmmCell>(
+            &configuration.device,
+            &vec![FmmCell { tag: 0, value: 1000000.0, queue_value: 0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * 16],
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            Some("syncronization data buffer.")
+            )
+        );
+
         buffers.insert(
             "fmm_params".to_string(),
             buffer_from_data::<FmmParams>(
@@ -843,20 +855,23 @@ impl Application for Fmm {
                             // @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+                            // @group(0) @binding(2) var<storage, read_write> syncronization_data: array<FmmCell>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(2) var<storage,read_write> output_char: array<Char>;
+                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage,read_write> output_arrow: array<Arrow>;
+                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(4) var<storage,read_write> output_aabb: array<AABB>;
+                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
                             create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(5) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
 
                         ],
                     ]
@@ -871,6 +886,7 @@ impl Application for Fmm {
                     vec![
                          &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"synchronization_data".to_string()).unwrap().as_entire_binding(),
                          &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
