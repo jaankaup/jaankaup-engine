@@ -139,7 +139,7 @@ impl WGPUFeatures for FmmFeatures {
         let mut limits = wgpu::Limits::default();
         limits.max_compute_invocations_per_workgroup = 1024;
         limits.max_compute_workgroup_size_x = 1024;
-        limits.max_storage_buffers_per_shader_stage = 8;
+        limits.max_storage_buffers_per_shader_stage = 9;
         limits
     }
 }
@@ -173,6 +173,8 @@ struct Fmm {
     pub fmm_prefix_params: FmmPrefixParams, 
     pub gpu_timer: Option<GpuTimer>,
     pub fmm_visualization_params: FmmVisualizationParams,
+    pub histogram_fmm: Histogram,
+    pub compute_object_calculate_all_band_values: ComputeObject,
 }
 
 impl Fmm {
@@ -188,9 +190,9 @@ impl Fmm {
         }
 
         let fmm_index = encode3Dmorton32(position[0], position[1], position[2]); 
-        println!("position == {:?}", position);
-        println!("fmm_index == {}", fmm_index);
-        println!("blsh == {}", std::mem::size_of::<FmmCell>() as u64 * fmm_index as u64);
+        // println!("position == {:?}", position);
+        // println!("fmm_index == {}", fmm_index);
+        // println!("blsh == {}", std::mem::size_of::<FmmCell>() as u64 * fmm_index as u64);
 
         queue.write_buffer(
             &self.buffers.get(&"fmm_data".to_string()).unwrap(),
@@ -198,6 +200,18 @@ impl Fmm {
             bytemuck::cast_slice(&[FmmCell {
                                       tag: KNOWN,
                                       value: 0.0,
+                                      queue_value: 0,
+            }]));
+    }
+
+    fn addOutsideCell(queue: &wgpu::Queue, fmm_data_buffer: &wgpu::Buffer) {
+
+        queue.write_buffer(
+            fmm_data_buffer,
+            std::mem::size_of::<FmmCell>() as u64 * (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z) as u64,
+            bytemuck::cast_slice(&[FmmCell {
+                                      tag: OUTSIDE,
+                                      value: 1000000.0,
                                       queue_value: 0,
             }]));
     }
@@ -345,7 +359,7 @@ impl Application for Fmm {
 
         println!("Creating compute object.");
 
-        let histogram_draw_counts = Histogram::init(&configuration.device, &vec![0; 2]);
+        // let histogram_draw_counts = Histogram::init(&configuration.device, &vec![0; 2]);
         let histogram_fmm = Histogram::init(&configuration.device, &vec![0; 4]);
 
         ////////////////////////////////////////////////////
@@ -388,7 +402,7 @@ impl Application for Fmm {
             &configuration.device,
             &vec![FmmCell { tag: 0, value: 1000000.0, queue_value: 0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * 16],
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            Some("syncronization data buffer.")
+            Some("synchronization_data data buffer.")
             )
         );
 
@@ -465,7 +479,7 @@ impl Application for Fmm {
             "fmm_data".to_string(),
             buffer_from_data::<FmmCell>(
             &configuration.device,
-            &vec![FmmCell { tag: 0, value: 1000000.0, queue_value: 0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+            &vec![FmmCell { tag: 0, value: 1000000.0, queue_value: 0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z + 1],
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             Some("fmm data buffer.")
             )
@@ -554,7 +568,8 @@ impl Application for Fmm {
                             // @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_fmm = create_bind_groups(
@@ -617,7 +632,8 @@ impl Application for Fmm {
                             //debug // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
                             //debug create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_fmm_triangle =
@@ -684,7 +700,8 @@ impl Application for Fmm {
                             //debug create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE),
 
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_fmm_prefix_scan =
@@ -745,7 +762,8 @@ impl Application for Fmm {
                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
 
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_reduce =
@@ -810,7 +828,8 @@ impl Application for Fmm {
                             create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
 
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_fmm_visualizer =
@@ -855,26 +874,30 @@ impl Application for Fmm {
                             // @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(2) var<storage, read_write> syncronization_data: array<FmmCell>;
+                            // @group(0) @binding(2) var<storage, read_write> synchronization_data: array<FmmCell>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
+                            // @group(0) @binding(3) var<storage, read_write> sync_point_counter: array<u32>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
+                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
+                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
                             create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
+                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
                             create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
 
+                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_initial_band_points =
@@ -887,6 +910,7 @@ impl Application for Fmm {
                          &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"synchronization_data".to_string()).unwrap().as_entire_binding(),
+                         &histogram_fmm.get_histogram_buffer().as_entire_binding(),
                          &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
@@ -895,6 +919,57 @@ impl Application for Fmm {
                     ]
                 ]
         );
+
+        ////////////////////////////////////////////////////
+        ////               Calculate all band values    ////
+        ////////////////////////////////////////////////////
+
+        // TODO: refactor!
+        let compute_object_calculate_all_band_values =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("initial_band_points.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/initial_band_points.wgsl"))),
+                    
+                    }),
+                    Some("Calculate all band values"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<storage, read_write> fmm_data: array<FmmCell>;
+                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage, read_write> synchronization_data: array<FmmCell>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage, read_write> sync_point_counter: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+
+                        ],
+                    ],
+                    &"sync_and_calculate_all_bands".to_string()
+        );
+
+        Fmm::addOutsideCell(&configuration.queue, &buffers.get(&"fmm_data".to_string()).unwrap());
 
         println!("Creating render bind groups.");
  
@@ -926,6 +1001,8 @@ impl Application for Fmm {
             fmm_prefix_params: fmm_prefix_params,
             gpu_timer: gpu_timer,
             fmm_visualization_params: fmm_visualization_params,
+            histogram_fmm,
+            compute_object_calculate_all_band_values,
         }
     }
 
@@ -982,8 +1059,16 @@ impl Application for Fmm {
             Some("fmm triangle dispatch")
         );
 
-        // Compute interface.
+        // Compute initial band points.
         self.compute_object_initial_band_points.dispatch(
+            &self.compute_bind_groups_initial_band_points,
+            &mut encoder_command,
+            256, 1, 1,
+            Some("initial band points dispatch")
+        );
+
+        // Compute initial band point values.
+        self.compute_object_calculate_all_band_values.dispatch(
             &self.compute_bind_groups_initial_band_points,
             &mut encoder_command,
             256, 1, 1,
@@ -1056,6 +1141,7 @@ impl Application for Fmm {
 
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
+        self.histogram_fmm.reset_all_cpu_version(queue, 0);
         self.camera.update_from_input(&queue, &input);
 
         if self.keys.test_key(&Key::P, input) { 

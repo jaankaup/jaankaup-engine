@@ -362,7 +362,8 @@ impl GpuDebugger {
                             // @group(0) @binding(3) var<storage,read_write> output: array<VVVC>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_char = create_bind_groups(
@@ -410,7 +411,8 @@ impl GpuDebugger {
                             // @group(0) @binding(4) var<storage,read_write> chars_array: array<Char>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_char_preprocessor =
@@ -460,7 +462,8 @@ impl GpuDebugger {
                             // @group(0) @binding(4) var<storage,read_write> output: array<Triangle>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_arrow = create_bind_groups(

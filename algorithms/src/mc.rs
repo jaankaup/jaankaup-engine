@@ -207,7 +207,8 @@ impl MarchingCubes {
                             // @group(0) @binding(4) var<storage, write> output: array<Vertex>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let mc_params_buffer = buffer_from_data::<McParams>(

@@ -36,6 +36,7 @@ impl ComputeObject {
                 wgsl_module: &wgpu::ShaderModule,
                 label: wgpu::Label,
                 bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
+                entry_point: &String,
             ) -> Self {
 
 
@@ -56,7 +57,7 @@ impl ComputeObject {
             label: label,
             layout: Some(&pipeline_layout),
             module: &wgsl_module,
-            entry_point: "main",
+            entry_point: entry_point //"main",
         });
 
         Self {

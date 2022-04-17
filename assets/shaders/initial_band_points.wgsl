@@ -41,6 +41,12 @@ struct FmmCell {
     queue_value: atomic<u32>,
 };
 
+struct FmmCellSync {
+    tag: u32,
+    value: f32,
+    queue_value: u32,
+};
+
 struct FmmBlock {
     index: u32,
     band_points_count: u32,
@@ -65,14 +71,15 @@ var<workgroup> known_points_counter: atomic<u32>;
 
 @group(0) @binding(0) var<storage, read_write> fmm_data: array<FmmCell>;
 @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
-@group(0) @binding(2) var<storage, read_write> syncronization_data: array<FmmCell>;
+@group(0) @binding(2) var<storage, read_write> synchronization_data: array<FmmCellSync>;
+@group(0) @binding(3) var<storage, read_write> sync_point_counter: array<atomic<u32>>;
 
 // Debugging.
-@group(0) @binding(3) var<storage,read_write> counter: array<atomic<u32>>;
-@group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
-@group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
-@group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
-@group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+@group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
+@group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
+@group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
+@group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
+@group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 // Encode "rgba" to u32.
 fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
@@ -158,12 +165,19 @@ fn load_neighbors(coord: vec3<u32>) {
     var cell_index5 = encode3Dmorton32(neighbor_5_coord_u32.x, neighbor_5_coord_u32.y, neighbor_5_coord_u32.z);
 
     // TODO: fmm_data[262144] == Outside Cell
-    cell_index0 = select(0u, cell_index0, cell_index0 < 262144u);
-    cell_index1 = select(0u, cell_index1, cell_index1 < 262144u);
-    cell_index2 = select(0u, cell_index2, cell_index2 < 262144u);
-    cell_index3 = select(0u, cell_index3, cell_index3 < 262144u);
-    cell_index4 = select(0u, cell_index4, cell_index4 < 262144u);
-    cell_index5 = select(0u, cell_index5, cell_index5 < 262144u);
+    cell_index0 = select(262144u, cell_index0, cell_index0 < 262144u);
+    cell_index1 = select(262144u, cell_index1, cell_index1 < 262144u);
+    cell_index2 = select(262144u, cell_index2, cell_index2 < 262144u);
+    cell_index3 = select(262144u, cell_index3, cell_index3 < 262144u);
+    cell_index4 = select(262144u, cell_index4, cell_index4 < 262144u);
+    cell_index5 = select(262144u, cell_index5, cell_index5 < 262144u);
+
+    var queue_val0 = atomicAdd(&fmm_data[cell_index0].queue_value, 1u);
+    var queue_val1 = atomicAdd(&fmm_data[cell_index1].queue_value, 1u);
+    var queue_val2 = atomicAdd(&fmm_data[cell_index2].queue_value, 1u);
+    var queue_val3 = atomicAdd(&fmm_data[cell_index3].queue_value, 1u);
+    var queue_val4 = atomicAdd(&fmm_data[cell_index4].queue_value, 1u);
+    var queue_val5 = atomicAdd(&fmm_data[cell_index5].queue_value, 1u);
 
     // TODO: do not access the data outside buffer range.
     var neighbor_cell0 = fmm_data[cell_index0];
@@ -173,137 +187,45 @@ fn load_neighbors(coord: vec3<u32>) {
     var neighbor_cell4 = fmm_data[cell_index4];
     var neighbor_cell5 = fmm_data[cell_index5];
 
-    // fmm_data[cell_index0] = FmmCell(1.0, BAND, 0u);
-    // fmm_data[cell_index1] = FmmCell(1.0, BAND, 0u);
-    // fmm_data[cell_index2] = FmmCell(1.0, BAND, 0u);
-    // fmm_data[cell_index3] = FmmCell(1.0, BAND, 0u);
-    // fmm_data[cell_index4] = FmmCell(1.0, BAND, 0u);
-    // fmm_data[cell_index5] = FmmCell(1.0, BAND, 0u);
+    var inside0 = isInside(&neighbor_0_coord);
+    var inside1 = isInside(&neighbor_1_coord);
+    var inside2 = isInside(&neighbor_2_coord);
+    var inside3 = isInside(&neighbor_3_coord);
+    var inside4 = isInside(&neighbor_4_coord);
+    var inside5 = isInside(&neighbor_5_coord);
+    let index = atomicAdd(&sync_point_counter[0], 1u);
 
-    // if (neighbor_cell0.tag == KNOWN) { fmm_data[cell_index0].tag = BAND; } // fmm_data[neighbor_cell_indices[0 + j*6u]] = neighbor_cells[0 + j*6u]; }
-    // if (neighbor_cell1.tag == KNOWN) { fmm_data[cell_index1].tag = BAND; } // fmm_data[neighbor_cell_indices[1 + j*6u]] = neighbor_cells[1 + j*6u]; }
-    // if (neighbor_cell2.tag == KNOWN) { fmm_data[cell_index2].tag = BAND; } // fmm_data[neighbor_cell_indices[2 + j*6u]] = neighbor_cells[2 + j*6u]; }
-    // if (neighbor_cell3.tag == KNOWN) { fmm_data[cell_index3].tag = BAND; } // fmm_data[neighbor_cell_indices[3 + j*6u]] = neighbor_cells[3 + j*6u]; }
-    // if (neighbor_cell4.tag == KNOWN) { fmm_data[cell_index4].tag = BAND; } // fmm_data[neighbor_cell_indices[4 + j*6u]] = neighbor_cells[4 + j*6u]; }
-    // if (neighbor_cell5.tag == KNOWN) { fmm_data[cell_index5].tag = BAND; } // fmm_data[neighbor_cell_indices[5 + j*6u]] = neighbor_cells[5 + j*6u]; }
-
-    if (isInside(&neighbor_0_coord) && neighbor_cell0.tag != KNOWN) { fmm_data[cell_index0].tag = BAND; } // fmm_data[neighbor_cell_indices[0 + j*6u]] = neighbor_cells[0 + j*6u]; }
-    if (isInside(&neighbor_1_coord) && neighbor_cell1.tag != KNOWN) { fmm_data[cell_index1].tag = BAND; } // fmm_data[neighbor_cell_indices[1 + j*6u]] = neighbor_cells[1 + j*6u]; }
-    if (isInside(&neighbor_2_coord) && neighbor_cell2.tag != KNOWN) { fmm_data[cell_index2].tag = BAND; } // fmm_data[neighbor_cell_indices[2 + j*6u]] = neighbor_cells[2 + j*6u]; }
-    if (isInside(&neighbor_3_coord) && neighbor_cell3.tag != KNOWN) { fmm_data[cell_index3].tag = BAND; } // fmm_data[neighbor_cell_indices[3 + j*6u]] = neighbor_cells[3 + j*6u]; }
-    if (isInside(&neighbor_4_coord) && neighbor_cell4.tag != KNOWN) { fmm_data[cell_index4].tag = BAND; } // fmm_data[neighbor_cell_indices[4 + j*6u]] = neighbor_cells[4 + j*6u]; }
-    if (isInside(&neighbor_5_coord) && neighbor_cell5.tag != KNOWN) { fmm_data[cell_index5].tag = BAND; } // fmm_data[neighbor_cell_indices[5 + j*6u]] = neighbor_cells[5 + j*6u]; }
-
-    //++ // var<workgroup> neighbor_cells: array<FmmCell, THREAD_COUNT * 6u>;
-    //++ // var<workgroup> neighbor_cell_indices: array<FmmCell, THREAD_COUNT * 6u>;
-
-    //++ let c = atomicAdd(&neighbor_cells_counter, 1u);
-
-    //++ neighbor_cell_indices[0 + j*6u] = encode3Dmorton32(neighbor_0_coord_u32.x, neighbor_0_coord_u32.y, neighbor_0_coord_u32.z);
-    //++ neighbor_cell_indices[1 + j*6u] = encode3Dmorton32(neighbor_1_coord_u32.x, neighbor_1_coord_u32.y, neighbor_1_coord_u32.z);
-    //++ neighbor_cell_indices[2 + j*6u] = encode3Dmorton32(neighbor_2_coord_u32.x, neighbor_2_coord_u32.y, neighbor_2_coord_u32.z);
-    //++ neighbor_cell_indices[3 + j*6u] = encode3Dmorton32(neighbor_3_coord_u32.x, neighbor_3_coord_u32.y, neighbor_3_coord_u32.z);
-    //++ neighbor_cell_indices[4 + j*6u] = encode3Dmorton32(neighbor_4_coord_u32.x, neighbor_4_coord_u32.y, neighbor_4_coord_u32.z);
-    //++ neighbor_cell_indices[5 + j*6u] = encode3Dmorton32(neighbor_5_coord_u32.x, neighbor_5_coord_u32.y, neighbor_5_coord_u32.z);
-
-    //++ neighbor_cells[0] = FmmCell(OUTSIDE, 0.0);
-    //++ neighbor_cells[1] = FmmCell(OUTSIDE, 0.0);
-    //++ neighbor_cells[2] = FmmCell(OUTSIDE, 0.0);
-    //++ neighbor_cells[3] = FmmCell(OUTSIDE, 0.0);
-    //++ neighbor_cells[4] = FmmCell(OUTSIDE, 0.0);
-    //++ neighbor_cells[5] = FmmCell(OUTSIDE, 0.0);
-
-    //++ if (isInside(&neighbor_0_coord) && neighbor_cells[0 + j*6u].tag != KNOWN) { neighbor_cells[0 + j*6u].tag = BAND; } // fmm_data[neighbor_cell_indices[0 + j*6u]] = neighbor_cells[0 + j*6u]; }
-    //++ if (isInside(&neighbor_1_coord) && neighbor_cells[1 + j*6u].tag != KNOWN) { neighbor_cells[1 + j*6u].tag = BAND; } // fmm_data[neighbor_cell_indices[1 + j*6u]] = neighbor_cells[1 + j*6u]; }
-    //++ if (isInside(&neighbor_2_coord) && neighbor_cells[2 + j*6u].tag != KNOWN) { neighbor_cells[2 + j*6u].tag = BAND; } // fmm_data[neighbor_cell_indices[2 + j*6u]] = neighbor_cells[2 + j*6u]; }
-    //++ if (isInside(&neighbor_3_coord) && neighbor_cells[3 + j*6u].tag != KNOWN) { neighbor_cells[3 + j*6u].tag = BAND; } // fmm_data[neighbor_cell_indices[3 + j*6u]] = neighbor_cells[3 + j*6u]; }
-    //++ if (isInside(&neighbor_4_coord) && neighbor_cells[4 + j*6u].tag != KNOWN) { neighbor_cells[4 + j*6u].tag = BAND; } // fmm_data[neighbor_cell_indices[4 + j*6u]] = neighbor_cells[4 + j*6u]; }
-    //++ if (isInside(&neighbor_5_coord) && neighbor_cells[5 + j*6u].tag != KNOWN) { neighbor_cells[5 + j*6u].tag = BAND; } // fmm_data[neighbor_cell_indices[5 + j*6u]] = neighbor_cells[5 + j*6u]; }
-
-    // var neighbor_0_cell = select(FmmCell(0u, 0.0), FmmCell(0u, 1.0), true); // isInside(&neighbor_0_coord));
-    // var neighbor_0_cell = select(FmmCell(0u, 0.0), fmm_data[encode3Dmorton32(coord)], true); // isInside(&neighbor_0_coord));
-
-    // neighbor_cells[0] = fmm_data[encode3Dmorton32(ptr)];
-    // neighbor_cells[1] = fmm_data[encode3Dmorton32(ptr)];
-    // neighbor_cells[2] = fmm_data[encode3Dmorton32(ptr)];
-    // neighbor_cells[3] = fmm_data[encode3Dmorton32(ptr)];
-    // neighbor_cells[4] = fmm_data[encode3Dmorton32(ptr)];
-    // neighbor_cells[5] = fmm_data[encode3Dmorton32(ptr)];
-
-    // output_char[atomicAdd(&counter[0], 1u)] =  
-    //     
-    //     Char (
-    //         vec3<f32>(neighbor_0_coord_u32) * 0.25,
-    //         0.002,
-    //         vec4<f32>(vec3<f32>(neighbor_0_coord_u32), 0.0),
-    //         3u,
-    //         rgba_u32(255u, 0u, 2550u, 255u),
-    //         2u,
-    //         0u
-    //     );
-    // output_char[atomicAdd(&counter[0], 1u)] =  
-    //     Char (
-    //         vec3<f32>(neighbor_1_coord_u32) * 0.25,
-    //         0.002,
-    //         vec4<f32>(vec3<f32>(neighbor_1_coord_u32), 0.0),
-    //         3u,
-    //         rgba_u32(255u, 0u, 2550u, 255u),
-    //         2u,
-    //         0u
-    //     );
-    // output_char[atomicAdd(&counter[0], 1u)] =  
-    //     Char (
-    //         vec3<f32>(neighbor_2_coord_u32) * 0.25,
-    //         0.002,
-    //         vec4<f32>(vec3<f32>(neighbor_2_coord_u32), 0.0),
-    //         3u,
-    //         rgba_u32(255u, 0u, 2550u, 255u),
-    //         2u,
-    //         0u
-    //     );
-    // output_char[atomicAdd(&counter[0], 1u)] =  
-    //     Char (
-    //         vec3<f32>(neighbor_3_coord_u32) * 0.25,
-    //         0.002,
-    //         vec4<f32>(vec3<f32>(neighbor_3_coord_u32), 0.0),
-    //         3u,
-    //         rgba_u32(255u, 0u, 2550u, 255u),
-    //         3u,
-    //         0u
-    //     );
-    // output_char[atomicAdd(&counter[0], 1u)] =  
-    //     Char (
-    //         vec3<f32>(neighbor_4_coord_u32) * 0.25,
-    //         0.002,
-    //         vec4<f32>(vec3<f32>(neighbor_4_coord_u32), 0.0),
-    //         3u,
-    //         rgba_u32(255u, 0u, 2550u, 255u),
-    //         2u,
-    //         0u
-    //     );
-    // output_char[atomicAdd(&counter[0], 1u)] =  
-    //     Char (
-    //         vec3<f32>(neighbor_5_coord_u32) * 0.25,
-    //         0.002,
-    //         vec4<f32>(vec3<f32>(neighbor_5_coord_u32), 0.0),
-    //         3u,
-    //         rgba_u32(255u, 0u, 2550u, 255u),
-    //         2u,
-    //         0u
-    //     );
+    if (inside0 && neighbor_cell0.tag != KNOWN && queue_val0 == 0u) {
+        let index = atomicAdd(&sync_point_counter[0], 1u);
+        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+    }
+    if (inside0 && neighbor_cell1.tag != KNOWN && queue_val1 == 0u) {
+        let index = atomicAdd(&sync_point_counter[0], 1u);
+        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+    }
+    if (inside0 && neighbor_cell2.tag != KNOWN && queue_val2 == 0u) {
+        let index = atomicAdd(&sync_point_counter[0], 1u);
+        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+    }
+    if (inside0 && neighbor_cell3.tag != KNOWN && queue_val3 == 0u) {
+        let index = atomicAdd(&sync_point_counter[0], 1u);
+        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+    }
+    if (inside0 && neighbor_cell4.tag != KNOWN && queue_val4 == 0u) {
+        let index = atomicAdd(&sync_point_counter[0], 1u);
+        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+    }
+    if (inside0 && neighbor_cell5.tag != KNOWN && queue_val5 == 0u) {
+        let index = atomicAdd(&sync_point_counter[0], 1u);
+        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+    }
 }
 
-fn create_adjacend_band() {
-    //++ for (var i: i32; i < 6 ; i = i + 1) {
-    //++     if (neighbor_cells[i].tag == FAR) {
-    //++         fmm_data[neighbor_cell_indices[i]].tag = BAND; 
-    //++     }
-    //++ }
-}
+// fn collect_known_points(thread_index: u32) {
+//    let fc = fmm_data[thread_index];
+// }
 
-fn collect_known_points(thread_index: u32) {
-   let fc = fmm_data[thread_index];
-}
+
 
 @stage(compute)
 @workgroup_size(1024,1,1)
@@ -311,41 +233,24 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    // if (global_id.x == 0u ) {
-
-    //         output_char[atomicAdd(&counter[0], 1u)] =  
-    //             
-    //             Char (
-    //                 vec3<f32>(-2.0),
-    //                 2.0,
-    //                 vec4<f32>(777.0, 0.0, 0.0, 0.0),
-    //                 1u,
-    //                 rgba_u32(255u, 0u, 2550u, 255u),
-    //                 2u,
-    //                 0u
-    //             );
-    //      }
-
-
-    
     var this_coordinate_u32 = decode3Dmorton32(global_id.x);
     var this_coordinate_i32 = vec3<i32>(this_coordinate_u32);
     var this_cell = fmm_data[global_id.x];
     if (this_cell.tag == KNOWN) {
-        
-        // output_char[atomicAdd(&counter[0], 1u)] =  
-        //     Char (
-        //         vec3<f32>(this_coordinate_i32) * 0.25,
-        //         0.002,
-        //         //vec4<f32>(vec3<f32>(this_coordinate_i32), 0.0),
-        //         vec4<f32>(f32(this_coordinate_i32.x), f32(this_coordinate_i32.y), f32(this_coordinate_i32.z), f32(global_id.x)),
-        //         4u,
-        //         rgba_u32(255u, 0u, 2550u, 255u),
-        //         2u,
-        //         0u
-        //     );
         load_neighbors(this_coordinate_u32);
-        //++ create_adjacend_band();
     }
-    // load_neighbors(&this_coordinate_u32);
+}
+
+@stage(compute)
+@workgroup_size(1024,1,1)
+fn sync_and_calculate_all_bands(@builtin(local_invocation_id)    local_id: vec3<u32>,
+        @builtin(local_invocation_index) local_index: u32,
+        @builtin(global_invocation_id)   global_id: vec3<u32>) {
+
+    var this_coordinate_u32 = decode3Dmorton32(global_id.x);
+    var this_coordinate_i32 = vec3<i32>(this_coordinate_u32);
+    var this_cell = fmm_data[global_id.x];
+    if (this_cell.tag == KNOWN) {
+        load_neighbors(this_coordinate_u32);
+    }
 }
