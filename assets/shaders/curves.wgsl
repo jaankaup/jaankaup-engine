@@ -81,7 +81,7 @@ var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
 @binding(3)
-var<storage,read_write> output: array<Triangle>;
+var<storage,read_write> output_data: array<Triangle>;
 
 // Map index to 3d coordinate (hexahedron). The x and y dimensions are chosen. The curve goes from left to right, row by row.
 // The z direction is "unlimited".
@@ -479,7 +479,7 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 //++ 
 //++     loop {
 //++         if (i == 36u) { break; }
-//++     	output[index+i] = temp_vertex_data[offset + STRIDE * i];
+//++     	output_data[index+i] = temp_vertex_data[offset + STRIDE * i];
 //++         i = i + 1u;
 //++     }
 //++ 
@@ -541,7 +541,7 @@ fn u32_rgba(c: u32) -> vec4<f32> {
 //++ 
 //++     loop {
 //++         if (i == 36u) { break; }
-//++     	output[index+i] = temp_vertex_data[offset + STRIDE * i];
+//++     	output_data[index+i] = temp_vertex_data[offset + STRIDE * i];
 //++         i = i + 1u;
 //++     }
 //++ 
@@ -613,7 +613,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
 
     loop {
         if (i == 12u) { break; }
-        output[thread_group_counter + i * offset + local_index]  = 
+        output_data[thread_group_counter + i * offset + local_index]  = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[i*3u]],
@@ -709,7 +709,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
 
     loop {
         if (j == 12u) { break; }
-        output[thread_group_counter + offset * 12u + j * offset + local_index]  = 
+        output_data[thread_group_counter + offset * 12u + j * offset + local_index]  = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[j*3u]],
@@ -729,7 +729,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32) {
     }
 }
 
-@stage(compute)
+@compute
 @workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,

@@ -25,25 +25,20 @@ struct DrawIndirect {
     base_instance: u32, // The instance ID of the first instance to draw.
 };
 
-@group(0)
-@binding(0)
+@group(0) @binding(0)
 var<uniform> mc_uniform: McParams;
 
-@group(0)
-@binding(1)
+@group(0) @binding(1)
 var<storage, read_write> indirect: array<DrawIndirect>;
 
-@group(0)
-@binding(2)
+@group(0) @binding(2)
 var<storage, read_write> counter: array<atomic<u32>>; // atomic<32> doesn't work!
 
-@group(0)
-@binding(3)
+@group(0) @binding(3)
 var<storage, read> noise_values: array<f32>;
 
-@group(0)
-@binding(4)
-var<storage, read_write> output: array<Vertex>;
+@group(0) @binding(4)
+var<storage, read_write> output_data: array<Vertex>;
 
 var<private> cube: Cube;
 
@@ -583,7 +578,7 @@ fn createVertex(edgeValue: i32, arrayIndex: i32) {
     v.v = interpolateV(vert_a, vert_b);
     v.n = interpolateN(cube.normals[edge.x], cube.normals[edge.y], vert_a.a, vert_b.a);
 
-    output[arrayIndex] = v;
+    output_data[arrayIndex] = v;
 }
 
 fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u32> {
@@ -597,7 +592,7 @@ fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u
 	return vec3<u32>(x, y, z);	
 }
 
-@stage(compute)
+@compute
 @workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,

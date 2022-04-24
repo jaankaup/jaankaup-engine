@@ -6,7 +6,7 @@ struct NoiseParams {
 };
 
 struct Output {
-    output: array<f32>,
+    output_data: array<f32>,
 };
 
 @group(0)
@@ -15,20 +15,20 @@ var<uniform> noise_params: NoiseParams;
 
 @group(0)
 @binding(1)
-var<storage, read_write> noise_output: Output;
+var<storage, read_write> noise_output_data: Output;
 
-fn mod(x: vec4<f32>, y: vec4<f32>) -> vec4<f32> {
+fn my_mod(x: vec4<f32>, y: vec4<f32>) -> vec4<f32> {
   return x - y * floor(x/y); 
 }
-fn permute(x: vec4<f32>) -> vec4<f32> {return mod(((x*34.0)+vec4<f32>(1.0))*x, vec4<f32>(289.0));}
+fn permute(x: vec4<f32>) -> vec4<f32> {return my_mod(((x*34.0)+vec4<f32>(1.0))*x, vec4<f32>(289.0));}
 fn taylorInvSqrt(r: vec4<f32>) -> vec4<f32> {return 1.79284291400159 * vec4<f32>(1.0) - 0.85373472095314 * r;}
 fn fade(t: vec4<f32>) -> vec4<f32> {return t*t*t*(t*(t*6.0-vec4<f32>(15.0))+vec4<f32>(10.0));}
 
 fn cnoise(P: vec4<f32>) -> f32 {
   var Pi0 = floor(P); // Integer part for indexing
   var Pi1 = Pi0 + 1.0; // Integer part + 1
-  Pi0 = mod(Pi0, vec4<f32>(289.0));
-  Pi1 = mod(Pi1, vec4<f32>(289.0));
+  Pi0 = my_mod(Pi0, vec4<f32>(289.0));
+  Pi1 = my_mod(Pi1, vec4<f32>(289.0));
   let Pf0 = fract(P); // Fractional part for interpolation
   let Pf1 = Pf0 - vec4<f32>(1.0); // Fractional part - 1.0
   let ix = vec4<f32>(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
@@ -303,7 +303,7 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
    );
 }
 
-@stage(compute)
+@compute
 @workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
@@ -329,9 +329,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let ball2 = pow(c2.x - scene_center.x, 2.0) + pow(c2.y - scene_center.y, 2.0) + pow(c2.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
     let ball3 = pow(c3.x - scene_center.x, 2.0) + pow(c3.y - scene_center.y, 2.0) + pow(c3.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
  
-    noise_output.output[actual_global_id]               = ball0 + cnoise(c0 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
-    noise_output.output[actual_global_id + offset]      = ball1 + cnoise(c1 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
-    noise_output.output[actual_global_id + offset * 2u] = ball2 + cnoise(c2 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
-    noise_output.output[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+    noise_output_data.output_data[actual_global_id]               = ball0 + cnoise(c0 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+    noise_output_data.output_data[actual_global_id + offset]      = ball1 + cnoise(c1 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+    noise_output_data.output_data[actual_global_id + offset * 2u] = ball2 + cnoise(c2 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+    noise_output_data.output_data[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
 }
 

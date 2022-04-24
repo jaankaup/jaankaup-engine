@@ -8,6 +8,7 @@ use jaankaup_core::template::{
         BasicLoop,
         Spawner,
 };
+use jaankaup_core::render_things::LightBuffer;
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups,draw};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
@@ -19,7 +20,11 @@ use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
 use jaankaup_core::impl_convert;
-use jaankaup_core::common_functions::encode_rgba_u32;
+use jaankaup_core::common_functions::{
+    encode_rgba_u32, 
+    create_uniform_bindgroup_layout,
+    create_buffer_bindgroup_layout
+};
 use jaankaup_core::histogram::Histogram;
 use bytemuck::{Pod, Zeroable};
 
@@ -116,6 +121,7 @@ struct DebugVisualizator {
     pub temp_visualization_params: VisualizationParams,
     pub keys: KeyboardManager,
     pub block64mode: bool,
+    pub light: LightBuffer,
 }
 
 impl DebugVisualizator {
@@ -148,6 +154,16 @@ impl Application for DebugVisualizator {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
+        let light = LightBuffer::create(
+                      &configuration.device,
+                      [10.0, 250.0, 10.0], // pos
+                      [25, 25, 130],  // spec
+                      [25,100,25], // light 
+                      15.0,
+                      0.15,
+                      0.00013
+        );
+
         // vvvvnnnn
         let render_object_vvvvnnnn =
                 RenderObject::init(
@@ -161,17 +177,12 @@ impl Application for DebugVisualizator {
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
                     &vec![
-                        // Group 0
-                        vec![wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                    },
-                                count: None,
-                            },
+                        vec![
+                            // @group(0) @binding(0) var<uniform> camerauniform: Camera;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
+
+                            // @group(0) @binding(1) var<uniform> light: Light;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT)
                         ],
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
@@ -183,11 +194,10 @@ impl Application for DebugVisualizator {
                                      &render_object_vvvvnnnn.bind_group_layout_entries,
                                      &render_object_vvvvnnnn.bind_group_layouts,
                                      &vec![
-                                         vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                 buffer: &camera.get_camera_uniform(&configuration.device),
-                                                 offset: 0,
-                                                 size: None,
-                                         })],
+                                         vec![
+                                             &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                             &light.get_buffer().as_entire_binding(),
+                                         ],
                                      ]
         );
 
@@ -204,17 +214,8 @@ impl Application for DebugVisualizator {
                     }),
                     &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
                     &vec![
-                        // Group 0
-                        vec![wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                    },
-                                count: None,
-                            },
+                        vec![
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
                         ],
                     ],
                     Some("Debug visualizator vvvc renderer with camera."),
@@ -226,11 +227,9 @@ impl Application for DebugVisualizator {
                                      &render_object_vvvc.bind_group_layout_entries,
                                      &render_object_vvvc.bind_group_layouts,
                                      &vec![
-                                         vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                 buffer: &camera.get_camera_uniform(&configuration.device),
-                                                 offset: 0,
-                                                 size: None,
-                                         })],
+                                         vec![
+                                             &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                         ],
                                      ]
         );
 
@@ -299,73 +298,23 @@ impl Application for DebugVisualizator {
                     Some("Font visualizer Compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> camerauniform: Camera;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<uniform> visualization_params: VisualizationParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read_write> counter: Counter;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage, read> counter: array<Arrow>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(4)
-                            // var<storage,read_write> output: array<VertexBuffer>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 4,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> camerauniform: Camera;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> visualization_params: VisualizationParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> counter: Counter;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage, read> counter: array<Arrow>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage,read_write> output: array<VertexBuffer>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         println!("Creating compute bind groups.");
@@ -391,7 +340,7 @@ impl Application for DebugVisualizator {
                 ComputeObject::init(
                     &configuration.device,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("compute_visuzlizer_wgsl array"),
+                        label: Some("compute_visualizer_wgsl array"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
                     
@@ -399,60 +348,20 @@ impl Application for DebugVisualizator {
                     Some("Visualizer Compute object"),
                     &vec![
                         vec![
-                            // @group(0)
-                            // @binding(0)
-                            // var<uniform> visualization_params: VisualizationParams;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(1)
-                            // var<storage, read_write> counter: Counter;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(2)
-                            // var<storage, read> counter: array<Arrow>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
-                            // @group(0)
-                            // @binding(3)
-                            // var<storage,read_write> output: array<VertexBuffer>;
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::COMPUTE,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            },
+                            // @group(0) @binding(0) var<uniform> visualization_params: VisualizationParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage, read_write> counter: Counter;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage, read> counter: array<Arrow>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage,read_write> output: array<VertexBuffer>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let compute_bind_groups_arrow = create_bind_groups(
@@ -491,6 +400,7 @@ impl Application for DebugVisualizator {
             temp_visualization_params: temp_params,
             keys: keys,
             block64mode: false,
+            light: light,
         }
     }
 
@@ -601,7 +511,7 @@ impl Application for DebugVisualizator {
     }
 
     #[allow(unused)]
-    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache) {
+    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, _spawner: &Spawner) {
         self.camera.update_from_input(&queue, &input);
 
     }

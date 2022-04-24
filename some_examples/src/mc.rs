@@ -174,10 +174,9 @@ impl Application for McApp {
                     &configuration.device,
                     &configuration.sc_desc,
                     &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("renderer_v4n4_debug_visualizator_wgsl"),
+                        label: Some("renderer_v4n4.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
-                            //Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_wasm.wgsl"))),
                     
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
@@ -351,7 +350,8 @@ impl Application for McApp {
                             // @group(0) @binding(1) var<storage, read_write> counter: Counter;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                    ]
+                    ],
+                    &"main".to_string()
         );
 
         let noise_compute_bind_groups = create_bind_groups(

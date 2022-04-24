@@ -51,7 +51,7 @@ var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
 @binding(3)
-var<storage,read_write> output: array<Vertex>;
+var<storage,read_write> output_data: array<Vertex>;
 
 let STRIDE: u32 = 64u;
 let PI: f32 = 3.14159265358979323846;
@@ -229,7 +229,7 @@ fn store_hexaedron(positions: ptr<function, array<vec4<f32>, 8>>,
 
     loop {
         if (i == 36u) { break; }
-    	output[index+i] = temp_vertex_data[offset + STRIDE * i];
+    	output_data[index+i] = temp_vertex_data[offset + STRIDE * i];
         i = i + 1u;
     }
 
@@ -474,7 +474,7 @@ fn create_arrow(arr: Arrow, offset: u32) {
     store_hexaedron(&positions_head, &normals_head, offset);
 }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,

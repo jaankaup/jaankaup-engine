@@ -90,7 +90,7 @@ var<storage, read_write> arrows: array<Arrow>;
 
 @group(0)
 @binding(4)
-var<storage,read_write> output: array<VVVC>;
+var<storage,read_write> output_data: array<VVVC>;
 
 let STRIDE: u32 = 64u;
 let PI: f32 = 3.14159265358979323846;
@@ -471,7 +471,7 @@ fn bezier_4c(thread_index: u32,
         let mt2 = mt * mt;
         let mt3 = mt2 * mt;
         let result = c0.xyz * mt3 + c1.xyz * 3.0 * mt2*t + c2.xyz * 3.0 * mt*t2 + c3.xyz * t3;
-        output[workgroup_params.start_index + 64u * i + thread_index] = VVVC(result, color);
+        output_data[workgroup_params.start_index + 64u * i + thread_index] = VVVC(result, color);
     }
 }
 
@@ -506,7 +506,7 @@ fn create_char(char_index: u32,
         // Number of points for this bezier curve. At least one vertex per bezier.
         let count = u32(max(1.0, f32(num_points) * bi.w));
 
-	// Allocate memory from output buffer.
+	// Allocate memory from output_data buffer.
         if (local_index == 0u) {
 
             // The start position for storing the vertices.
@@ -712,7 +712,7 @@ fn log_u32_b2(n: u32, bit_count: u32, thread_index: u32, base_pos: ptr<function,
     } 
 }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
