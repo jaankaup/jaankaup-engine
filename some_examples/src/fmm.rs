@@ -19,6 +19,7 @@ use jaankaup_core::wgpu;
 use jaankaup_core::winit;
 use jaankaup_core::log;
 use jaankaup_core::screen::ScreenTexture;
+use jaankaup_core::render_things::LightBuffer;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::misc::Convert2Vec;
@@ -90,6 +91,15 @@ struct FmmCell {
     tag: u32,
     value: f32,
     queue_value: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmCellSync {
+    tag: u32,
+    value: f32,
+    queue_value: u32,
+    mem_location: u32,
 }
 
 #[repr(C)]
@@ -175,6 +185,7 @@ struct Fmm {
     pub fmm_visualization_params: FmmVisualizationParams,
     pub histogram_fmm: Histogram,
     pub compute_object_calculate_all_band_values: ComputeObject,
+    pub light: LightBuffer,
 }
 
 impl Fmm {
@@ -247,7 +258,7 @@ impl Application for Fmm {
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.002);
+        camera.set_movement_sensitivity(0.02);
 
         // gpu debugger.
         let gpu_debugger = GpuDebugger::Init(
@@ -271,6 +282,16 @@ impl Application for Fmm {
         keys.register_key(Key::Key0, 200.0);
         keys.register_key(Key::N, 200.0);
 
+        let light = LightBuffer::create(
+                      &configuration.device,
+                      [10.0, 250.0, 10.0], // pos
+                      [25, 25, 130],  // spec
+                      [25,100,25], // light 
+                      15.0,
+                      0.15,
+                      0.00013
+        );
+
         // vvvvnnnn
         let render_object_vvvvnnnn =
                 RenderObject::init(
@@ -284,18 +305,13 @@ impl Application for Fmm {
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
                     &vec![
-                        // Group 0
-                        vec![wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                    },
-                                count: None,
-                            },
-                        ],
+                        vec![
+                            // @group(0) @binding(0) var<uniform> camerauniform: Camera;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
+
+                            // @group(0) @binding(1) var<uniform> light: Light;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT)
+                        ]
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
                     true,
@@ -306,11 +322,10 @@ impl Application for Fmm {
                                      &render_object_vvvvnnnn.bind_group_layout_entries,
                                      &render_object_vvvvnnnn.bind_group_layouts,
                                      &vec![
-                                         vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                 buffer: &camera.get_camera_uniform(&configuration.device),
-                                                 offset: 0,
-                                                 size: None,
-                                         })],
+                                         vec![
+                                             &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                             &light.get_buffer().as_entire_binding(),
+                                         ],
                                      ]
         );
 
@@ -349,11 +364,9 @@ impl Application for Fmm {
                                      &render_object_vvvc.bind_group_layout_entries,
                                      &render_object_vvvc.bind_group_layouts,
                                      &vec![
-                                         vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                 buffer: &camera.get_camera_uniform(&configuration.device),
-                                                 offset: 0,
-                                                 size: None,
-                                         })],
+                                         vec![
+                                             &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                         ]
                                      ]
         );
 
@@ -376,7 +389,10 @@ impl Application for Fmm {
         let triangle_mesh_draw_count = triangle_mesh_wood.len() as u32; 
         println!("triangle_mesh_draw_count == {}", triangle_mesh_draw_count);
 
-        let color = encode_rgba_u32(255, 0, 0, 255) as f32;
+        let color = unsafe {
+            std::mem::transmute::<u32, f32>(encode_rgba_u32(11, 0, 155, 255))
+        };
+
 
         // Apply color information to the fourth component (triangle position).
         for tr in triangle_mesh_wood.iter_mut() {
@@ -398,9 +414,9 @@ impl Application for Fmm {
         // buffer. The size of this buffer might be too small.
         buffers.insert(
             "synchronization_data".to_string(),
-            buffer_from_data::<FmmCell>(
+            buffer_from_data::<FmmCellSync>(
             &configuration.device,
-            &vec![FmmCell { tag: 0, value: 1000000.0, queue_value: 0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * 16],
+            &vec![FmmCellSync { tag: 0, value: 1000000.0, queue_value: 0, mem_location: 0, } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * 16],
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             Some("synchronization_data data buffer.")
             )
@@ -1003,6 +1019,7 @@ impl Application for Fmm {
             fmm_visualization_params: fmm_visualization_params,
             histogram_fmm,
             compute_object_calculate_all_band_values,
+            light: light,
         }
     }
 

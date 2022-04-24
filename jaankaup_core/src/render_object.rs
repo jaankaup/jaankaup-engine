@@ -76,7 +76,7 @@ impl ComputeObject {
         for (e, bgs) in bind_groups.iter().enumerate() {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }
-        pass.dispatch(x, y, z)
+        pass.dispatch_workgroups(x, y, z)
     }
 
     pub fn dispatch_indirect(&self,
@@ -93,7 +93,7 @@ impl ComputeObject {
         for (e, bgs) in bind_groups.iter().enumerate() {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }
-        pass.dispatch_indirect(indirect_buffer, offset);
+        pass.dispatch_workgroups_indirect(indirect_buffer, offset);
     }
 }
 

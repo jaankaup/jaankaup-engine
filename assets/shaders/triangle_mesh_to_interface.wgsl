@@ -289,13 +289,16 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
         // Prefix sum?
 
         // The global index for cube.
+        // let base_coordinate = (index_to_uvec3(u32(i), dim_x, dim_y) + aabb.min);
         let base_coordinate = (index_to_uvec3(u32(i), dim_x, dim_y) + aabb.min) * 4u;
         let base_index = encode3Dmorton32(base_coordinate.x, base_coordinate.y, base_coordinate.z);
         let actual_index = base_index + thread_index; 
         let actual_coordinate = decode3Dmorton32(actual_index);
 
         let cp = closest_point_to_triangle(vec3<f32>(actual_coordinate) * 0.25, tr.a.v.xyz, tr.b.v.xyz, tr.c.v.xyz);
+        // let cp = closest_point_to_triangle(vec3<f32>(actual_coordinate), tr.a.v.xyz, tr.b.v.xyz, tr.c.v.xyz);
         let dist = distance(cp, vec3<f32>(actual_coordinate) * 0.25);
+        //let dist = distance(cp, vec3<f32>(actual_coordinate));
 
     	let color = f32(rgba_u32(222u, 200u, 150u, 255u));
 
@@ -306,6 +309,7 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
             let cell = fmm_data[actual_index];
 
                 if (dist < 0.25 && dist < cell.value) {
+                //if (dist < 1.0 && dist < cell.value) {
 
                    // Is this safe. Do we need atomic operations?
                    fmm_data[actual_index] = FmmCell(KNOWN, dist, 0u);
@@ -320,6 +324,7 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
 
             // Update the isotropic speed data. TODO: repalce 15.0 with some actual speed data. 
             if (dist < 0.25 && 15.0 / max(0.05, dist) > speed) {
+            //if (dist < 1.0 && 15.0 / max(0.05, dist) > speed) {
 
                // Is this safe. Do we need atomic operations?
                isotropic_data[actual_index] = 15.0 / max(0.05, dist);
@@ -328,7 +333,7 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
     }
 }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
@@ -342,45 +347,4 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let tr = triangle_mesh_in[work_group_id.x];
     let tr_aabb = triangle_to_aabb(tr);
     update_fmm_interface(tr_aabb, tr, local_index);
-
-    // else if (fmm_params.visualize == 1u) {
-
-    //     if (global_id.x == 0u) {
-    //         output_aabb_wire[global_id.x] =  
-    //               AABB (
-    //                   vec4<f32>(0.0, 0.0, 0.0, color),
-    //                   vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
-    //               );
-    //         atomicAdd(&counter[3], 1u);
-    //     }
-
-    //     let cell = fmm_data[global_id.x];
-    //     let position = vec3<f32>(decode3Dmorton32(global_id.x)) * 0.25;
-
-    //     if (cell.tag == FAR) { return; }
-
-    //     var col = select(f32(rgba_u32(0u  , 255u, 0u, 255u)),
-    //                      f32(rgba_u32(0u, 255u,   0u, 255u)),
-    //                      cell.tag == KNOWN); 
-    //     output_aabb[atomicAdd(&counter[2], 1u)] =
-    //           AABB (
-    //               vec4<f32>(position - vec3<f32>(0.008), col),
-    //               vec4<f32>(position + vec3<f32>(0.008), 0.0),
-    //           );
-    // }
-
-    // Initalize fmm data to far points.  
-    // fmm_data[global_id.x] = FmmCell (FAR, 10000000.0);
-
-    // Triangle to fmm interface.
-
-    // let global_coordinate = vec3<f32>(decode3Dmorton32(work_group_id.x));
-    // let local_coordinate  = vec3<f32>(decode3Dmorton32(local_index)) * 0.25;
-    
-
-    // output_aabb[atomicAdd(&counter[2], 1u)] = 
-    //       AABB (
-    //           vec4<f32>(global_coordinate + local_coordinate - vec3<f32>(0.008), color),
-    //           vec4<f32>(global_coordinate + local_coordinate + vec3<f32>(0.008), 0.0),
-    //       );
 }

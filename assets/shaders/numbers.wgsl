@@ -69,21 +69,17 @@ struct DrawIndirect {
     base_instance: u32,
 };
 
-@group(0)
-@binding(0)
+@group(0) @binding(0)
 var<storage, read_write> indirect: array<DrawIndirect>;
 
-@group(0)
-@binding(1)
+@group(0) @binding(1)
 var<storage, read_write> dispatch_counter: array<atomic<u32>>;
 
-@group(0)
-@binding(2)
-var<storage,read_write> input: array<Char>;
+@group(0) @binding(2)
+var<storage,read_write> input_data: array<Char>;
 
-@group(0)
-@binding(3)
-var<storage,read_write> output: array<VVVC>;
+@group(0) @binding(3)
+var<storage,read_write> output_data: array<VVVC>;
 
 let STRIDE: u32 = 64u;
 let PI: f32 = 3.14159265358979323846;
@@ -376,7 +372,7 @@ fn bezier_4c(vertices_per_thread: u32,
         let result = c0.xyz * mt3 + c1.xyz * 3.0 * mt2*t + c2.xyz * 3.0 * mt*t2 + c3.xyz * t3;
         let ind = 64u * i + private_params.this_id;
         if (ind < total_num_points) {
-            output[start_offset + ind] = VVVC(result, color);
+            output_data[start_offset + ind] = VVVC(result, color);
         }
     }
 }
@@ -700,7 +696,7 @@ fn log_vec4(v: vec4<f32>, max_decimals: u32, base_pos: ptr<function, vec3<f32>>,
 //     } 
 // }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
@@ -710,12 +706,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if (local_index == 0u) {
         let char_number = atomicAdd(&dispatch_counter[0], 1u);
         workgroup_params.char_id = char_number;
-        workgroup_params.wg_char = input[char_number]; 
+        workgroup_params.wg_char = input_data[char_number]; 
     }
     workgroupBarrier();
 
     // Load element. TODO: from hash array. TODO: use workgroup Char instead?
-    var ch = input[workgroup_params.char_id]; 
+    var ch = input_data[workgroup_params.char_id]; 
     // private_char = wg_char;
 
     // Store thread id.

@@ -132,7 +132,7 @@ fn load_chunk_to_workgroup() {
     fmm_data[private_params.index * private_params.g_index] = temp_fmm_cells[private_params.index]; 
 }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,

@@ -275,7 +275,7 @@ fn gather_data() {
     }
 }
 
-@stage(compute)
+@compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,

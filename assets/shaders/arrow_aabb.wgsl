@@ -43,29 +43,20 @@ struct Errors {
     vertex_buffer_overflow: u32,
 };
 
-@group(0)
-@binding(0)
+@group(0) @binding(0)
 var<uniform> arrow_aabb_params: ArrowAabbParams;
 
-// @group(0)
-// @binding(1)
-// var<storage, read_write> counter: array<atomic<u32>>;
-
-@group(0)
-@binding(1)
+@group(0) @binding(1)
 var<storage, read_write> arrows: array<Arrow>;
 
-@group(0)
-@binding(2)
+@group(0) @binding(2)
 var<storage, read_write> aabbs: array<AABB>;
 
-@group(0)
-@binding(3)
+@group(0) @binding(3)
 var<storage, read_write> aabb_wires: array<AABB>;
 
-@group(0)
-@binding(4)
-var<storage,read_write> output: array<Triangle>;
+@group(0) @binding(4)
+var<storage,read_write> output_data: array<Triangle>;
 
 var<workgroup> thread_group_counter: u32 = 0; 
 
@@ -273,8 +264,8 @@ fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: f32, start_inde
 
     loop {
         if (i == 12u) { break; }
-        // output[thread_group_counter + i * offset + local_index] = 
-        output[start_index + i * offset + local_index] = 
+        // output_data[thread_group_counter + i * offset + local_index] = 
+        output_data[start_index + i * offset + local_index] = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[i*3u]],
@@ -336,11 +327,11 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32,
 
     	var j: u32 = 0u;
 
-        //output[start_index + i * offset + local_index] = 
+        //output_data[start_index + i * offset + local_index] = 
 
     	loop {
     	    if (j == 12u) { break; }
-    	    output[start_index + j * offset + local_index + u32(i) * offset * 12u ]  = 
+    	    output_data[start_index + j * offset + local_index + u32(i) * offset * 12u ]  = 
     	        Triangle(
     	        	Vertex(
     	        	    positions[vertex_positions[j*3u]],
@@ -426,7 +417,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32, start_index: u32) {
 
     loop {
         if (i == 12u) { break; }
-        output[start_index + i * offset + local_index]  = 
+        output_data[start_index + i * offset + local_index]  = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[i*3u]],
@@ -522,7 +513,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32, start_index: u32) {
 
     loop {
         if (j == 12u) { break; }
-        output[start_index + offset * 12u + j * offset + local_index]  = 
+        output_data[start_index + offset * 12u + j * offset + local_index]  = 
             Triangle(
             	Vertex(
             	    positions[vertex_positions[j*3u]],
@@ -542,7 +533,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32, start_index: u32) {
     }
 }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) work_group_id: vec3<u32>,

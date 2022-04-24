@@ -231,7 +231,7 @@ fn u32_rgba(c: u32) -> vec4<f32> {
   return vec4<f32>(r,g,b,a);
 }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
@@ -257,7 +257,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         output_aabb_wire[global_id.x] =  
               AABB (
                   vec4<f32>(0.0, 0.0, 0.0, color),
-                  vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension), 0.1)
+                  vec4<f32>(vec3<f32>(fmm_params.fmm_global_dimension) * 4.0, 0.1)
               );
         atomicAdd(&counter[3], 1u);
     }

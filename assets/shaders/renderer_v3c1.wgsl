@@ -8,8 +8,7 @@ struct Camera {
     camera_pos: vec4<f32>,
 };
 
-@group(0)
-@binding(0)
+@group(0) @binding(0)
 var<uniform> camerauniform: Camera;
 
 fn decode_color(c: u32) -> vec4<f32> {
@@ -20,7 +19,7 @@ fn decode_color(c: u32) -> vec4<f32> {
   return vec4<f32>(r,g,b,a);
 }
 
-@stage(vertex)
+@vertex
 fn vs_main(@location(0) pos: vec3<f32>, @location(1) col: u32) -> VertexOutput {
     return VertexOutput(
                  camerauniform.u_view_proj * vec4<f32>(pos, 1.0),
@@ -28,7 +27,7 @@ fn vs_main(@location(0) pos: vec3<f32>, @location(1) col: u32) -> VertexOutput {
     );
 }
 
-@stage(fragment)
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return in.col;
+@fragment
+fn fs_main(in_data: VertexOutput) -> @location(0) vec4<f32> {
+    return in_data.col;
 }

@@ -45,6 +45,7 @@ struct FmmCellSync {
     tag: u32,
     value: f32,
     queue_value: u32,
+    mem_location: u32,
 };
 
 struct FmmBlock {
@@ -66,7 +67,7 @@ var<workgroup> known_points_counter: atomic<u32>;
 // |      |     |     |      |     |      |
 // +------+-----+-----+------+-----+------+
 
-// var<private> neighbor_cells: array<FmmCell, 6>;
+var<private> neighbor_cells: array<FmmCellSync, 6>;
 // var<private> neighbor_cell_indices: array<u32, 6>;
 
 @group(0) @binding(0) var<storage, read_write> fmm_data: array<FmmCell>;
@@ -193,31 +194,106 @@ fn load_neighbors(coord: vec3<u32>) {
     var inside3 = isInside(&neighbor_3_coord);
     var inside4 = isInside(&neighbor_4_coord);
     var inside5 = isInside(&neighbor_5_coord);
-    let index = atomicAdd(&sync_point_counter[0], 1u);
 
-    if (inside0 && neighbor_cell0.tag != KNOWN && queue_val0 == 0u) {
-        let index = atomicAdd(&sync_point_counter[0], 1u);
-        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+    neighbor_cells[0] = FmmCellSync(OUTSIDE, 100000.0, 0u, 262144u);
+    neighbor_cells[1] = FmmCellSync(OUTSIDE, 100000.0, 0u, 262144u);
+    neighbor_cells[2] = FmmCellSync(OUTSIDE, 100000.0, 0u, 262144u);
+    neighbor_cells[3] = FmmCellSync(OUTSIDE, 100000.0, 0u, 262144u);
+    neighbor_cells[4] = FmmCellSync(OUTSIDE, 100000.0, 0u, 262144u);
+    neighbor_cells[5] = FmmCellSync(OUTSIDE, 100000.0, 0u, 262144u);
+
+    if (inside0) {
+        neighbor_cells[0] = FmmCellSync(neighbor_cell0.tag, neighbor_cell0.value, queue_val0, cell_index0);
+    } 
+    if (inside1) {
+        neighbor_cells[1] = FmmCellSync(neighbor_cell1.tag, neighbor_cell1.value, queue_val1, cell_index1);
+    } 
+    if (inside2) {
+        neighbor_cells[2] = FmmCellSync(neighbor_cell2.tag, neighbor_cell2.value, queue_val2, cell_index2);
+    } 
+    if (inside3) {
+        neighbor_cells[3] = FmmCellSync(neighbor_cell3.tag, neighbor_cell3.value, queue_val3, cell_index3);
+    } 
+    if (inside4) {
+        neighbor_cells[4] = FmmCellSync(neighbor_cell4.tag, neighbor_cell4.value, queue_val4, cell_index4);
+    } 
+    if (inside5) {
+        neighbor_cells[5] = FmmCellSync(neighbor_cell5.tag, neighbor_cell5.value, queue_val5, cell_index5);
+    } 
+
+    // neighbor_cells[1] = if (inside1) {
+    //     neighbor_cells[1] = FmmCellSync(neighbor_cell1.tag, neighbor_cell1.value, queue_val1, cell_index1);
+    // ); 
+    // neighbor_cells[2] = if (inside2) {
+    //     neighbor_cells[2] = FmmCellSync(neighbor_cell2.tag, neighbor_cell2.value, queue_val2, cell_index2);
+    // ); 
+    // neighbor_cells[3] = if (inside3) {
+    //     neighbor_cells[3] = FmmCellSync(neighbor_cell3.tag, neighbor_cell3.value, queue_val3, cell_index3);
+    // ); 
+    // neighbor_cells[4] = if (inside4) {
+    //     neighbor_cells[4] = FmmCellSync(neighbor_cell4.tag, neighbor_cell4.value, queue_val4, cell_index4);
+    // ); 
+    // neighbor_cells[5] = if (inside5) {
+    //     neighbor_cells[5] = FmmCellSync(neighbor_cell5.tag, neighbor_cell5.value, queue_val5, cell_index5);
+    // ); 
+
+    // neighbor_cells[1] = neighbor_cell1; 
+    // neighbor_cells[2] = neighbor_cell2; 
+    // neighbor_cells[3] = neighbor_cell3; 
+    // neighbor_cells[4] = neighbor_cell4; 
+    // neighbor_cells[5] = neighbor_cell5; 
+
+    // if (inside0 && neighbor_cell0.tag != KNOWN && queue_val0 == 0u) {
+    //     let index = atomicAdd(&sync_point_counter[0], 1u);
+    //     synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u, cell_index0);
+    // }
+    // if (inside0 && neighbor_cell1.tag != KNOWN && queue_val1 == 0u) {
+    //     let index = atomicAdd(&sync_point_counter[0], 1u);
+    //     synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u, cell_index1);
+    // }
+    // if (inside0 && neighbor_cell2.tag != KNOWN && queue_val2 == 0u) {
+    //     let index = atomicAdd(&sync_point_counter[0], 1u);
+    //     synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u, cell_index2);
+    // }
+    // if (inside0 && neighbor_cell3.tag != KNOWN && queue_val3 == 0u) {
+    //     let index = atomicAdd(&sync_point_counter[0], 1u);
+    //     synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u, cell_index3);
+    // }
+    // if (inside0 && neighbor_cell4.tag != KNOWN && queue_val4 == 0u) {
+    //     let index = atomicAdd(&sync_point_counter[0], 1u);
+    //     synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u, cell_index4);
+    // }
+    // if (inside0 && neighbor_cell5.tag != KNOWN && queue_val5 == 0u) {
+    //     let index = atomicAdd(&sync_point_counter[0], 1u);
+    //     synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u, cell_index5);
+    // }
+}
+
+fn add_neihgbors_to_sync() {
+
+    for (var i: i32 = 0 ; i < 6 ; i = i + 1) {
+        if (neighbor_cells[i].tag != OUTSIDE && neighbor_cells[i].tag != KNOWN && neighbor_cells[i].queue_value == 0u) {
+            let index = atomicAdd(&sync_point_counter[0], 1u);
+            synchronization_data[index] = neighbor_cells[index]; 
+            // var temp_cell: FmmCell;
+            // temp_cell.tag = BAND;
+            // temp_cell.value = 100000.0;
+            // temp_cell.queue_value = 0u;
+            // fmm_data[neighbor_cells[i].mem_location] = temp_cell;
+        }
     }
-    if (inside0 && neighbor_cell1.tag != KNOWN && queue_val1 == 0u) {
-        let index = atomicAdd(&sync_point_counter[0], 1u);
-        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
-    }
-    if (inside0 && neighbor_cell2.tag != KNOWN && queue_val2 == 0u) {
-        let index = atomicAdd(&sync_point_counter[0], 1u);
-        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
-    }
-    if (inside0 && neighbor_cell3.tag != KNOWN && queue_val3 == 0u) {
-        let index = atomicAdd(&sync_point_counter[0], 1u);
-        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
-    }
-    if (inside0 && neighbor_cell4.tag != KNOWN && queue_val4 == 0u) {
-        let index = atomicAdd(&sync_point_counter[0], 1u);
-        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
-    }
-    if (inside0 && neighbor_cell5.tag != KNOWN && queue_val5 == 0u) {
-        let index = atomicAdd(&sync_point_counter[0], 1u);
-        synchronization_data[index] = FmmCellSync(BAND, 100000.0, 0u);
+}
+
+fn add_neihgbors_to_band() {
+
+    for (var i: i32 = 0 ; i < 6 ; i = i + 1) {
+        if (neighbor_cells[i].tag != OUTSIDE && neighbor_cells[i].tag != KNOWN && neighbor_cells[i].queue_value == 0u) {
+            var temp_cell: FmmCell;
+            temp_cell.tag = BAND;
+            temp_cell.value = 100000.0;
+            temp_cell.queue_value = 0u;
+            fmm_data[neighbor_cells[i].mem_location] = temp_cell;
+        }
     }
 }
 
@@ -227,7 +303,75 @@ fn load_neighbors(coord: vec3<u32>) {
 
 
 
-@stage(compute)
+/////////////
+//   FMM   // 
+/////////////
+
+fn solve_quadratic() -> f32 {
+
+        var phis: array<f32, 3> = array<f32, 3>(0.0, 0.0, 0.0);
+
+        // Deltas. 
+        var hs: array<f32, 3> = array<f32, 3>(0.0, 0.0, 0.0);
+ 
+         // x dir.
+         phis[0] = select(0.0, min(neighbor_cells[0].value, neighbor_cells[1].value), neighbor_cells[0].tag == KNOWN && neighbor_cells[1].tag == KNOWN);
+         phis[0] = select(0.0, neighbor_cells[0].value, neighbor_cells[0].tag == KNOWN && neighbor_cells[1].tag != KNOWN);
+         phis[0] = select(0.0, neighbor_cells[1].value, neighbor_cells[0].tag != KNOWN && neighbor_cells[1].tag == KNOWN);
+
+         // y dir.
+         phis[1] = select(0.0, min(neighbor_cells[2].value, neighbor_cells[3].value), neighbor_cells[2].tag == KNOWN && neighbor_cells[3].tag == KNOWN);
+         phis[1] = select(0.0, neighbor_cells[2].value, neighbor_cells[2].tag == KNOWN && neighbor_cells[3].tag != KNOWN);
+         phis[1] = select(0.0, neighbor_cells[3].value, neighbor_cells[2].tag != KNOWN && neighbor_cells[3].tag == KNOWN);
+
+         // z dir.
+         phis[2] = select(0.0, min(neighbor_cells[4].value, neighbor_cells[5].value), neighbor_cells[4].tag == KNOWN && neighbor_cells[5].tag == KNOWN);
+         phis[2] = select(0.0, neighbor_cells[4].value, neighbor_cells[4].tag == KNOWN && neighbor_cells[5].tag != KNOWN);
+         phis[2] = select(0.0, neighbor_cells[5].value, neighbor_cells[4].tag != KNOWN && neighbor_cells[5].tag == KNOWN);
+
+
+         if (phis[0] != 0.0) { hs[0] = 1.0; }
+         if (phis[1] != 0.0) { hs[1] = 1.0; }
+         if (phis[2] != 0.0) { hs[2] = 1.0; }
+
+         var final_distance = 777.0;
+
+         for (var j: i32 = 0 ; j<3 ; j = j + 1) {
+             let h0 = hs[0] * hs[0];
+             let h1 = hs[1] * hs[1];
+             let h2 = hs[2] * hs[2];
+
+             let a = h0 + h1 + h2;
+             let b = (-2.0) * (h0*phis[0] + h1*phis[1] + h2*phis[2]); 
+             let c = h0 * phis[0]*phis[0] + h1 * phis[1]*phis[1] + h2 * phis[2]*phis[2] - 1.0;
+
+             let discriminant = pow(b, 2.0) - (4.0*a*c);
+
+             if (discriminant >= 0.0) {
+                 let t_phi = ((-1.0) * b + sqrt(discriminant)) / (2.0*a); 
+                 if (phis[0] < t_phi && phis[1] < t_phi && phis[2] < t_phi) {
+                     final_distance = min(t_phi, final_distance);
+                 }
+             }
+
+             var max_j = select(0, 1, phis[0] < phis[1]);
+             max_j = select(max_j, 2, phis[max_j] < phis[2]);
+             phis[max_j] = 0.0;
+             hs[max_j] = 0.0;
+         }
+
+         return final_distance;
+}
+
+fn add_to_band(cell: FmmCellSync) {
+    var temp_cell: FmmCell;
+    temp_cell.tag = BAND;
+    temp_cell.value = cell.value;
+    temp_cell.queue_value = 0u;
+    fmm_data[cell.mem_location] = temp_cell; 
+}
+
+@compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
@@ -238,19 +382,32 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     var this_cell = fmm_data[global_id.x];
     if (this_cell.tag == KNOWN) {
         load_neighbors(this_coordinate_u32);
+        output_arrow[atomicAdd(&counter[1], 1u)] =  
+              Arrow (
+                  vec4<f32>(vec3<f32>(this_coordinate_i32), 0.0),
+                  vec4<f32>(vec3<f32>(decode3Dmorton32(neighbor_cells[0].mem_location)), 0.0),
+                  rgba_u32(255u, 0u, 0u, 255u),
+                  0.01
+        );
+        add_neihgbors_to_sync();
     }
 }
 
-@stage(compute)
+@compute
 @workgroup_size(1024,1,1)
 fn sync_and_calculate_all_bands(@builtin(local_invocation_id)    local_id: vec3<u32>,
-        @builtin(local_invocation_index) local_index: u32,
-        @builtin(global_invocation_id)   global_id: vec3<u32>) {
+                                @builtin(local_invocation_index) local_index: u32,
+                                @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    var this_coordinate_u32 = decode3Dmorton32(global_id.x);
-    var this_coordinate_i32 = vec3<i32>(this_coordinate_u32);
-    var this_cell = fmm_data[global_id.x];
-    if (this_cell.tag == KNOWN) {
+    let sync_point_count = sync_point_counter[0];
+    if (local_index < sync_point_count) {
+        var sync_cell = synchronization_data[local_index];
+        let this_coordinate_u32 = decode3Dmorton32(sync_cell.mem_location);
         load_neighbors(this_coordinate_u32);
+        var value = solve_quadratic();
+        sync_cell.value = value; 
+        add_to_band(sync_cell);
+            
+        // add_neihgbors_to_band();
     }
 }

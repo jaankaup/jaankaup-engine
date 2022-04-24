@@ -246,7 +246,7 @@ fn visualize_cell(position: vec3<f32>, color: u32) {
           );
 }
 
-@stage(compute)
+@compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
@@ -266,7 +266,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let cell = fmm_data[global_id.x];
     let speed = isotropic_data[global_id.x];
-    var position = vec3<f32>(decode3Dmorton32(global_id.x)) * 0.25;
+    var position = vec3<f32>(decode3Dmorton32(global_id.x)); // * 0.25;
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);

@@ -12,6 +12,7 @@ use crate::common_functions::{
     create_uniform_bindgroup_layout,
     create_buffer_bindgroup_layout
 };
+use crate::render_things::LightBuffer;
 use crate::buffer::{buffer_from_data, to_vec};
 use crate::camera::Camera;
 
@@ -119,6 +120,7 @@ pub struct GpuDebugger {
     max_number_of_aabb_wires: u32,
     thread_count: u32,
     histogram_dispatch_counter: Histogram,
+    light: LightBuffer,
 }
 
 impl GpuDebugger {
@@ -153,6 +155,16 @@ impl GpuDebugger {
 
         // This must be given to the shaders that uses GpuDebugger.
         let histogram_element_counter = Histogram::init(&device, &vec![0; 4]);
+
+        let light = LightBuffer::create(
+                      &device,
+                      [100.0, 100.0, 100.0],
+                      [25, 125, 25], 
+                      [255,255,255], 
+                      55.0,
+                      0.15,
+                      0.00013
+        );
 
         let arrow_aabb_params = ArrowAabbParams {
             max_number_of_vertices: 123 as u32,
@@ -284,7 +296,8 @@ impl GpuDebugger {
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
                     &vec![
                         vec![
-                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
                         ],
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
@@ -298,6 +311,7 @@ impl GpuDebugger {
                                      &vec![
                                           vec![
                                               &camera_buffer.as_entire_binding(),
+                                              &light.get_buffer().as_entire_binding(),
                                          ]
                                      ]
         );
@@ -502,6 +516,7 @@ impl GpuDebugger {
             max_number_of_aabb_wires: max_number_of_aabb_wires,
             thread_count: thread_count,
             histogram_dispatch_counter: histogram_dispatch_counter,
+            light: light,
         }
     }
 

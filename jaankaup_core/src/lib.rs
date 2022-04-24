@@ -12,6 +12,7 @@ pub mod aabb;
 pub mod gpu_debugger;
 pub mod histogram;
 pub mod gpu_timer;
+pub mod render_things;
 pub use wgpu;
 pub use winit;
 pub use log;
