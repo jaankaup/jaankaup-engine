@@ -22,6 +22,9 @@ struct Char {
     auxiliary_data: u32,
 };
 
+let FONT_SIZE = 0.015;
+let AABB_SIZE = 0.06;
+
 // FMM tags
 // 0 :: Far
 // 1 :: Band
@@ -241,8 +244,8 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
 fn visualize_cell(position: vec3<f32>, color: u32) {
     output_aabb[atomicAdd(&counter[2], 1u)] =
           AABB (
-              vec4<f32>(position - vec3<f32>(0.016), bitcast<f32>(color)),
-              vec4<f32>(position + vec3<f32>(0.016), 0.0),
+              vec4<f32>(position - vec3<f32>(AABB_SIZE), bitcast<f32>(color)),
+              vec4<f32>(position + vec3<f32>(AABB_SIZE), 0.0),
           );
 }
 
@@ -271,7 +274,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
     let color_known = rgba_u32(0u, 255u, 0u, 255u);
-    var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_known, color_far, 0u);  
+    let color_text = rgba_u32(155u, 0u, 155u, 255u);
+    var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_known, color_far, 0u);
     //let colors_ptr = &colors;
 
     var col = colors[cell.tag];
@@ -279,14 +283,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // TODO: spaces!
     let value = vec4<f32>(f32(cell.value), 0.0, 0.0, 0.0);
     let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
-    let font_size = 0.002;
-    let element_position = position - vec3<f32>(f32(total_number_of_chars) * font_size * 0.5, 0.0, -0.016); 
+    let font_size = FONT_SIZE;
+    let element_position = position - vec3<f32>(f32(total_number_of_chars) * font_size * 0.5, 0.0, -AABB_SIZE);
     let renderable_element = Char (
                     element_position,
                     font_size,
                     value,
                     1u,
-                    col,
+                    color_text,
                     2u,
                     0u
     );
@@ -331,7 +335,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     font_size,
                     vec4<f32>(speed, 0.0, 0.0, 0.0),
                     1u,
-                    rgba_u32(255u, 0u, 2550u, 255u),
+                    color_text,
                     2u,
                     0u
                 );

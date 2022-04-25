@@ -284,12 +284,12 @@ impl Application for Fmm {
 
         let light = LightBuffer::create(
                       &configuration.device,
-                      [10.0, 250.0, 10.0], // pos
+                      [10.0, 40.0, 10.0], // pos
                       [25, 25, 130],  // spec
-                      [25,100,25], // light 
-                      15.0,
+                      [25,200,25], // light 
+                      55.0,
                       0.15,
-                      0.00013
+                      0.000013
         );
 
         // vvvvnnnn

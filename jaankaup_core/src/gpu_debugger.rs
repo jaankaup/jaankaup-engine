@@ -205,7 +205,7 @@ impl GpuDebugger {
                     &vec![CharParams{ vertices_so_far: 0,
                                       iterator_end: 0,
                                       draw_index: 0,
-                                      max_points_per_char: 500,
+                                      max_points_per_char: 4000,
                                       max_number_of_vertices: max_number_of_vertices,
                                       padding: [1,2,3],
                                       dispatch_indirect_prefix_sum: [0; 64]}],
@@ -678,7 +678,7 @@ impl GpuDebugger {
             let cp = CharParams{ vertices_so_far: 0,
                                  iterator_end: number_of_chars, 
                                  draw_index: 0,
-                                 max_points_per_char: 1000,
+                                 max_points_per_char: 4000,
                                  max_number_of_vertices: self.max_number_of_vertices - 500000, // TODO: ???
                                  padding: [1,2,3],
                                  dispatch_indirect_prefix_sum: [0; 64], // TODO: not used.

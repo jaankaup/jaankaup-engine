@@ -33,9 +33,11 @@ impl LightBuffer {
         let light = Light {
             light_pos: position,
             material_shininess: material_shininess,
-            material_spec_color: [material_spec_color[0] as f32, material_spec_color[1] as f32, material_spec_color[2] as f32],
+            material_spec_color: [material_spec_color[0] as f32 / 255.0,
+                                  material_spec_color[1] as f32 / 255.0,
+                                  material_spec_color[2] as f32 / 255.0],
             ambient_coeffience: ambient_coeffience,
-            light_color: [light_color[0] as f32, light_color[1] as f32,light_color[2] as f32],
+            light_color: [light_color[0] as f32 / 255.0, light_color[1] as f32 / 255.0, light_color[2] as f32 / 255.0],
             attentuation_factor: attentuation_factor,
         };
 
