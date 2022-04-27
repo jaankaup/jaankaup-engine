@@ -73,14 +73,15 @@ var<private> neighbor_cells: array<FmmCellSync, 6>;
 @group(0) @binding(0) var<storage, read_write> fmm_data: array<FmmCell>;
 @group(0) @binding(1) var<storage, read_write> fmm_blocks: array<FmmBlock>;
 @group(0) @binding(2) var<storage, read_write> synchronization_data: array<FmmCellSync>;
-@group(0) @binding(3) var<storage, read_write> sync_point_counter: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
+@group(0) @binding(4) var<storage, read_write> sync_point_counter: array<atomic<u32>>;
 
 // Debugging.
-@group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
-@group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
-@group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
-@group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
-@group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+@group(0) @binding(5) var<storage,read_write> counter: array<atomic<u32>>;
+@group(0) @binding(6) var<storage,read_write> output_char: array<Char>;
+@group(0) @binding(7) var<storage,read_write> output_arrow: array<Arrow>;
+@group(0) @binding(8) var<storage,read_write> output_aabb: array<AABB>;
+@group(0) @binding(9) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 // Encode "rgba" to u32.
 fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
@@ -269,7 +270,7 @@ fn load_neighbors(coord: vec3<u32>) {
     // }
 }
 
-fn add_neihgbors_to_sync() {
+fn add_neighbors_to_sync() {
 
     for (var i: i32 = 0 ; i < 6 ; i = i + 1) {
         if (neighbor_cells[i].tag != OUTSIDE && neighbor_cells[i].tag != KNOWN && neighbor_cells[i].queue_value == 0u) {
@@ -284,7 +285,7 @@ fn add_neihgbors_to_sync() {
     }
 }
 
-fn add_neihgbors_to_band() {
+fn add_neighbors_to_band() {
 
     for (var i: i32 = 0 ; i < 6 ; i = i + 1) {
         if (neighbor_cells[i].tag != OUTSIDE && neighbor_cells[i].tag != KNOWN && neighbor_cells[i].queue_value == 0u) {
@@ -307,60 +308,113 @@ fn add_neihgbors_to_band() {
 //   FMM   // 
 /////////////
 
-fn solve_quadratic() -> f32 {
+fn solve_quadratic_2(speed: f32) -> f32 {
+
+    var phis: array<f32, 6> = array<f32, 6>(
+                                  select(1000000.0, neighbor_cells[0].value, neighbor_cells[0].tag == KNOWN),
+                                  select(1000000.0, neighbor_cells[1].value, neighbor_cells[1].tag == KNOWN),
+                                  select(1000000.0, neighbor_cells[2].value, neighbor_cells[2].tag == KNOWN),
+                                  select(1000000.0, neighbor_cells[3].value, neighbor_cells[3].tag == KNOWN),
+                                  select(1000000.0, neighbor_cells[4].value, neighbor_cells[4].tag == KNOWN),
+                                  select(1000000.0, neighbor_cells[5].value, neighbor_cells[5].tag == KNOWN) 
+    );
+
+    var p = vec3<f32>(min(phis[0], phis[1]), min(phis[2], phis[3]), min(phis[4], phis[5]));
+    var p_sorted: vec3<f32>;
+
+    var tmp: f32;
+
+    if p[1] < p[0] {
+        tmp = p[1];
+        p[1] = p[0];
+        p[0] = tmp;
+    }
+    if p[2] < p[0] {
+        tmp = p[2];
+        p[2] = p[0];
+        p[0] = tmp;
+    }
+    if p[2] < p[1] {
+        tmp = p[2];
+        p[2] = p[1];
+        p[1] = tmp;
+    }
+
+    var result = 777.0;
+
+    if (abs(p[0] - p[2]) < 1.0) {
+        var phi_sum = p[0] + p[1] + p[2];
+        var phi_sum_pow2 = pow(phi_sum, 2.0);
+        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum_pow2 - 1.0/pow(speed, 2.0)))); 
+        // result = 123.0;
+    }
+
+    else if (abs(p[0] - p[1]) < 1.0) {
+        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0/pow(speed, 2.0) - pow((p[0] - p[1]), 2.0)));
+        // result = 555.0;
+    }
+ 
+    else {
+        result = p[0] + 1.0/speed;
+    }
+
+    return result;
+}
+
+fn solve_quadratic(speed: f32) -> f32 {
 
         var phis: array<f32, 3> = array<f32, 3>(0.0, 0.0, 0.0);
 
         // Deltas. 
         var hs: array<f32, 3> = array<f32, 3>(0.0, 0.0, 0.0);
  
-         // x dir.
-         phis[0] = select(0.0, min(neighbor_cells[0].value, neighbor_cells[1].value), neighbor_cells[0].tag == KNOWN && neighbor_cells[1].tag == KNOWN);
-         phis[0] = select(0.0, neighbor_cells[0].value, neighbor_cells[0].tag == KNOWN && neighbor_cells[1].tag != KNOWN);
-         phis[0] = select(0.0, neighbor_cells[1].value, neighbor_cells[0].tag != KNOWN && neighbor_cells[1].tag == KNOWN);
+        // x dir.
+        phis[0] = select(phis[0], min(neighbor_cells[0].value, neighbor_cells[1].value), neighbor_cells[0].tag == KNOWN && neighbor_cells[1].tag == KNOWN);
+        phis[0] = select(phis[0], neighbor_cells[0].value, neighbor_cells[0].tag == KNOWN && neighbor_cells[1].tag != KNOWN);
+        phis[0] = select(phis[0], neighbor_cells[1].value, neighbor_cells[0].tag != KNOWN && neighbor_cells[1].tag == KNOWN);
 
-         // y dir.
-         phis[1] = select(0.0, min(neighbor_cells[2].value, neighbor_cells[3].value), neighbor_cells[2].tag == KNOWN && neighbor_cells[3].tag == KNOWN);
-         phis[1] = select(0.0, neighbor_cells[2].value, neighbor_cells[2].tag == KNOWN && neighbor_cells[3].tag != KNOWN);
-         phis[1] = select(0.0, neighbor_cells[3].value, neighbor_cells[2].tag != KNOWN && neighbor_cells[3].tag == KNOWN);
+        // y dir.
+        phis[1] = select(phis[1], min(neighbor_cells[2].value, neighbor_cells[3].value), neighbor_cells[2].tag == KNOWN && neighbor_cells[3].tag == KNOWN);
+        phis[1] = select(phis[1], neighbor_cells[2].value, neighbor_cells[2].tag == KNOWN && neighbor_cells[3].tag != KNOWN);
+        phis[1] = select(phis[1], neighbor_cells[3].value, neighbor_cells[2].tag != KNOWN && neighbor_cells[3].tag == KNOWN);
 
-         // z dir.
-         phis[2] = select(0.0, min(neighbor_cells[4].value, neighbor_cells[5].value), neighbor_cells[4].tag == KNOWN && neighbor_cells[5].tag == KNOWN);
-         phis[2] = select(0.0, neighbor_cells[4].value, neighbor_cells[4].tag == KNOWN && neighbor_cells[5].tag != KNOWN);
-         phis[2] = select(0.0, neighbor_cells[5].value, neighbor_cells[4].tag != KNOWN && neighbor_cells[5].tag == KNOWN);
+        // z dir.
+        phis[2] = select(phis[2], min(neighbor_cells[4].value, neighbor_cells[5].value), neighbor_cells[4].tag == KNOWN && neighbor_cells[5].tag == KNOWN);
+        phis[2] = select(phis[2], neighbor_cells[4].value, neighbor_cells[4].tag == KNOWN && neighbor_cells[5].tag != KNOWN);
+        phis[2] = select(phis[2], neighbor_cells[5].value, neighbor_cells[4].tag != KNOWN && neighbor_cells[5].tag == KNOWN);
 
 
-         if (phis[0] != 0.0) { hs[0] = 1.0; }
-         if (phis[1] != 0.0) { hs[1] = 1.0; }
-         if (phis[2] != 0.0) { hs[2] = 1.0; }
+        if (phis[0] != 0.0) { hs[0] = 1.0; }
+        if (phis[1] != 0.0) { hs[1] = 1.0; }
+        if (phis[2] != 0.0) { hs[2] = 1.0; }
 
-         var final_distance = 777.0;
+        var final_distance = 777.0;
 
-         for (var j: i32 = 0 ; j<3 ; j = j + 1) {
-             let h0 = hs[0] * hs[0];
-             let h1 = hs[1] * hs[1];
-             let h2 = hs[2] * hs[2];
+        for (var j: i32 = 0 ; j<3 ; j = j + 1) {
+            let h0 = hs[0] * hs[0];
+            let h1 = hs[1] * hs[1];
+            let h2 = hs[2] * hs[2];
 
-             let a = h0 + h1 + h2;
-             let b = (-2.0) * (h0*phis[0] + h1*phis[1] + h2*phis[2]); 
-             let c = h0 * phis[0]*phis[0] + h1 * phis[1]*phis[1] + h2 * phis[2]*phis[2] - 1.0;
+            let a = h0 + h1 + h2;
+            let b = (-2.0) * (h0*phis[0] + h1*phis[1] + h2*phis[2]); 
+            let c = h0 * phis[0]*phis[0] + h1 * phis[1]*phis[1] + h2 * phis[2]*phis[2] - 1.0;
 
-             let discriminant = pow(b, 2.0) - (4.0*a*c);
+            let discriminant = pow(b, 2.0) - (4.0*a*c);
 
-             if (discriminant >= 0.0) {
-                 let t_phi = ((-1.0) * b + sqrt(discriminant)) / (2.0*a); 
-                 if (phis[0] < t_phi && phis[1] < t_phi && phis[2] < t_phi) {
-                     final_distance = min(t_phi, final_distance);
-                 }
-             }
+            if (discriminant >= 0.0) {
+                let t_phi = ((-1.0) * b + sqrt(discriminant)) / (2.0*a); 
+                if (phis[0] < t_phi && phis[1] < t_phi && phis[2] < t_phi) {
+                    final_distance = min(t_phi, final_distance);
+                }
+            }
 
-             var max_j = select(0, 1, phis[0] < phis[1]);
-             max_j = select(max_j, 2, phis[max_j] < phis[2]);
-             phis[max_j] = 0.0;
-             hs[max_j] = 0.0;
-         }
+            var max_j = select(0, 1, phis[0] < phis[1]);
+            max_j = select(max_j, 2, phis[max_j] < phis[2]);
+            phis[max_j] = 0.0;
+            hs[max_j] = 0.0;
+        }
 
-         return final_distance;
+        return final_distance;
 }
 
 fn add_to_band(cell: FmmCellSync) {
@@ -389,7 +443,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                   rgba_u32(255u, 0u, 0u, 255u),
                   0.01
         );
-        add_neihgbors_to_sync();
+        add_neighbors_to_sync();
+        //add_neighbors_to_band();
     }
 }
 
@@ -402,10 +457,11 @@ fn sync_and_calculate_all_bands(@builtin(local_invocation_id)    local_id: vec3<
     let sync_point_count = sync_point_counter[0];
     if (local_index < sync_point_count) {
         var sync_cell = synchronization_data[local_index];
+        var speed = isotropic_data[sync_cell.mem_location];
         let this_coordinate_u32 = decode3Dmorton32(sync_cell.mem_location);
         load_neighbors(this_coordinate_u32);
-        var value = solve_quadratic();
-        sync_cell.value = value; 
+        var value = solve_quadratic_2(speed);
+        sync_cell.value = value;
         add_to_band(sync_cell);
             
         // add_neihgbors_to_band();

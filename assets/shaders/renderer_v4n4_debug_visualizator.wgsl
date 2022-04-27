@@ -12,6 +12,10 @@ struct Light {
     attentuation_factor: f32,
 };
 
+struct OtherParams {
+    scale_factor: f32,
+};
+
 struct VertexOutput {
     @builtin(position) my_pos: vec4<f32>,
     @location(0) pos: vec4<f32>,
@@ -27,6 +31,9 @@ var<uniform> camerauniform: Camera;
 
 @group(0) @binding(1)
 var<uniform> light: Light;
+
+@group(0) @binding(2)
+var<uniform> other_params: OtherParams;
 
 fn decode_color(c: u32) -> vec4<f32> {
   let a: f32 = f32(c & 256u) / 255.0;
@@ -47,7 +54,7 @@ fn vs_main(@location(0) pos: vec4<f32>, @location(1) nor: vec4<f32>) -> VertexOu
     // var camera_dir: vec3<f32> = normalize(camerauniform.camera_pos.xyz - pos.xyz);
 
     var out_next_stage: VertexOutput;
-    out_next_stage.my_pos = camerauniform.u_view_proj * vec4<f32>(pos.xyz, 1.0);
+    out_next_stage.my_pos = camerauniform.u_view_proj * vec4<f32>(other_params.scale_factor * pos.xyz, 1.0);
     out_next_stage.pos = pos;
     out_next_stage.nor = nor;
     //++ out.diff_coeffient = diff_coeffient;

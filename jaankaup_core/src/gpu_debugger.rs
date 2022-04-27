@@ -62,6 +62,12 @@ struct Char {
     auxiliary_data: u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct OtherRenderParams {
+    scale_factor: f32,
+}
+
 fn get_points_per_char(aux_data: u32) -> u32 {
     aux_data & 0x3FFF
 }
@@ -283,6 +289,19 @@ impl GpuDebugger {
         ////               Render vvvvnnnn              ////
         ////////////////////////////////////////////////////
 
+        let other_render_params = OtherRenderParams {
+            scale_factor: 1.0,
+        };
+
+        buffers.insert(
+            "other_render_params".to_string(),
+            buffer_from_data::<OtherRenderParams>(
+            &device,
+            &[other_render_params],
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+            None)
+        );
+
         let render_object_vvvvnnnn =
                 RenderObject::init(
                     &device,
@@ -298,6 +317,7 @@ impl GpuDebugger {
                         vec![
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
                             create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
+                            create_uniform_bindgroup_layout(2, wgpu::ShaderStages::VERTEX),
                         ],
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
@@ -312,6 +332,7 @@ impl GpuDebugger {
                                           vec![
                                               &camera_buffer.as_entire_binding(),
                                               &light.get_buffer().as_entire_binding(),
+                                              &buffers.get(&"other_render_params".to_string()).unwrap().as_entire_binding(),
                                          ]
                                      ]
         );

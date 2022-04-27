@@ -138,6 +138,12 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
 //         return result;
 //     }
 // }
+//
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct OtherRenderParams {
+    scale_factor: f32,
+}
 
 // State for this application.
 struct DebugVisualizator {
@@ -200,12 +206,25 @@ impl Application for DebugVisualizator {
 
         let light = LightBuffer::create(
                       &configuration.device,
-                      [10.0, 250.0, 10.0], // pos
+                      [10.0, 20.0, 10.0], // pos
                       [25, 25, 130],  // spec
-                      [25,100,25], // light 
+                      [200,200,200], // light 
                       15.0,
                       0.15,
                       0.00013
+        );
+
+        let other_render_params = OtherRenderParams {
+            scale_factor: 1.0,
+        };
+
+        buffers.insert(
+            "other_render_params".to_string(),
+            buffer_from_data::<OtherRenderParams>(
+            &configuration.device,
+            &[other_render_params],
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+            None)
         );
 
         let render_object =
@@ -226,7 +245,10 @@ impl Application for DebugVisualizator {
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
 
                             // @group(0) @binding(1) var<uniform> light: Light;
-                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT)
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
+
+                            // @group(0) @binding(2) var<uniform> other_params: OtherParams;
+                            create_uniform_bindgroup_layout(2, wgpu::ShaderStages::VERTEX)
                         ],
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
@@ -241,6 +263,7 @@ impl Application for DebugVisualizator {
                                          vec![
                                              &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
                                              &light.get_buffer().as_entire_binding(),
+                                             &buffers.get(&"other_render_params".to_string()).unwrap().as_entire_binding()
                                          ],
                                      ]
         );

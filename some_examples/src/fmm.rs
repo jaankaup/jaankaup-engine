@@ -130,6 +130,12 @@ struct FmmPrefixParams {
     stage: u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct OtherRenderParams {
+    scale_factor: f32,
+}
+
 impl_convert!{FmmCell}
 impl_convert!{FmmParams}
 impl_convert!{FmmBlock}
@@ -149,7 +155,7 @@ impl WGPUFeatures for FmmFeatures {
         let mut limits = wgpu::Limits::default();
         limits.max_compute_invocations_per_workgroup = 1024;
         limits.max_compute_workgroup_size_x = 1024;
-        limits.max_storage_buffers_per_shader_stage = 9;
+        limits.max_storage_buffers_per_shader_stage = 10;
         limits
     }
 }
@@ -186,6 +192,7 @@ struct Fmm {
     pub histogram_fmm: Histogram,
     pub compute_object_calculate_all_band_values: ComputeObject,
     pub light: LightBuffer,
+    pub other_render_params: OtherRenderParams,
 }
 
 impl Fmm {
@@ -292,6 +299,19 @@ impl Application for Fmm {
                       0.000013
         );
 
+        let other_render_params = OtherRenderParams {
+            scale_factor: 1.0,
+        };
+
+        buffers.insert(
+            "other_render_params".to_string(),
+            buffer_from_data::<OtherRenderParams>(
+            &configuration.device,
+            &[other_render_params],
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+            None)
+        );
+
         // vvvvnnnn
         let render_object_vvvvnnnn =
                 RenderObject::init(
@@ -310,7 +330,10 @@ impl Application for Fmm {
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
 
                             // @group(0) @binding(1) var<uniform> light: Light;
-                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT)
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
+
+                            // @group(0) @binding(2) var<uniform> other_params: OtherParams;
+                            create_uniform_bindgroup_layout(2, wgpu::ShaderStages::VERTEX)
                         ]
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
@@ -325,6 +348,7 @@ impl Application for Fmm {
                                          vec![
                                              &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
                                              &light.get_buffer().as_entire_binding(),
+                                             &buffers.get(&"other_render_params".to_string()).unwrap().as_entire_binding(),
                                          ],
                                      ]
         );
@@ -457,7 +481,7 @@ impl Application for Fmm {
             "isotropic_data".to_string(),
             buffer_from_data::<f32>(
             &configuration.device,
-            &vec![0.0 ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+            &vec![1.0 ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
             None)
         );
@@ -893,23 +917,26 @@ impl Application for Fmm {
                             // @group(0) @binding(2) var<storage, read_write> synchronization_data: array<FmmCell>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage, read_write> sync_point_counter: array<u32>;
+                            // @group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
+                            // @group(0) @binding(4) var<storage, read_write> sync_point_counter: array<u32>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
+                            // @group(0) @binding(5) var<storage, read_write> counter: array<atomic<u32>>;
                             create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
+                            // @group(0) @binding(6) var<storage,read_write> output_char: array<Char>;
                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
+                            // @group(0) @binding(7) var<storage,read_write> output_arrow: array<Arrow>;
                             create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            // @group(0) @binding(8) var<storage,read_write> output_aabb: array<AABB>;
                             create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(9) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(9, wgpu::ShaderStages::COMPUTE, false),
 
                         ],
                     ],
@@ -926,6 +953,7 @@ impl Application for Fmm {
                          &buffers.get(&"fmm_data".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
                          &buffers.get(&"synchronization_data".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"isotropic_data".to_string()).unwrap().as_entire_binding(),
                          &histogram_fmm.get_histogram_buffer().as_entire_binding(),
                          &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
@@ -962,23 +990,26 @@ impl Application for Fmm {
                             // @group(0) @binding(2) var<storage, read_write> synchronization_data: array<FmmCell>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage, read_write> sync_point_counter: array<u32>;
+                            // @group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(3) var<storage, read_write> counter: array<atomic<u32>>;
+                            // @group(0) @binding(4) var<storage, read_write> sync_point_counter: array<u32>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(4) var<storage,read_write> output_char: array<Char>;
+                            // @group(0) @binding(5) var<storage, read_write> counter: array<atomic<u32>>;
                             create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(5) var<storage,read_write> output_arrow: array<Arrow>;
+                            // @group(0) @binding(6) var<storage,read_write> output_char: array<Char>;
                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(6) var<storage,read_write> output_aabb: array<AABB>;
+                            // @group(0) @binding(7) var<storage,read_write> output_arrow: array<Arrow>;
                             create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(7) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            // @group(0) @binding(8) var<storage,read_write> output_aabb: array<AABB>;
                             create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(9) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(9, wgpu::ShaderStages::COMPUTE, false),
 
                         ],
                     ],
@@ -1020,6 +1051,7 @@ impl Application for Fmm {
             histogram_fmm,
             compute_object_calculate_all_band_values,
             light: light,
+            other_render_params: other_render_params,
         }
     }
 
@@ -1128,6 +1160,14 @@ impl Application for Fmm {
 
         if self.draw_triangle_mesh {
 
+            self.other_render_params.scale_factor = 4.0;
+
+            queue.write_buffer(
+                &self.buffers.get(&"other_render_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.other_render_params])
+            );
+
             let mut model_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("model encoder") });
 
             draw(&mut model_encoder,
@@ -1141,6 +1181,14 @@ impl Application for Fmm {
                  clear
             );
             queue.submit(Some(model_encoder.finish()));
+
+            self.other_render_params.scale_factor = 1.0;
+
+            queue.write_buffer(
+                &self.buffers.get(&"other_render_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[self.other_render_params])
+            );
         }
 
         // Update screen.

@@ -294,7 +294,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     0u
     );
 
-
     if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
 
         visualize_cell(position, col);
