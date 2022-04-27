@@ -81,6 +81,12 @@ struct VisualizationParams{
     // current_iterator_index: u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct OtherRenderParams {
+    scale_factor: f32,
+}
+
 impl_convert!{Arrow}
 impl_convert!{Char}
 
@@ -164,6 +170,19 @@ impl Application for DebugVisualizator {
                       0.00013
         );
 
+        let other_render_params = OtherRenderParams {
+            scale_factor: 1.0,
+        };
+
+        buffers.insert(
+            "other_render_params".to_string(),
+            buffer_from_data::<OtherRenderParams>(
+            &configuration.device,
+            &[other_render_params],
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+            None)
+        );
+
         // vvvvnnnn
         let render_object_vvvvnnnn =
                 RenderObject::init(
@@ -182,7 +201,10 @@ impl Application for DebugVisualizator {
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
 
                             // @group(0) @binding(1) var<uniform> light: Light;
-                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT)
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT),
+
+                            // @group(0) @binding(2) var<uniform> other_params: OtherParams;
+                            create_uniform_bindgroup_layout(2, wgpu::ShaderStages::VERTEX)
                         ],
                     ],
                     Some("Debug visualizator vvvvnnnn renderer with camera."),
@@ -197,6 +219,7 @@ impl Application for DebugVisualizator {
                                          vec![
                                              &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
                                              &light.get_buffer().as_entire_binding(),
+                                             &buffers.get(&"other_render_params".to_string()).unwrap().as_entire_binding()
                                          ],
                                      ]
         );
