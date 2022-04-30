@@ -2,6 +2,7 @@ use crate::misc::Convert2Vec;
 use bytemuck::Pod;
 use wgpu::util::DeviceExt;
 use crate::template::Spawner;
+use std::{thread, time};
 
 /// A struct that holds information for one draw call.
 #[allow(dead_code)]
@@ -54,8 +55,20 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     let res: Vec<T>;
 
     let buffer_slice = staging_buffer.slice(..);
-    let _ = buffer_slice.map_async(wgpu::MapMode::Read);
+    let slice = buffer_slice.map_async(wgpu::MapMode::Read);
     device.poll(wgpu::Maintain::Wait);
+    // let _ = buffer_slice.map_async(wgpu::MapMode::Read);
+
+    _spawner.spawn_local(async {
+        slice.await.unwrap()
+    });
+
+    device.map_buffer();
+
+    //log::info!("{:?}", staging_buffer.map_state);
+    log::info!("{:?}", buffer_slice);
+
+    // thread::sleep(time::Duration::from_millis(10));
 
     // Wasm version crashes: DOMException.getMappedRange: Buffer not mapped.
     let data = buffer_slice.get_mapped_range().to_vec();

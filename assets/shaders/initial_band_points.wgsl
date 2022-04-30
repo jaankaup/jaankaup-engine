@@ -50,7 +50,7 @@ struct FmmCellSync {
 
 struct FmmBlock {
     index: u32,
-    band_points_count: u32,
+    band_points_count: i32,
 };
 
 let THREAD_COUNT: u32 = 1024u;
@@ -423,6 +423,7 @@ fn add_to_band(cell: FmmCellSync) {
     temp_cell.value = cell.value;
     temp_cell.queue_value = 0u;
     fmm_data[cell.mem_location] = temp_cell; 
+    fmm_blocks[cell.mem_location / 64u].band_points_count += 1;
 }
 
 @compute

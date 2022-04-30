@@ -290,7 +290,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     value,
                     1u,
                     color_text,
-                    2u,
+                    4u,
                     0u
     );
 

@@ -323,11 +323,11 @@ fn update_fmm_interface(aabb: AABB_Uvec3, tr: Triangle, thread_index: u32) {
             let speed = isotropic_data[actual_index];
 
             // Update the isotropic speed data. TODO: repalce 15.0 with some actual speed data. 
-            if (dist < 0.25 && 15.0 / max(0.05, dist) > speed) {
-            //if (dist < 1.0 && 15.0 / max(0.05, dist) > speed) {
+            //if (dist < 0.25 && 15.0 * max(0.05, dist) > speed) {
+            if (dist < 0.25 && dist < speed) {
 
                // Is this safe. Do we need atomic operations?
-               isotropic_data[actual_index] = 15.0 / max(0.05, dist);
+               isotropic_data[actual_index] = dist;
             }
         }
     }
