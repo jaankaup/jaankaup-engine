@@ -42,9 +42,9 @@ Fmm algorithm
    * if a new KNOWN cell is found, update the neigbhorhood (find and add new BAND points to syncList)
 6. Merge the syncList to fmm_data. Jump to 4 (update the fmm_blocks list). Is the active_fmm_blocks list is empty break loop. 
 
-Phase 1 - [x]
-Phase 2 - [x]
-Phase 3 - [x]
-Phase 4 - [ ]
-Phase 5 - [ ]
-Phase 6 - [ ]
+- [x] Phase 1 
+- [x] Phase 2 
+- [x] Phase 3 
+- [ ] Phase 4 
+- [ ] Phase 5 
+- [ ] Phase 6 
