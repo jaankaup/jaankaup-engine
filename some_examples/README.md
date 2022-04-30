@@ -4,7 +4,7 @@
 
 You can compile and run the project as follows. Beware, the project is under contruction.
 
-$ cargo run --example curves 
+$ cargo run --example fmm 
 
 ### Plan.
 
