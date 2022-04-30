@@ -3,32 +3,22 @@
 ## Plan.
 
 | FmmCell            |
-| :---
+| :---               |
 | tag: u32           |
 | value: f32         |
 
-h
-
-+---------------------+
 | FmmCellSync         |
-+---------------------+
-|                     |
-| * tag: u32          |
-| * value: f32        |
-| * queue_value: u32  |
-| * mem_location: u32 |
-| * block_index: u32  |
-|                     |
-+---------------------+
+| :---                |
+| tag: u32            |
+| value: f32          |
+| queue_value: u32    |
+| mem_location: u32   |
+| block_index: u32    |
 
-+-------------------------+
-| FmmBlock                |
-+-------------------------+
-|                         |
-| * index: u32            |
-| * band_point_count: f32 |
-|                         |
-+-------------------------+
+| FmmBlock              |
+| :---                  |
+| index: u32            |
+| band_point_count: f32 |
 
 fmm_data : List<FmmCell>
 fmm_blocks : List<FmmBlock>
