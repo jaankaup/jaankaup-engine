@@ -1,6 +1,6 @@
-# The fast marching method
+## The fast marching method
 
-## Plan.
+### Plan.
 
 | FmmCell            |
 | :---               |
