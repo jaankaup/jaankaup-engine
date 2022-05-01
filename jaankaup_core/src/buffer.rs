@@ -59,14 +59,14 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     device.poll(wgpu::Maintain::Wait);
     // let _ = buffer_slice.map_async(wgpu::MapMode::Read);
 
-    _spawner.spawn_local(async {
-        slice.await.unwrap()
-    });
+    // _spawner.spawn_local(async {
+    //     slice.await.unwrap()
+    // });
 
-    device.map_buffer();
+    // device.map_buffer();
 
     //log::info!("{:?}", staging_buffer.map_state);
-    log::info!("{:?}", buffer_slice);
+    //log::info!("{:?}", buffer_slice);
 
     // thread::sleep(time::Duration::from_millis(10));
 
