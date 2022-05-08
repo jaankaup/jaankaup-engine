@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use jaankaup_core::input::*;
 use jaankaup_core::template::{
         WGPUFeatures,
@@ -9,12 +10,14 @@ use jaankaup_core::template::{
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
 use jaankaup_core::camera::Camera;
+use jaankaup_core::gpu_debugger::GpuDebugger;
 
 // TODO: add to fmm params.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
 const MAX_NUMBER_OF_AABBS:      usize = 262144;
 const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 const MAX_NUMBER_OF_CHARS:      usize = 262144;
+const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
 // FMM global dimensions.
 const FMM_GLOBAL_X: usize = 16; 
@@ -49,6 +52,7 @@ impl WGPUFeatures for EikonalFeatures {
 
 struct Eikonal {
     camera: Camera,
+    gpu_debugger: GpuDebugger,
 //++    pub screen: ScreenTexture, 
 //++    pub gpu_debugger: GpuDebugger,
 //++    pub render_object_vvvvnnnn: RenderObject, 
@@ -93,8 +97,15 @@ impl Application for Eikonal {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
+        let gpu_debugger = create_gpu_debugger(
+            &configuration.device,
+            &configuration.sc_desc,
+            &mut camera
+        );
+
         Self {
             camera: camera,
+            gpu_debugger: gpu_debugger,
         }
     }
 
@@ -129,6 +140,7 @@ fn main() {
     println!("Finished...");
 }
 
+/// A helper function for logging adapter information.
 fn log_adapter_info(adapter: &wgpu::Adapter) {
 
         let adapter_limits = adapter.limits(); 
@@ -140,4 +152,21 @@ fn log_adapter_info(adapter: &wgpu::Adapter) {
         log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
         log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
         log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
+}
+
+fn create_gpu_debugger(device: &wgpu::Device,
+                       sc_desc: &wgpu::SurfaceConfiguration,
+                       camera: &mut Camera) -> GpuDebugger {
+
+        GpuDebugger::Init(
+                &device,
+                &sc_desc,
+                &camera.get_camera_uniform(&device),
+                MAX_NUMBER_OF_VVVVNNNN.try_into().unwrap(),
+                MAX_NUMBER_OF_CHARS.try_into().unwrap(),
+                MAX_NUMBER_OF_ARROWS.try_into().unwrap(),
+                MAX_NUMBER_OF_AABBS.try_into().unwrap(),
+                MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
+                64,
+        )
 }
