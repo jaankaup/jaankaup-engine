@@ -305,7 +305,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         copy_block_to_shared_temp();
         local_prefix_sum(work_group_id.x);
         store_block_to_global_temp();
-
     }
 
     // STAGE 2.

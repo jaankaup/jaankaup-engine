@@ -36,7 +36,7 @@ let KNOWN    = 3u;
 let OUTSIDE  = 4u;
 
 struct FmmCell {
-    tag: u32,
+    tag: atomic<u32>,
     value: f32,
     queue_value: atomic<u32>,
 };
@@ -418,12 +418,21 @@ fn solve_quadratic(speed: f32) -> f32 {
 }
 
 fn add_to_band(cell: FmmCellSync) {
+    atomicAdd(&fmm_data[cell.mem_location].tag, 1u);
+   // var temp = atomicCompareExchangeWeak(&fmm_data[cell.mem_location].tag, 1u, 2u);
+    let atomicCompareExchangeWeak = 66u;
     var temp_cell: FmmCell;
     temp_cell.tag = BAND;
     temp_cell.value = cell.value;
     temp_cell.queue_value = 0u;
     fmm_data[cell.mem_location] = temp_cell; 
+
     fmm_blocks[cell.mem_location / 64u].band_points_count += 1;
+
+    // 
+    // if (original_cell.tag != BAND) {
+    //     fmm_blocks[cell.mem_location / 64u].band_points_count += 1;
+    // }
 }
 
 @compute
