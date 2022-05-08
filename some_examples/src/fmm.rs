@@ -35,13 +35,8 @@ use jaankaup_core::common_functions::{
     set_bit_to,
     get_bit
 };
-// use jaankaup_algorithms::histogram::Histogram;
-use bytemuck::{Pod, Zeroable};
-use jaankaup_core::cgmath::Vector4 as Vec4;
-// use cgmath::{prelude::*, Vector3, Vector4};
 
-use winit::event as ev;
-pub use ev::VirtualKeyCode as Key;
+use bytemuck::{Pod, Zeroable};
 
 const FAR: u32      = 0;
 const BAND_NEW: u32 = 1;
@@ -50,10 +45,10 @@ const KNOWN: u32    = 3;
 const OUTSIDE: u32  = 4;
 
 // TODO: add to fmm params.
-const MAX_NUMBERS_OF_ARROWS:     usize = 40960;
-const MAX_NUMBERS_OF_AABBS:      usize = 262144;
-const MAX_NUMBERS_OF_AABB_WIRES: usize = 40960;
-const MAX_NUMBERS_OF_CHARS:      usize = 262144;
+const MAX_NUMBER_OF_ARROWS:     usize = 40960;
+const MAX_NUMBER_OF_AABBS:      usize = 262144;
+const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+const MAX_NUMBER_OF_CHARS:      usize = 262144;
 
 // FMM global dimensions.
 const FMM_GLOBAL_X: usize = 16; 
@@ -68,12 +63,7 @@ const FMM_INNER_Z: usize = 4;
 const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 const MAX_NUMBER_OF_VVVC: usize = MAX_NUMBER_OF_VVVVNNNN * 2;
 
-/// The size of draw buffer in bytes;
-// const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>();
-//const VERTEX_BUFFER_SIZE: usize = MAX_NUMBER_OF_VVVVNNNN * size_of::<Vertex>() / 4;
-
 const THREAD_COUNT: u32 = 64;
-//const PREFIX_THREAD_COUNT: u32 = 256;
 const PREFIX_THREAD_COUNT: u32 = 1024;
 
 #[repr(C)]
@@ -146,7 +136,6 @@ struct FmmFeatures {}
 impl WGPUFeatures for FmmFeatures {
     fn optional_features() -> wgpu::Features {
         wgpu::Features::TIMESTAMP_QUERY
-        // wgpu::Features::empty()
     }
     fn required_features() -> wgpu::Features {
         wgpu::Features::empty()
@@ -208,9 +197,6 @@ impl Fmm {
         }
 
         let fmm_index = encode3Dmorton32(position[0], position[1], position[2]); 
-        // println!("position == {:?}", position);
-        // println!("fmm_index == {}", fmm_index);
-        // println!("blsh == {}", std::mem::size_of::<FmmCell>() as u64 * fmm_index as u64);
 
         queue.write_buffer(
             &self.buffers.get(&"fmm_data".to_string()).unwrap(),
@@ -235,7 +221,6 @@ impl Fmm {
     }
 }
 
-//#[allow(unused_variables)]
 impl Application for Fmm {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
@@ -273,10 +258,10 @@ impl Application for Fmm {
                 &configuration.sc_desc,
                 &camera.get_camera_uniform(&configuration.device),
                 MAX_NUMBER_OF_VVVVNNNN.try_into().unwrap(),
-                MAX_NUMBERS_OF_CHARS.try_into().unwrap(),
-                MAX_NUMBERS_OF_ARROWS.try_into().unwrap(),
-                MAX_NUMBERS_OF_AABBS.try_into().unwrap(),
-                MAX_NUMBERS_OF_AABB_WIRES.try_into().unwrap(),
+                MAX_NUMBER_OF_CHARS.try_into().unwrap(),
+                MAX_NUMBER_OF_ARROWS.try_into().unwrap(),
+                MAX_NUMBER_OF_AABBS.try_into().unwrap(),
+                MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
                 64,
         );
 
@@ -548,7 +533,6 @@ impl Application for Fmm {
             fmm_blocks.push(fmm_block);
             // println!("{:?}", fmm_block); 
         }
-
 
         buffers.insert(
             "fmm_blocks".to_string(),

@@ -15,13 +15,13 @@ $ cargo run --example fmm
 | update: u32        |
 | misc: u32          |
 
-$ tag { FAR, BAND, KNOWN }
+**tag { FAR, BAND, KNOWN }**
 
-$ value is the generalized distance from the initial interface.
+**value is the generalized distance from the initial interface.**
 
-$ update: the previous update number.
+**update: the previous update number.**
 
-$ misc: a bit mask that holds information for the cell block index, and for each direction (does the FmmCell has neighbor).
+**misc: a bit mask that holds information for the cell block index, and for each direction (does the FmmCell has neighbor).**
 
 |31|30|29|28|27|26|25|24|23|22|21|20|19|18|17|16|15|14|13|12|11|10| 9| 8| 7| 6| 5| 4| 3| 2| 1| 0|
 |--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|
@@ -50,12 +50,6 @@ Fmm algorithm
 
    * Method 1 : all speed values are 1.0 (euclidic distance field)
    * Method 2 : from isotropic speed information (time arrival from the initial interface)
-
-
-
-
-
-
 
 1. Create the initial fmm interface (initial known points)
    * this can be created from triangle meshes, distance/denstity function etc.
