@@ -11,6 +11,7 @@ use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
+use jaankaup_core::gpu_timer::GpuTimer;
 
 // TODO: add to fmm params.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -53,6 +54,7 @@ impl WGPUFeatures for EikonalFeatures {
 struct Eikonal {
     camera: Camera,
     gpu_debugger: GpuDebugger,
+    gpu_timer: Option<GpuTimer>,
 //++    pub screen: ScreenTexture, 
 //++    pub gpu_debugger: GpuDebugger,
 //++    pub render_object_vvvvnnnn: RenderObject, 
@@ -97,15 +99,16 @@ impl Application for Eikonal {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
-        let gpu_debugger = create_gpu_debugger(
-            &configuration.device,
-            &configuration.sc_desc,
-            &mut camera
-        );
+        // Gpu debugger.
+        let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
+
+        // Gpu timer.
+        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
 
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
+            gpu_timer: gpu_timer,
         }
     }
 
@@ -154,6 +157,7 @@ fn log_adapter_info(adapter: &wgpu::Adapter) {
         log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
 }
 
+/// Initialize and create GpuDebugger for this project. TODO: add MAX_... to function parameters.
 fn create_gpu_debugger(device: &wgpu::Device,
                        sc_desc: &wgpu::SurfaceConfiguration,
                        camera: &mut Camera) -> GpuDebugger {
