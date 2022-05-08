@@ -55,6 +55,7 @@ struct Eikonal {
     camera: Camera,
     gpu_debugger: GpuDebugger,
     gpu_timer: Option<GpuTimer>,
+    keyboard_manager: KeyboardManager,
 //++    pub screen: ScreenTexture, 
 //++    pub gpu_debugger: GpuDebugger,
 //++    pub render_object_vvvvnnnn: RenderObject, 
@@ -92,6 +93,7 @@ impl Application for Eikonal {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
+        // Log adapter info.
         log_adapter_info(&configuration.adapter);
 
         // Camera.
@@ -105,10 +107,14 @@ impl Application for Eikonal {
         // Gpu timer.
         let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
 
+        // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
+        let mut keyboard_manager = create_keyboard_manager();
+
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
             gpu_timer: gpu_timer,
+            keyboard_manager: keyboard_manager,
         }
     }
 
@@ -173,4 +179,21 @@ fn create_gpu_debugger(device: &wgpu::Device,
                 MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
                 64,
         )
+}
+
+/// Initialize and create KeyboardManager. Register all the keys that are used in the application.
+/// The registered keys: P, N, Key1, Key2, Key3, Key4, Key0
+fn create_keyboard_manager() -> KeyboardManager {
+
+        let mut keys = KeyboardManager::init();
+
+        keys.register_key(Key::P, 200.0);
+        keys.register_key(Key::Key1, 200.0);
+        keys.register_key(Key::Key2, 200.0);
+        keys.register_key(Key::Key3, 200.0);
+        keys.register_key(Key::Key4, 200.0);
+        keys.register_key(Key::Key0, 200.0);
+        keys.register_key(Key::N, 200.0);
+        
+        keys
 }

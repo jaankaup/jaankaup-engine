@@ -1366,4 +1366,3 @@ fn main() {
     jaankaup_core::template::run_loop::<Fmm, BasicLoop, FmmFeatures>(); 
     println!("Finished...");
 }
-
