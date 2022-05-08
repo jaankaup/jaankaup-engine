@@ -225,7 +225,6 @@ impl Application for Fmm {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
-        log::info!("Adapter limits are: ");
 
         let once = true;
 
@@ -1367,3 +1366,4 @@ fn main() {
     jaankaup_core::template::run_loop::<Fmm, BasicLoop, FmmFeatures>(); 
     println!("Finished...");
 }
+

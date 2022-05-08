@@ -6,8 +6,9 @@ use jaankaup_core::template::{
         BasicLoop,
         Spawner,
 };
-use jaankaup_core::wgpu;
+use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
+use jaankaup_core::camera::Camera;
 
 // TODO: add to fmm params.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -47,6 +48,7 @@ impl WGPUFeatures for EikonalFeatures {
 }
 
 struct Eikonal {
+    camera: Camera,
 //++    pub screen: ScreenTexture, 
 //++    pub gpu_debugger: GpuDebugger,
 //++    pub render_object_vvvvnnnn: RenderObject, 
@@ -84,10 +86,16 @@ impl Application for Eikonal {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
+        log_adapter_info(&configuration.adapter);
+
+        // Camera.
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
+        camera.set_rotation_sensitivity(0.4);
+        camera.set_movement_sensitivity(0.02);
+
         Self {
-
+            camera: camera,
         }
-
     }
 
     fn render(&mut self,
@@ -101,7 +109,7 @@ impl Application for Eikonal {
 
     #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input: &InputCache) {
-        // self.camera.update_from_input(&queue, &input);
+        self.camera.update_from_input(&queue, &input);
     }
 
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {
@@ -119,4 +127,17 @@ fn main() {
     
     jaankaup_core::template::run_loop::<Eikonal, BasicLoop, EikonalFeatures>(); 
     println!("Finished...");
+}
+
+fn log_adapter_info(adapter: &wgpu::Adapter) {
+
+        let adapter_limits = adapter.limits(); 
+
+        log::info!("Adapter limits.");
+        log::info!("max_compute_workgroup_storage_size: {:?}", adapter_limits.max_compute_workgroup_storage_size);
+        log::info!("max_compute_invocations_per_workgroup: {:?}", adapter_limits.max_compute_invocations_per_workgroup);
+        log::info!("max_compute_workgroup_size_x: {:?}", adapter_limits.max_compute_workgroup_size_x);
+        log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
+        log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
+        log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
 }
