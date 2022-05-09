@@ -14,6 +14,7 @@ use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::shaders::Render_VVVVNNNN_camera;
+use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 
 // TODO: add to fmm params.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -59,6 +60,10 @@ struct Eikonal {
     gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
+    light: LightBuffer,
+    render_params: RenderParamBuffer,
+    triangle_mesh_renderer: Render_VVVVNNNN_camera,
+    triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvvnnnn: RenderObject, 
 //++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvc: RenderObject,
@@ -111,7 +116,31 @@ impl Application for Eikonal {
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
         let mut keyboard_manager = create_keyboard_manager();
 
-        // let p = ShaderProgram {};
+        // Light source for triangle meshes.
+        let light = LightBuffer::create(
+                      &configuration.device,
+                      [10.0, 40.0, 10.0], // pos
+                      [25, 25, 130],  // spec
+                      [25,200,25], // light 
+                      55.0,
+                      0.15,
+                      0.000013
+        );
+
+        // Scale_factor for triangle meshes.
+        let render_params = RenderParamBuffer::create(
+                    &configuration.device,
+                    4.0
+        );
+
+        // RenderObject for basic triangle mesh rendering.
+        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+
+        // Create bindgroups for triangle_mesh_renderer.
+        let triangle_mesh_bindgroups = 
+                triangle_mesh_renderer.create_bingroups(
+                    &configuration.device, &mut camera, &light, &render_params
+                );
 
         Self {
             camera: camera,
@@ -119,6 +148,10 @@ impl Application for Eikonal {
             gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
+            light: light,
+            render_params: render_params,
+            triangle_mesh_renderer: triangle_mesh_renderer,
+            triangle_mesh_bindgroups: triangle_mesh_bindgroups,
         }
     }
 

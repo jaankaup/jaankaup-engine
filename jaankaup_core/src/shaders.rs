@@ -14,7 +14,7 @@ pub struct Render_VVVVNNNN_camera {
 
 impl Render_VVVVNNNN_camera {
 
-    fn init(device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration) -> Self {
+    pub fn init(device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration) -> Self {
         Self {
             render_object: RenderObject::init(
                                &device,
@@ -45,11 +45,11 @@ impl Render_VVVVNNNN_camera {
         }
     }
 
-    fn get_render_object(&self) -> &RenderObject {
+    pub fn get_render_object(&self) -> &RenderObject {
         &self.render_object
     }
 
-    fn create_bingroups(&self, device: &wgpu::Device, camera: &mut Camera, light: &LightBuffer, render_params: &RenderParamBuffer) -> Vec<wgpu::BindGroup> {
+    pub fn create_bingroups(&self, device: &wgpu::Device, camera: &mut Camera, light: &LightBuffer, render_params: &RenderParamBuffer) -> Vec<wgpu::BindGroup> {
         create_bind_groups(
                 &device,
                 &self.render_object.bind_group_layout_entries,
