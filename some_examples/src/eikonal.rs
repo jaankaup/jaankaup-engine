@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::convert::TryInto;
 use jaankaup_core::input::*;
 use jaankaup_core::template::{
@@ -9,30 +10,49 @@ use jaankaup_core::template::{
 };
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
+use jaankaup_core::buffer::{buffer_from_data};
+use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::shaders::Render_VVVVNNNN_camera;
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
+use jaankaup_core::texture::Texture;
+use jaankaup_core::aabb::Triangle_vvvvnnnn;
+use jaankaup_core::common_functions::encode_rgba_u32;
+use jaankaup_core::render_object::draw;
 
-// TODO: add to fmm params.
+/// Max number of arrows for gpu debugger.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
+
+/// Max number of aabbs for gpu debugger.
 const MAX_NUMBER_OF_AABBS:      usize = 262144;
+
+/// Max number of box frames for gpu debugger.
 const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+
+/// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
 const MAX_NUMBER_OF_CHARS:      usize = 262144;
+
+/// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
 const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
-// FMM global dimensions.
+/// Name for the fire tower mesh (assets/models/wood.obj).
+const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
+
+/// FMM global dimensions.
 const FMM_GLOBAL_X: usize = 16; 
 const FMM_GLOBAL_Y: usize = 16; 
 const FMM_GLOBAL_Z: usize = 16; 
 
-// FMM inner dimensions.
+/// FMM inner dimensions.
 const FMM_INNER_X: usize = 4; 
 const FMM_INNER_Y: usize = 4; 
 const FMM_INNER_Z: usize = 4; 
 
+
+/// Features and limits for Eikonal application.
 struct EikonalFeatures {}
 
 impl WGPUFeatures for EikonalFeatures {
@@ -54,6 +74,7 @@ impl WGPUFeatures for EikonalFeatures {
     }
 }
 
+/// Eikonal solver. A Fast marching method (GPU) for solving the eikonal equation.
 struct Eikonal {
     camera: Camera,
     gpu_debugger: GpuDebugger,
@@ -64,6 +85,8 @@ struct Eikonal {
     render_params: RenderParamBuffer,
     triangle_mesh_renderer: Render_VVVVNNNN_camera,
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+    buffers: HashMap<String, wgpu::Buffer>,
+    triangle_meshes: HashMap<String, TriangleMesh>,
 //++    pub render_object_vvvvnnnn: RenderObject, 
 //++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvc: RenderObject,
@@ -142,6 +165,27 @@ impl Application for Eikonal {
                     &configuration.device, &mut camera, &light, &render_params
                 );
 
+        // Buffer hash_map.
+        let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
+
+        // Container for triangle meshes.
+        let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
+
+        // Load fire tower mesh.
+        let fire_tower_mesh = load_vvvnnn_mesh(
+                         &configuration.device,
+                         FIRE_TOWER_MESH,
+                         "assets/models/wood.obj",
+                         2.0,
+                         [5.0, -2.0, 5.0],
+                         [11, 0, 155]
+        );
+
+        triangle_meshes.insert(
+            FIRE_TOWER_MESH.to_string(),
+            fire_tower_mesh);
+
+
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
@@ -152,6 +196,8 @@ impl Application for Eikonal {
             render_params: render_params,
             triangle_mesh_renderer: triangle_mesh_renderer,
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+            buffers: buffers,
+            triangle_meshes: triangle_meshes,
         }
     }
 
@@ -162,6 +208,34 @@ impl Application for Eikonal {
               sc_desc: &wgpu::SurfaceConfiguration,
               spawner: &Spawner) {
 
+        self.screen.acquire_screen_texture(
+            &device,
+            &sc_desc,
+            &surface
+        );
+
+        let mut encoder = device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+        });
+
+        let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
+
+        draw(&mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.triangle_mesh_bindgroups,
+             &self.triangle_mesh_renderer.get_render_object().pipeline,
+             &fire_tower.get_buffer(),
+             0..fire_tower.get_triangle_count() * 3, 
+             true
+        );
+
+        queue.submit(Some(encoder.finish())); 
+
+        self.screen.prepare_for_rendering();
     }
 
     #[allow(unused)]
@@ -170,8 +244,10 @@ impl Application for Eikonal {
     }
 
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {
-        // self.screen.depth_texture = Some(Texture::create_depth_texture(&device, &sc_desc, Some("depth-texture")));
-        // self.camera.resize(sc_desc.width as f32, sc_desc.height as f32);
+
+        // TODO: add this functionality to the Screen.
+        self.screen.depth_texture = Some(Texture::create_depth_texture(&device, &sc_desc, Some("depth-texture")));
+        self.camera.resize(sc_desc.width as f32, sc_desc.height as f32);
     }
 
     #[allow(unused)]
@@ -219,7 +295,7 @@ fn create_gpu_debugger(device: &wgpu::Device,
 }
 
 /// Initialize and create KeyboardManager. Register all the keys that are used in the application.
-/// The registered keys: P, N, Key1, Key2, Key3, Key4, Key0
+/// Registered keys: P, N, Key1, Key2, Key3, Key4, Key0
 fn create_keyboard_manager() -> KeyboardManager {
 
         let mut keys = KeyboardManager::init();
@@ -233,4 +309,39 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::N, 200.0);
         
         keys
+}
+
+/// Load a wavefront mesh and store it to hash_map. Drop texture coordinates.
+fn load_vvvnnn_mesh(device: &wgpu::Device,
+                    file_name: &'static str,
+                    buffer_name: &'static str,
+                    scale_factor: f32,
+                    transition: [f32;3],
+                    color: [u32;3]) -> TriangleMesh {
+
+        // Load model. Tower.
+        let (_, mut triangle_mesh_wood, _) = load_triangles_from_obj(
+            "assets/models/wood.obj",
+            scale_factor,
+            transition,
+            None)
+            .unwrap();
+
+        let triangle_mesh_draw_count = triangle_mesh_wood.len() as u32; 
+
+        let col = unsafe {
+            std::mem::transmute::<u32, f32>(encode_rgba_u32(color[0], color[1], color[2], 255))
+        };
+
+        // Apply color information to the fourth component (triangle position).
+        for tr in triangle_mesh_wood.iter_mut() {
+            tr.a.w = col;
+            tr.b.w = col;
+            tr.c.w = col;
+        }
+
+        TriangleMesh::create_from_data(&device,
+                                       &triangle_mesh_wood,
+                                       buffer_name,
+                                       triangle_mesh_draw_count)
 }

@@ -3,17 +3,58 @@ use std::fs::File;
 use wavefront_obj::obj::*;
 use cgmath::{Vector3, Vector4};
 use crate::aabb::{BBox, Triangle, Triangle_vvvvnnnn};
+use crate::buffer::buffer_from_data;
+
+pub struct TriangleMesh {
+    name: String,
+    buffer: wgpu::Buffer,
+    triangle_count: u32,
+}
+
+impl TriangleMesh {
+
+    pub fn create_from_data(device: &wgpu::Device,
+                         data: &Vec<Triangle_vvvvnnnn>,
+                         name: &'static str,
+                         triangle_count: u32) -> Self {
+        
+        let buf = buffer_from_data::<Triangle_vvvvnnnn>(
+                  &device,
+                  data,
+                  wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                  Some(&format!("Triangle mesh {:?}", &name[..]).to_string())
+        );
+
+        Self {
+            name: name.to_string(),
+            buffer: buf,
+            triangle_count: triangle_count,
+        }
+    }
+
+    pub fn get_buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
+
+    pub fn get_triangle_count(&self) -> u32 {
+        self.triangle_count
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+}
 
 pub fn load_triangles_from_obj(file_name: &'static str,
                                scale_factor: f32,
-                               translation: [f32;3],
+                               transition: [f32;3],
                                take: Option<u32>) -> Option<(Vec<Triangle>, Vec<Triangle_vvvvnnnn>, BBox)> {
 
     let file_content = {
-      let mut file = File::open(file_name).map_err(|e| format!("cannot open file: {}", e)).unwrap();
-      let mut content = String::new();
-      file.read_to_string(&mut content).unwrap();
-      content
+            let mut file = File::open(file_name).map_err(|e| format!("cannot open file: {}", e)).unwrap();
+            let mut content = String::new();
+            file.read_to_string(&mut content).unwrap();
+            content
     };
 
     let obj_set = parse(file_content).map_err(|e| format!("cannot parse: {:?}", e)).unwrap();
@@ -43,9 +84,9 @@ pub fn load_triangles_from_obj(file_name: &'static str,
                     vec_b.w = 1.0;
                     vec_c.w = 1.0;
 
-                    vec_a = vec_a + Vector4::<f32>::new(translation[0], translation[1],translation[2], 0.0);
-                    vec_b = vec_b + Vector4::<f32>::new(translation[0], translation[1],translation[2], 0.0);
-                    vec_c = vec_c + Vector4::<f32>::new(translation[0], translation[1],translation[2], 0.0);
+                    vec_a = vec_a + Vector4::<f32>::new(transition[0], transition[1],transition[2], 0.0);
+                    vec_b = vec_b + Vector4::<f32>::new(transition[0], transition[1],transition[2], 0.0);
+                    vec_c = vec_c + Vector4::<f32>::new(transition[0], transition[1],transition[2], 0.0);
 
                     let vec_na = Vector4::<f32>::new(normal_a.x as f32, normal_a.y as f32, normal_a.z as f32, 0.0); 
                     let vec_nb = Vector4::<f32>::new(normal_b.x as f32, normal_b.y as f32, normal_b.z as f32, 0.0); 
@@ -103,4 +144,3 @@ pub fn load_triangles_from_obj(file_name: &'static str,
     }
     // Some((result, result_vvvvnnnn, aabb))
 }
-

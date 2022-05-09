@@ -393,7 +393,8 @@ impl Application for Fmm {
             2.0,
             [5.0, -2.0, 5.0],
             None)
-            .unwrap(); // -> Option<(Vec<Triangle>, Vec<Triangle_vvvvnnnn>, BBox)> {
+            .unwrap();
+
         let triangle_mesh_draw_count = triangle_mesh_wood.len() as u32; 
         println!("triangle_mesh_draw_count == {}", triangle_mesh_draw_count);
 
