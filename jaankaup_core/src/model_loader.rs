@@ -45,19 +45,12 @@ impl TriangleMesh {
     }
 }
 
-pub fn load_triangles_from_obj(file_name: &'static str,
-                               scale_factor: f32,
-                               transition: [f32;3],
-                               take: Option<u32>) -> Option<(Vec<Triangle>, Vec<Triangle_vvvvnnnn>, BBox)> {
+pub fn create_from_bytes(data: String,
+                         scale_factor: f32,
+                         transition: [f32;3],
+                         take: Option<u32>) -> Option<(Vec<Triangle>, Vec<Triangle_vvvvnnnn>, BBox)> {
 
-    let file_content = {
-            let mut file = File::open(file_name).map_err(|e| format!("cannot open file: {}", e)).unwrap();
-            let mut content = String::new();
-            file.read_to_string(&mut content).unwrap();
-            content
-    };
-
-    let obj_set = parse(file_content).map_err(|e| format!("cannot parse: {:?}", e)).unwrap();
+    let obj_set = parse(data).map_err(|e| format!("cannot parse: {:?}", e)).unwrap();
     let objects = obj_set.objects;
 
     let mut aabb = BBox { min: Vector3::<f32>::new(0.0, 0.0, 0.0), max: Vector3::<f32>::new(0.0, 0.0, 0.0), };
@@ -143,4 +136,24 @@ pub fn load_triangles_from_obj(file_name: &'static str,
         None => Some((result, result_vvvvnnnn, aabb)) 
     }
     // Some((result, result_vvvvnnnn, aabb))
+
+}
+
+pub fn load_triangles_from_obj(file_name: &'static str,
+                               scale_factor: f32,
+                               transition: [f32;3],
+                               take: Option<u32>) -> Option<(Vec<Triangle>, Vec<Triangle_vvvvnnnn>, BBox)> {
+
+    let file_content = {
+            let mut file = File::open(file_name).map_err(|e| format!("cannot open file: {}", e)).unwrap();
+            let mut content = String::new();
+            file.read_to_string(&mut content).unwrap();
+            content
+    };
+
+    create_from_bytes(file_content,
+                      scale_factor,
+                      transition,
+                      take
+    ) 
 }

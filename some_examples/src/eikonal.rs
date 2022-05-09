@@ -11,7 +11,7 @@ use jaankaup_core::template::{
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
 use jaankaup_core::buffer::{buffer_from_data};
-use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh};
+use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
@@ -142,9 +142,10 @@ impl Application for Eikonal {
         // Light source for triangle meshes.
         let light = LightBuffer::create(
                       &configuration.device,
-                      [10.0, 40.0, 10.0], // pos
+                      [10.0, 20.0, 10.0], // pos
+                      // [25, 25, 130],  // spec
                       [25, 25, 130],  // spec
-                      [25,200,25], // light 
+                      [255,200,255], // light 
                       55.0,
                       0.15,
                       0.000013
@@ -174,8 +175,8 @@ impl Application for Eikonal {
         // Load fire tower mesh.
         let fire_tower_mesh = load_vvvnnn_mesh(
                          &configuration.device,
+                         include_str!("../../assets/models/wood.obj")[..].to_string(),
                          FIRE_TOWER_MESH,
-                         "assets/models/wood.obj",
                          2.0,
                          [5.0, -2.0, 5.0],
                          [11, 0, 155]
@@ -313,15 +314,15 @@ fn create_keyboard_manager() -> KeyboardManager {
 
 /// Load a wavefront mesh and store it to hash_map. Drop texture coordinates.
 fn load_vvvnnn_mesh(device: &wgpu::Device,
-                    file_name: &'static str,
+                    data: String,
                     buffer_name: &'static str,
                     scale_factor: f32,
                     transition: [f32;3],
                     color: [u32;3]) -> TriangleMesh {
 
         // Load model. Tower.
-        let (_, mut triangle_mesh_wood, _) = load_triangles_from_obj(
-            "assets/models/wood.obj",
+        let (_, mut triangle_mesh_wood, _) = create_from_bytes(
+            data,
             scale_factor,
             transition,
             None)
