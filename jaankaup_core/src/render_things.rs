@@ -7,6 +7,41 @@ use crate::buffer::buffer_from_data;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct RenderParams {
+    scale_factor: f32,
+}
+
+pub struct RenderParamBuffer {
+    params: RenderParams,
+    buffer: wgpu::Buffer,
+}
+
+impl RenderParamBuffer {
+    pub fn create(device: &wgpu::Device, scale_factor: f32 ) -> Self {
+
+        let params = RenderParams { scale_factor: scale_factor, };
+
+        let buf = buffer_from_data::<RenderParams>(
+                  &device,
+                  &vec![params],
+                  wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                  Some("render params buffer.")
+        );
+
+        Self {
+            params: params,
+            buffer: buf,
+        }
+    }
+
+    pub fn get_buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
+}
+
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Light {
     light_pos: [f32; 3],
     material_shininess: f32,
@@ -61,6 +96,7 @@ impl LightBuffer {
 
 impl_convert!{Light}
 
+// TODO: Replace with RenderParams
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct ScaleFactor {

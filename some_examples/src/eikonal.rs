@@ -12,6 +12,8 @@ use jaankaup_core::winit;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
+use jaankaup_core::screen::ScreenTexture;
+use jaankaup_core::shaders::Render_VVVVNNNN_camera;
 
 // TODO: add to fmm params.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -56,8 +58,7 @@ struct Eikonal {
     gpu_debugger: GpuDebugger,
     gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
-//++    pub screen: ScreenTexture, 
-//++    pub gpu_debugger: GpuDebugger,
+    screen: ScreenTexture, 
 //++    pub render_object_vvvvnnnn: RenderObject, 
 //++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvc: RenderObject,
@@ -110,11 +111,14 @@ impl Application for Eikonal {
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
         let mut keyboard_manager = create_keyboard_manager();
 
+        // let p = ShaderProgram {};
+
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
             gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
+            screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
         }
     }
 

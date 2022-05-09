@@ -12,7 +12,7 @@ struct Light {
     attentuation_factor: f32,
 };
 
-struct OtherParams {
+struct RenderParams {
     scale_factor: f32,
 };
 
@@ -33,7 +33,7 @@ var<uniform> camerauniform: Camera;
 var<uniform> light: Light;
 
 @group(0) @binding(2)
-var<uniform> other_params: OtherParams;
+var<uniform> other_params: RenderParams;
 
 fn decode_color(c: u32) -> vec4<f32> {
   let a: f32 = f32(c & 256u) / 255.0;
