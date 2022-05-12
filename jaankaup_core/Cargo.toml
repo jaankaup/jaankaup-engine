@@ -11,13 +11,8 @@ input_debug = []
 texture_debug = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c226a10329f8c3283b995cccda21f4881b1ce6b1" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="fab11dcc76e160271f69c800896ff260f15af220" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="b52d68d5adc3392d3157edcb33f1d5e8470a449a" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c5d5dbc7eb8ee3d3a629ca628fb97cc9b473f653" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c314c55788eaa1f1d311f4c3fa2ac56604006a00", features = ["webgl"] }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c314c55788eaa1f1d311f4c3fa2ac56604006a00", features = ["vulkan-portability"] }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="0ac9ce002656565ccd05b889f5856f4e2c38fa73" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="8e62ca05381fed4f89fabf3eea8340f2f347c31f" }
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c226a10329f8c3283b995cccda21f4881b1ce6b1" }
 winit = { version = "0.26"}
 async-executor = "1.0"
 cgmath = "0.18"
