@@ -94,7 +94,7 @@ struct ArrowAabbParams{
 struct CharParams{
     vertices_so_far: u32,
     iterator_end: u32,
-    draw_index: u32, 
+    draw_index: u32,
     max_points_per_char: u32,
     max_number_of_vertices: u32,
     padding: [u32 ; 3],
@@ -106,15 +106,15 @@ impl_convert!{Char}
 impl_convert!{CharParams}
 
 pub struct GpuDebugger {
-    render_object_vvvvnnnn: RenderObject, 
+    render_object_vvvvnnnn: RenderObject,
     render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
     render_object_vvvc: RenderObject,
     render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
-    compute_object_char: ComputeObject, 
+    compute_object_char: ComputeObject,
     compute_bind_groups_char: Vec<wgpu::BindGroup>,
-    compute_object_arrow: ComputeObject, 
+    compute_object_arrow: ComputeObject,
     compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
-    compute_object_char_preprocessor: ComputeObject, 
+    compute_object_char_preprocessor: ComputeObject,
     compute_bind_groups_char_preprocessor: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     arrow_aabb_params: ArrowAabbParams,
@@ -165,8 +165,8 @@ impl GpuDebugger {
         let light = LightBuffer::create(
                       &device,
                       [100.0, 100.0, 100.0],
-                      [25, 125, 25], 
-                      [255,255,255], 
+                      [25, 125, 25],
+                      [255,255,255],
                       55.0,
                       0.15,
                       0.00013
@@ -270,7 +270,7 @@ impl GpuDebugger {
             "output_render".to_string(),
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("gpu_debug draw buffer"),
-                size: (max_number_of_vertices * size_of::<Vertex>() as u32) as u64, 
+                size: (max_number_of_vertices * size_of::<Vertex>() as u32) as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             })
@@ -310,7 +310,7 @@ impl GpuDebugger {
                         label: Some("renderer_v4n4_debug_visualizator.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
-                    
+
                     }),
                     &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
                     &vec![
@@ -346,7 +346,7 @@ impl GpuDebugger {
                         label: Some("renderer_v3c1.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
-                    
+
                     }),
                     &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
                     &vec![
@@ -380,20 +380,20 @@ impl GpuDebugger {
                         label: Some("numbers.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/numbers.wgsl"))),
-                    
+
                     }),
                     Some("Numbers Compute object"),
                     &vec![
                         vec![
                             // @group(0) @binding(0) var<storage, read_write> indirect: array<DrawIndirect>;
                             create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
-                            
+
                             // @group(0) @binding(1) var<storage, read_write> dispatch_counter: array<atomic<u32>>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(2) var<storage,read_write> input: array<Char>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
-                            
+
                             // @group(0) @binding(3) var<storage,read_write> output: array<VVVC>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                         ],
@@ -426,7 +426,7 @@ impl GpuDebugger {
                         label: Some("char_preprocessor.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/char_preprocessor.wgsl"))),
-                    
+
                     }),
                     Some("Char preprocessor Compute object"),
                     &vec![
@@ -477,7 +477,7 @@ impl GpuDebugger {
                         label: Some("arrow_aabb.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/arrow_aabb.wgsl"))),
-                    
+
                     }),
                     Some("Arrow_aabb Compute object"),
                     &vec![
@@ -517,15 +517,15 @@ impl GpuDebugger {
         );
 
         Self {
-            render_object_vvvvnnnn: render_object_vvvvnnnn, 
+            render_object_vvvvnnnn: render_object_vvvvnnnn,
             render_bind_groups_vvvvnnnn: render_bind_groups_vvvvnnnn,
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             compute_object_char: compute_object_char,
             compute_bind_groups_char: compute_bind_groups_char,
-            compute_object_arrow: compute_object_arrow, 
+            compute_object_arrow: compute_object_arrow,
             compute_bind_groups_arrow: compute_bind_groups_arrow,
-            compute_object_char_preprocessor: compute_object_char_preprocessor, 
+            compute_object_char_preprocessor: compute_object_char_preprocessor,
             compute_bind_groups_char_preprocessor: compute_bind_groups_char_preprocessor,
             buffers: buffers,
             arrow_aabb_params: arrow_aabb_params,
@@ -547,7 +547,7 @@ impl GpuDebugger {
     }
 
     pub fn get_element_counter_buffer(&self) -> &wgpu::Buffer {
-        &self.histogram_element_counter.get_histogram_buffer() 
+        &self.histogram_element_counter.get_histogram_buffer()
     }
 
     // draw indirect! Reduce finish() calls.
@@ -565,7 +565,7 @@ impl GpuDebugger {
         let total_number_of_arrows = elem_counter[1];
         let total_number_of_aabbs = elem_counter[2];
         let total_number_of_aabb_wires = elem_counter[3];
-        
+
         let vertices_per_element_arrow = 72;
         let vertices_per_element_aabb = 36;
         let vertices_per_element_aabb_wire = 432;
@@ -578,7 +578,7 @@ impl GpuDebugger {
         // [(element_type, total number of elements, number of vercies per dispatch, vertices_per_element)]
         let draw_params = [(0, total_number_of_arrows,     vertices_per_dispatch_arrow, vertices_per_element_arrow),
                            (1, total_number_of_aabbs,      vertices_per_dispatch_aabb, vertices_per_element_aabb), // !!!
-                           (2, total_number_of_aabb_wires, vertices_per_dispatch_aabb_wire, vertices_per_element_aabb_wire)]; 
+                           (2, total_number_of_aabb_wires, vertices_per_dispatch_aabb_wire, vertices_per_element_aabb_wire)];
 
         // For each element type, create triangle meshes and render with respect of draw buffer size.
         for (e_type, e_size, v_per_dispatch, vertices_per_elem) in draw_params.iter() {
@@ -614,10 +614,10 @@ impl GpuDebugger {
                 // rendering.
                 let total_number_of_dispatches = udiv_up_safe32(items_to_process, self.thread_count);
 
-                // Calculate the number of dispatches for this run. 
+                // Calculate the number of dispatches for this run.
                 let local_dispatch = std::cmp::min(total_number_of_dispatches, safe_number_of_dispatches);
 
-                // Then number of elements that are going to be rendered. 
+                // Then number of elements that are going to be rendered.
                 let number_of_elements = std::cmp::min(local_dispatch * self.thread_count, items_to_process);
 
                 let mut encoder_arrow_aabb = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow_aabb ... ") });
@@ -654,11 +654,11 @@ impl GpuDebugger {
                      0..draw_count,
                      *clear
                 );
-               
+
                 if *clear { *clear = false; }
 
                 // Decrease the total count of elements.
-                items_to_process = items_to_process - number_of_elements; 
+                items_to_process = items_to_process - number_of_elements;
 
                 queue.submit(Some(encoder_arrow_rendering.finish()));
 
@@ -672,9 +672,9 @@ impl GpuDebugger {
 
 
         // TODO:
-          
+
         let number_of_chars = elem_counter[0];
-        // println!("NUMBER_OF_CHARS == {}", number_of_chars); 
+        // println!("NUMBER_OF_CHARS == {}", number_of_chars);
 
         self.arrow_aabb_params.iterator_start_index = 0;
         self.arrow_aabb_params.iterator_end_index = number_of_chars;
@@ -697,7 +697,7 @@ impl GpuDebugger {
             // println!("number of chars == {}", number_of_chars);
 
             let cp = CharParams{ vertices_so_far: 0,
-                                 iterator_end: number_of_chars, 
+                                 iterator_end: number_of_chars,
                                  draw_index: 0,
                                  max_points_per_char: 4000,
                                  max_number_of_vertices: self.max_number_of_vertices - 500000, // TODO: ???
@@ -767,24 +767,27 @@ impl GpuDebugger {
             //++ // if (sum != 6400) { panic!("apuva"); }
 
             //++ // Get the number of indirect dispatches.
-            let charparams_result = to_vec::<CharParams>(
-                &device,
-                &queue,
-                self.buffers.get(&"char_params".to_string()).unwrap(),
-                0,
-                (size_of::<CharParams>()) as wgpu::BufferAddress,
-                spawner,
-            );
+
+            //++++ let charparams_result = to_vec::<CharParams>(
+            //++++     &device,
+            //++++     &queue,
+            //++++     self.buffers.get(&"char_params".to_string()).unwrap(),
+            //++++     0,
+            //++++     (size_of::<CharParams>()) as wgpu::BufferAddress,
+            //++++     spawner,
+            //++++ );
 
             // println!("{:?}", charparams_result[0]);
 
             //if 0 > 0 {
-            if charparams_result[0].vertices_so_far > 0 {
+            // if charparams_result[0].vertices_so_far > 0 {
+            if true {
 
                 // Create point data from number elements and draw.
                 let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
 
-                for i in 0..(charparams_result[0].draw_index + 1) {
+                //++ for i in 0..(charparams_result[0].draw_index + 1) {
+                for i in 0..64 {
 
                     // let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
                     self.compute_object_char.dispatch_indirect(
@@ -813,3 +816,4 @@ impl GpuDebugger {
         } // if
     }
 }
+

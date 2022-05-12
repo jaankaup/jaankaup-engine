@@ -388,9 +388,9 @@ impl Application for Fmm {
         ////////////////////////////////////////////////////
 
         // Load model. Tower.
-        let (_, mut triangle_mesh_wood, _) = load_triangles_from_obj(
-            "assets/models/wood.obj",
-            2.0,
+        let (_, mut triangle_mesh_wood, _) = create_from_bytes(
+            include_str!("../../assets/models/wood.obj")[..].to_string(),
+            4.0,
             [5.0, -2.0, 5.0],
             None)
             .unwrap();
@@ -1240,7 +1240,7 @@ impl Application for Fmm {
         // How many dispatches.
         let number_of_dispathces = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32 / (PREFIX_THREAD_COUNT * 2); 
 
-        let wgpu_timer_unwrapped = self.gpu_timer.as_mut().unwrap();
+        //++++ let wgpu_timer_unwrapped = self.gpu_timer.as_mut().unwrap();
 
         // fmm visualizer. 
         let mut ce_fmm_visualizer = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm visualizer command encoder") });
@@ -1258,7 +1258,7 @@ impl Application for Fmm {
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
-        wgpu_timer_unwrapped.start(&mut encoder_command);
+        //++++ wgpu_timer_unwrapped.start(&mut encoder_command);
 
         // Compute interface.
         self.compute_object_fmm_prefix_scan.dispatch(
@@ -1268,13 +1268,13 @@ impl Application for Fmm {
             Some("fmm prefix scan dispatch")
         );
 
-        wgpu_timer_unwrapped.end(&mut encoder_command);
+        //++++ wgpu_timer_unwrapped.end(&mut encoder_command);
         // wgpu_timer_unwrapped.start(&mut encoder_command);
         // wgpu_timer_unwrapped.end(&mut encoder_command);
         // wgpu_timer_unwrapped.start(&mut encoder_command);
         // wgpu_timer_unwrapped.end(&mut encoder_command);
 
-        wgpu_timer_unwrapped.resolve_timestamps(&mut encoder_command);
+        //++++ wgpu_timer_unwrapped.resolve_timestamps(&mut encoder_command);
 
         queue.submit(Some(encoder_command.finish()));
 
@@ -1290,7 +1290,7 @@ impl Application for Fmm {
         // Prefix sum.
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm prefix scan command encoder") });
 
-        wgpu_timer_unwrapped.start(&mut encoder_command);
+        //++++ wgpu_timer_unwrapped.start(&mut encoder_command);
 
         // Compute interface.
         self.compute_object_fmm_prefix_scan.dispatch(
@@ -1300,16 +1300,16 @@ impl Application for Fmm {
             Some("fmm prefix scan dispatch 2")
         );
 
-        wgpu_timer_unwrapped.end(&mut encoder_command);
-        wgpu_timer_unwrapped.resolve_timestamps(&mut encoder_command);
+        //++++ wgpu_timer_unwrapped.end(&mut encoder_command);
+        //++++ wgpu_timer_unwrapped.resolve_timestamps(&mut encoder_command);
 
         queue.submit(Some(encoder_command.finish()));
 
-        wgpu_timer_unwrapped.create_timestamp_data(&device, &queue, spawner);
+        //++++ wgpu_timer_unwrapped.create_timestamp_data(&device, &queue, spawner);
 
         // wgpu_timer_unwrapped.print_data();
 
-        wgpu_timer_unwrapped.reset();
+        //++++ wgpu_timer_unwrapped.reset();
         // let gpu_timer_result = wgpu_timer_unwrapped.get_data(); 
 
         // println!("{:?}", gpu_timer_result);
@@ -1333,14 +1333,14 @@ impl Application for Fmm {
 
         //++ queue.submit(Some(encoder_command.finish()));
 
-        let result =  to_vec::<FmmBlock>(
-            &device,
-            &queue,
-            &self.buffers.get(&"filtered_blocks".to_string()).unwrap(),
-            0,
-            (size_of::<FmmBlock>() * 128) as wgpu::BufferAddress,
-            spawner
-        );
+        // let result =  to_vec::<FmmBlock>(
+        //     &device,
+        //     &queue,
+        //     &self.buffers.get(&"filtered_blocks".to_string()).unwrap(),
+        //     0,
+        //     (size_of::<FmmBlock>() * 128) as wgpu::BufferAddress,
+        //     spawner
+        // );
 
         // let result =  to_vec::<u32>(
         //     &device,
@@ -1350,13 +1350,13 @@ impl Application for Fmm {
         //     (size_of::<u32>() * 4608) as wgpu::BufferAddress
         // );
 
-        if self.once {
-            for i in 0..128 {
-                println!("{:?} == {:?}", i, result[i]);
-            }
-            self.addSeed(queue, [5,6,7]);
-            self.once = !self.once;
-        }
+        // if self.once {
+        //     for i in 0..128 {
+        //         println!("{:?} == {:?}", i, result[i]);
+        //     }
+        //     self.addSeed(queue, [5,6,7]);
+        //     self.once = !self.once;
+        // }
         //println!("{:?}", result);
     }
 }

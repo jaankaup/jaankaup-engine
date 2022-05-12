@@ -16,7 +16,7 @@ use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
-use jaankaup_core::shaders::Render_VVVVNNNN_camera;
+use jaankaup_core::shaders::{Render_VVVVNNNN_camera, NoiseMaker};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
@@ -87,6 +87,7 @@ struct Eikonal {
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     triangle_meshes: HashMap<String, TriangleMesh>,
+    noise_maker: NoiseMaker,
 //++    pub render_object_vvvvnnnn: RenderObject, 
 //++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvc: RenderObject,
@@ -186,6 +187,13 @@ impl Application for Eikonal {
             FIRE_TOWER_MESH.to_string(),
             fire_tower_mesh);
 
+        let noise_maker = NoiseMaker::init(
+                &configuration.device,
+                &"main".to_string(),
+                [16, 16, 16],
+                [4, 4, 4],
+                [0.0, 0.0, 0.0]
+        );
 
         Self {
             camera: camera,
@@ -199,6 +207,7 @@ impl Application for Eikonal {
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
             triangle_meshes: triangle_meshes,
+            noise_maker: noise_maker,
         }
     }
 

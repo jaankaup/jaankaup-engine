@@ -26,6 +26,7 @@ use jaankaup_core::common_functions::{
     create_buffer_bindgroup_layout,
 };
 use jaankaup_core::histogram::Histogram;
+use jaankaup_core::gpu_debugger::GpuDebugger;
 use bytemuck::{Pod, Zeroable};
 
 use winit::event as ev;
@@ -38,17 +39,6 @@ const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 vert
 const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
 const THREAD_COUNT: u32 = 256;
-
-//
-//  Arrow
-//
-//  +----------------+
-//  | start: [3;f32] |
-//  | end: [3;f32]   |
-//  | color: u32     |
-//  | size: f32      |
-//  +----------------+
-//
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]

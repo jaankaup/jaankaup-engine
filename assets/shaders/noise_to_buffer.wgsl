@@ -3,18 +3,18 @@ struct NoiseParams {
     time: f32,
     local_dim: vec3<u32>,
     value: f32,
+    position: vec3<f32>,
+    value2: f32,
 };
 
 struct Output {
     output_data: array<f32>,
 };
 
-@group(0)
-@binding(0)
+@group(0) @binding(0)
 var<uniform> noise_params: NoiseParams;
 
-@group(0)
-@binding(1)
+@group(0) @binding(1)
 var<storage, read_write> noise_output_data: Output;
 
 fn my_mod(x: vec4<f32>, y: vec4<f32>) -> vec4<f32> {
@@ -256,15 +256,14 @@ fn cnoise(P: vec4<f32>) -> f32 {
 //++     return v;
 //++ }
 
-fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u32> {
-	var index: u32 = global_index.x;
-	var wh: u32 = x_dim * y_dim;
-	let z: u32 = index / wh;
-	index = index - z * wh;
-	let y: u32 = index / x_dim;
-	index = index - y * x_dim;
-	let x: u32 = index;
-	return vec3<u32>(x, y, z);	
+fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
+  var x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh; // check
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  return vec3<u32>(x, y, z);
 }
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
@@ -303,6 +302,27 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
    );
 }
 
+fn get_cell_index(global_index: u32) -> vec3<u32> {
+
+    // let block_count = noise_params.global_dim.x * noise_params.global_dim.y * noise_params.global_dim.z;
+
+    let stride = noise_params.local_dim.x * noise_params.local_dim.y * noise_params.local_dim.z;
+
+    let block_index = global_index / stride;
+
+    let block_position = index_to_uvec3(block_index, noise_params.global_dim.x, noise_params.global_dim.y) * noise_params.local_dim;
+
+    // Calculate local position.
+    let local_index = global_index - block_index * stride;
+
+    let local_position = decode3Dmorton32(local_index);
+
+    // let cell_position = noise_params.local_dim * block_position + local_position;
+    let cell_position = block_position + local_position;
+
+    return cell_position; 
+}
+
 @compute
 @workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -317,12 +337,17 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let noise_velocity = 2.4 + noise_params.time;
     let wave_height_factor = noise_params.value;
 
-    let actual_global_id = local_id.x + offset * 4u * work_group_id.x; 
+    let actual_global_id = local_id.x + offset * 4u * work_group_id.x;
 
-    let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id))       , 1.0);
-    let c1 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset)) , 1.0);
-    let c2 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 2u)) , 1.0);
-    let c3 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 3u)) , 1.0);
+    // let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id))       , 1.0);
+    // let c1 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset)) , 1.0);
+    // let c2 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 2u)) , 1.0);
+    // let c3 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 3u)) , 1.0);
+
+    let c0 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id))       , 1.0);
+    let c1 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset)) , 1.0);
+    let c2 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 2u)) , 1.0);
+    let c3 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 3u)) , 1.0);
 
     let ball0 = pow(c0.x - scene_center.x, 2.0) + pow(c0.y - scene_center.y, 2.0) + pow(c0.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
     let ball1 = pow(c1.x - scene_center.x, 2.0) + pow(c1.y - scene_center.y, 2.0) + pow(c1.z - scene_center.z, 2.0) - pow(50.0, 2.0); 
@@ -333,5 +358,19 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     noise_output_data.output_data[actual_global_id + offset]      = ball1 + cnoise(c1 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
     noise_output_data.output_data[actual_global_id + offset * 2u] = ball2 + cnoise(c2 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
     noise_output_data.output_data[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
-}
 
+    //++ let c0 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id))       , 1.0);
+    //++ let c1 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset)) , 1.0);
+    //++ let c2 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 2u)) , 1.0);
+    //++ let c3 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 3u)) , 1.0);
+
+    //++ noise_output_data.output_data[actual_global_id]               = f32(actual_global_id);
+    //++ noise_output_data.output_data[actual_global_id + offset]      = f32(actual_global_id + offset);
+    //++ noise_output_data.output_data[actual_global_id + offset * 2u] = f32(actual_global_id + offset * 2u);
+    //++ noise_output_data.output_data[actual_global_id + offset * 3u] = f32(actual_global_id + offset * 3u);
+
+    //++ noise_output_data.output_data[actual_global_id]               = f32(c0.x);
+    //++ noise_output_data.output_data[actual_global_id + offset]      = f32(c1.x);
+    //++ noise_output_data.output_data[actual_global_id + offset * 2u] = f32(c2.x);
+    //++ noise_output_data.output_data[actual_global_id + offset * 3u] = f32(c3.x);
+}

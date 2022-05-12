@@ -9,9 +9,10 @@ use jaankaup_core::template::{
         Spawner,
 };
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups, draw, draw_indirect, DrawIndirect};
+use jaankaup_core::shaders::{NoiseMaker,NoiseParams};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
-use jaankaup_core::buffer::{buffer_from_data}; //, to_vec};
+use jaankaup_core::buffer::{buffer_from_data, to_vec};
 use jaankaup_core::wgpu;
 use jaankaup_core::winit;
 use jaankaup_core::log;
@@ -31,12 +32,12 @@ use bytemuck::{Pod, Zeroable};
 use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
 
-const GLOBAL_NOISE_X_DIMENSION: u32 = 1; 
-const GLOBAL_NOISE_Y_DIMENSION: u32 = 1; 
-const GLOBAL_NOISE_Z_DIMENSION: u32 = 1; 
-const LOCAL_NOISE_X_DIMENSION:  u32 = 128; 
-const LOCAL_NOISE_Y_DIMENSION:  u32 = 128; 
-const LOCAL_NOISE_Z_DIMENSION:  u32 = 128; 
+const GLOBAL_NOISE_X_DIMENSION: u32 = 32; 
+const GLOBAL_NOISE_Y_DIMENSION: u32 = 32; 
+const GLOBAL_NOISE_Z_DIMENSION: u32 = 32; 
+const LOCAL_NOISE_X_DIMENSION:  u32 = 4; 
+const LOCAL_NOISE_Y_DIMENSION:  u32 = 4; 
+const LOCAL_NOISE_Z_DIMENSION:  u32 = 4; 
 
 const NOISE_BUFFER_SIZE: u32 = GLOBAL_NOISE_X_DIMENSION *
                                GLOBAL_NOISE_Y_DIMENSION *
@@ -56,14 +57,16 @@ const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
 const THREAD_COUNT: u32 = 64;
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct NoiseParams {
-    global_dim: [u32; 3],
-    time: f32,
-    local_dim: [u32; 3],
-    value: f32,
-}
+// #[repr(C)]
+// #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+// struct NoiseParams {
+//     global_dim: [u32; 3],
+//     time: f32,
+//     local_dim: [u32; 3],
+//     value: f32,
+//     position: [f32; 3],
+//     value2: f32,
+// }
 
 struct McAppFeatures {}
 
@@ -87,8 +90,8 @@ struct McApp {
     pub screen: ScreenTexture, 
     pub render_object: RenderObject, 
     pub render_bind_groups: Vec<wgpu::BindGroup>,
-    pub noise_compute_object: ComputeObject, 
-    pub noise_compute_bind_groups: Vec<wgpu::BindGroup>,
+    // pub noise_compute_object: ComputeObject, 
+    // pub noise_compute_bind_groups: Vec<wgpu::BindGroup>,
     pub textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
@@ -98,6 +101,7 @@ struct McApp {
     pub keys: KeyboardManager,
     pub marching_cubes: MarchingCubes,
     pub update: bool,
+    noise_maker: NoiseMaker,
 }
 
 impl McApp {
@@ -255,31 +259,31 @@ impl Application for McApp {
 
         println!("Creating compute object.");
 
-        let noise_params = NoiseParams {
-            global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
-            time: 0.0,
-            local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
-            value: 0.0,
-        };
+        //++ let noise_params = NoiseParams {
+        //++     global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
+        //++     time: 0.0,
+        //++     local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
+        //++     value: 0.0,
+        //++ };
 
-        buffers.insert(
-            "noise_params".to_string(),
-            buffer_from_data::<NoiseParams>(
-            &configuration.device,
-            &vec![noise_params],
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            None)
-        );
+        //++ buffers.insert(
+        //++     "noise_params".to_string(),
+        //++     buffer_from_data::<NoiseParams>(
+        //++     &configuration.device,
+        //++     &vec![noise_params],
+        //++     wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //++     None)
+        //++ );
 
-        buffers.insert(
-            "noise_output".to_string(),
-            configuration.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Noise output buffer"),
-                size: NOISE_BUFFER_SIZE as u64, 
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })
-        );
+        //++ buffers.insert(
+        //++     "noise_output".to_string(),
+        //++     configuration.device.create_buffer(&wgpu::BufferDescriptor {
+        //++         label: Some("Noise output buffer"),
+        //++         size: NOISE_BUFFER_SIZE as u64, 
+        //++         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //++         mapped_at_creation: false,
+        //++     })
+        //++ );
 
         buffers.insert(
             "mc_output".to_string(),
@@ -306,9 +310,9 @@ impl Application for McApp {
                                          0
                 ],
                 noise_local_dimension: [LOCAL_NOISE_X_DIMENSION,
-                                         LOCAL_NOISE_Y_DIMENSION,
-                                         LOCAL_NOISE_Z_DIMENSION,
-                                         0
+                                        LOCAL_NOISE_Y_DIMENSION,
+                                        LOCAL_NOISE_Z_DIMENSION,
+                                        0
                 ],
         };
 
@@ -320,51 +324,61 @@ impl Application for McApp {
                         }
         );
 
+        let noise_maker = NoiseMaker::init(
+                &configuration.device,
+                &"main".to_string(),
+                [32, 32, 32],
+                [4, 4, 4],
+                [0.0, 0.0, 0.0]
+        );
+
         let mc_instance = MarchingCubes::init_with_noise_buffer(
             &configuration.device,
             &mc_params,
             &mc_shader,
-            &buffers.get(&"noise_output".to_string()).unwrap(),
+            //&buffers.get(&"noise_output".to_string()).unwrap(),
+            noise_maker.get_buffer(),
             &buffers.get(&"mc_output".to_string()).unwrap(),
         );
 
         println!("creating noise compute object");
 
+
         // let histogram = Histogram::init(&configuration.device, &vec![0; 1]);
 
-        let noise_compute_object =
-                ComputeObject::init(
-                    &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("noise compute object"),
-                        source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),
-                    
-                    }),
-                    Some("Noise compute object"),
-                    &vec![
-                        vec![
-                            // @group(0) @binding(0) var<uniform> noise_params: NoiseParams;
-                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+        //++ let noise_compute_object =
+        //++         ComputeObject::init(
+        //++             &configuration.device,
+        //++             &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        //++                 label: Some("noise compute object"),
+        //++                 source: wgpu::ShaderSource::Wgsl(
+        //++                     Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),
+        //++             
+        //++             }),
+        //++             Some("Noise compute object"),
+        //++             &vec![
+        //++                 vec![
+        //++                     // @group(0) @binding(0) var<uniform> noise_params: NoiseParams;
+        //++                     create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(1) var<storage, read_write> counter: Counter;
-                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
-                        ],
-                    ],
-                    &"main".to_string()
-        );
+        //++                     // @group(0) @binding(1) var<storage, read_write> counter: Counter;
+        //++                     create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+        //++                 ],
+        //++             ],
+        //++             &"main".to_string()
+        //++ );
 
-        let noise_compute_bind_groups = create_bind_groups(
-                                           &configuration.device,
-                                           &noise_compute_object.bind_group_layout_entries,
-                                           &noise_compute_object.bind_group_layouts,
-                                           &vec![
-                                               vec![
-                                                    &buffers.get(&"noise_params".to_string()).unwrap().as_entire_binding(),
-                                                    &buffers.get(&"noise_output".to_string()).unwrap().as_entire_binding()
-                                               ]
-                                           ]
-        );
+        //++ let noise_compute_bind_groups = create_bind_groups(
+        //++                                    &configuration.device,
+        //++                                    &noise_compute_object.bind_group_layout_entries,
+        //++                                    &noise_compute_object.bind_group_layouts,
+        //++                                    &vec![
+        //++                                        vec![
+        //++                                             &buffers.get(&"noise_params".to_string()).unwrap().as_entire_binding(),
+        //++                                             &buffers.get(&"noise_output".to_string()).unwrap().as_entire_binding()
+        //++                                        ]
+        //++                                    ]
+        //++ );
 
         println!("Done!.");
 
@@ -372,8 +386,8 @@ impl Application for McApp {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             render_object: render_object,
             render_bind_groups: render_bind_groups,
-            noise_compute_object: noise_compute_object,
-            noise_compute_bind_groups: noise_compute_bind_groups,
+            //++ noise_compute_object: noise_compute_object,
+            //++ noise_compute_bind_groups: noise_compute_bind_groups,
             textures: textures,
             buffers: buffers,
             camera: camera,
@@ -383,6 +397,7 @@ impl Application for McApp {
             keys: keys,
             marching_cubes: mc_instance,
             update: true,
+            noise_maker: noise_maker,
         }
     }
 
@@ -405,25 +420,6 @@ impl Application for McApp {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
 
-        // draw(&mut encoder,
-        //      &view,
-        //      self.screen.depth_texture.as_ref().unwrap(),
-        //      &self.render_bind_groups,
-        //      &self.render_object.pipeline,
-        //      &self.buffers.get("mc_output").unwrap(),
-        //      0..self.draw_count, 
-        //      clear
-        // );
-        //
-        // let result =  to_vec::<DrawIndirect>(
-        //     &device,
-        //     &queue,
-        //     self.marching_cubes.get_draw_indirect_buffer(),
-        //     0,
-        //     (size_of::<DrawIndirect>()) as wgpu::BufferAddress
-        // );
-
-        // println!("{:?}", result);
         draw_indirect(
              &mut encoder,
              &view,
@@ -436,7 +432,6 @@ impl Application for McApp {
              clear
         );
         queue.submit(Some(encoder.finish()));
-        // self.histogram.set_values_cpu_version(queue, &vec![0]);
 
         self.screen.prepare_for_rendering();
 
@@ -462,40 +457,82 @@ impl Application for McApp {
         let val = (((input.get_time() / 5000000) as f32) * 0.0015).sin() * 5.0;
         let val2 = (((input.get_time() / 5000000) as f32) * 0.0015).cos() * 0.35;
 
-        let noise_params = NoiseParams {
-            global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
-            time: (input.get_time() / 50000000) as f32,
-            local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
-            value: val2,
-        };
+        //++ let noise_params = NoiseParams {
+        //++     global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
+        let    time = (input.get_time() as f64 / 50000000.0) as f32;
+        //++     local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
+        let value = val2; //     value: val2,
+        //++ };
 
-        queue.write_buffer(
-            &self.buffers.get(&("noise_params".to_string())).unwrap(),
-            0,
-            bytemuck::cast_slice(&[noise_params])
-        );
+        //++ queue.write_buffer(
+        //++     &self.buffers.get(&("noise_params".to_string())).unwrap(),
+        //++     0,
+        //++     bytemuck::cast_slice(&[noise_params])
+        //++ );
+        //
+
+        self.noise_maker.update_time(&queue, time);
+        self.noise_maker.update_value(&queue, value);
     
-        self.marching_cubes.update_mc_params(queue, val);    
+        // self.marching_cubes.update_mc_params(queue, val);    
 
         let total_grid_count = GLOBAL_NOISE_X_DIMENSION *
-                               GLOBAL_NOISE_Y_DIMENSION * 
-                               GLOBAL_NOISE_Z_DIMENSION * 
-                               LOCAL_NOISE_X_DIMENSION *  
-                               LOCAL_NOISE_Y_DIMENSION * 
-                               LOCAL_NOISE_Z_DIMENSION; 
+                               GLOBAL_NOISE_Y_DIMENSION *
+                               GLOBAL_NOISE_Z_DIMENSION *
+                               LOCAL_NOISE_X_DIMENSION *
+                               LOCAL_NOISE_Y_DIMENSION *
+                               LOCAL_NOISE_Z_DIMENSION;
 
         let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
 
-        self.noise_compute_object.dispatch(
-            &self.noise_compute_bind_groups,
-            &mut encoder_command,
-            total_grid_count / 1024, 1, 1, Some("noise dispatch")
-        );
+        self.noise_maker.dispatch(&mut encoder_command);
+
+        //++ self.noise_compute_object.dispatch(
+        //++     &self.noise_compute_bind_groups,
+        //++     &mut encoder_command,
+        //++     total_grid_count / 1024, 1, 1, Some("noise dispatch")
+        //++ );
 
         self.marching_cubes.dispatch(&mut encoder_command, total_grid_count / 256, 1, 1);
 
         // Submit compute.
         queue.submit(Some(encoder_command.finish()));
+
+        //++ let noise_result = to_vec::<f32>(
+        //++     &device,
+        //++     &queue,
+        //++     self.noise_maker.get_buffer(),
+        //++     0,
+        //++     (size_of::<f32>()) as wgpu::BufferAddress * (total_grid_count as u64),
+        //++     spawner
+        //++ );
+
+        //++ for i in 0..noise_result.len() {
+        //++     if noise_result[i] < 0.0 {
+        //++         println!("{:?}", noise_result[i]);
+        //++     }
+        //++     // if pre_processor_result[i] as usize != i {
+        //++     //     println!("{:?}", noise_processor_result[i]);
+        //++     // }
+        //++ }
+        
+        // let noise_result = to_vec::<NoiseParams>(
+        //     &device,
+        //     &queue,
+        //     self.noise_maker.noise_params.get_buffer(),
+        //     0,
+        //     (size_of::<NoiseParams>()) as wgpu::BufferAddress,
+        //     spawner
+        // );
+        // 
+        // println!("{:?}", noise_result[0]);
+
+        //++ for i in 0..pre_processor_result.len() {
+        //++     if pre_processor_result[i] as usize != i {
+        //++         print!("wrong! ");
+        //++         println!("{:?}", pre_processor_result[i]);
+        //++     }
+        //++ }
 
         // self.draw_count = self.marching_cubes.get_counter_value(device, queue);
 

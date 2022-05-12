@@ -456,17 +456,35 @@ fn calculate_density(v: vec3<i32>) -> f32 {
     if (v.x < 0 ||
         v.y < 0 ||
         v.z < 0 ||
-        v.x >= i32(mc_uniform.noise_local_dimension.x) ||
-        v.y >= i32(mc_uniform.noise_local_dimension.y) ||
-        v.z >= i32(mc_uniform.noise_local_dimension.z)) { return 10000.0; }
+        v.x >= i32(mc_uniform.noise_local_dimension.x * mc_uniform.noise_global_dimension.x) ||
+        v.y >= i32(mc_uniform.noise_local_dimension.y * mc_uniform.noise_global_dimension.y) ||
+        v.z >= i32(mc_uniform.noise_local_dimension.z * mc_uniform.noise_global_dimension.z)) { return 10000.0; }
 
     // if (encode3Dmorton32(u32(v.x), u32(v.y), u32(v.z)) > 64u*64u*64u) { return 0.0; }
 
-    return noise_values[
-	encode3Dmorton32(
-            u32(v.x), u32(v.y), u32(v.z)
-        )
-    ];
+    // return noise_values[
+    //     encode3Dmorton32(
+    //         u32(v.x), u32(v.y), u32(v.z)
+    //     )
+    // ];
+
+    let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
+
+    let xOffset = 1u;
+    let yOffset = mc_uniform.noise_global_dimension.x;
+    let zOffset = yOffset * mc_uniform.noise_global_dimension.y;
+
+    let global_coordinate = vec3<u32>(v) / mc_uniform.noise_local_dimension;
+
+    let global_index = (global_coordinate.x * xOffset +
+                        global_coordinate.y * yOffset +
+                        global_coordinate.z * zOffset) * stride;
+
+    let local_coordinate = vec3<u32>(v) - global_coordinate * mc_uniform.noise_local_dimension;
+
+    let local_index = encode3Dmorton32(local_coordinate.x, local_coordinate.y, local_coordinate.z);
+
+    return noise_values[global_index + local_index]; 
 }
 
 fn calculate_case() -> u32 {
@@ -581,15 +599,55 @@ fn createVertex(edgeValue: i32, arrayIndex: i32) {
     output_data[arrayIndex] = v;
 }
 
-fn index1D_to_index3D(global_index: vec3<u32>, x_dim: u32, y_dim: u32) -> vec3<u32> {
-	var index: u32 = global_index.x;
-	var wh: u32 = x_dim * y_dim;
-	let z: u32 = index / wh;
-	index = index - z * wh;
-	let y: u32 = index / x_dim;
-	index = index - y * x_dim;
-	let x: u32 = index;
-	return vec3<u32>(x, y, z);	
+fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
+  var x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh; // check
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  return vec3<u32>(x, y, z);
+}
+
+fn get_cell_mem_loc(v: vec3<u32>) -> u32 {
+
+    let block_count = mc_uniform.noise_global_dimension.x * mc_uniform.noise_global_dimension.y * mc_uniform.noise_global_dimension.z;
+}
+
+fn get_cell_index(global_index: u32) -> vec3<u32> {
+
+    let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
+    let block_index = global_index / stride;
+    let block_position = index_to_uvec3(block_index, mc_uniform.noise_global_dimension.x, mc_uniform.noise_global_dimension.y) * mc_uniform.noise_local_dimension;
+
+    // Calculate local position.
+    let local_index = global_index - block_index * stride;
+
+    let local_position = decode3Dmorton32(local_index);
+
+    // let cell_position = noise_params.local_dim * block_position + local_position;
+    let cell_position = block_position + local_position;
+
+    return cell_position; 
+
+    // let block_count = mc_uniform.noise_global_dimension.x * mc_uniform.noise_global_dimension.y * mc_uniform.noise_global_dimension.z;
+
+    // let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
+
+    // let block_index = global_index / stride;
+
+    // let block_position = index_to_uvec3(block_index, mc_uniform.noise_global_dimension.x, mc_uniform.noise_global_dimension.y);
+
+    // // Calculate local position.
+    // let local_index = global_index - block_index * stride;
+
+    // let local_position = decode3Dmorton32(local_index);
+
+    // // let cell_position = mc_uniform.noise_local_dimension * block_position + local_position;
+
+    // let cell_position = block_position + local_position;
+
+    // return cell_position; 
 }
 
 @compute
@@ -600,21 +658,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32) {
 
     // Create and scale cube base position.
-    // let coordinate3D = vec3<i32>(decode3Dmorton32(global_id.x + 65536u * global_id.y));
-    let coordinate3D = vec3<i32>(decode3Dmorton32(global_id.x));
-
-    //let position = vec3<f32>(f32(global_id.x), f32(global_id.y), f32(global_id.z)) * mc_uniform.cube_length + mc_uniform.base_position.xyz;
-    let position = coordinate3D; //global_id.x + 65536 * global_id.y;
-
-    // Create cube corner coordinates. 
-    // let p0 = position;
-    // let p3 = position + vec3<f32>(0.0                      , mc_uniform.cube_length   , 0.0);
-    // let p2 = position + vec3<f32>(mc_uniform.cube_length   , mc_uniform.cube_length   , 0.0);
-    // let p1 = position + vec3<f32>(mc_uniform.cube_length   , 0.0                      , 0.0);
-    // let p4 = position + vec3<f32>(0.0                      , 0.0                      , mc_uniform.cube_length);
-    // let p7 = position + vec3<f32>(0.0                      , mc_uniform.cube_length   , mc_uniform.cube_length);
-    // let p6 = position + vec3<f32>(mc_uniform.cube_length   , mc_uniform.cube_length   , mc_uniform.cube_length);
-    // let p5 = position + vec3<f32>(mc_uniform.cube_length   , 0.0                      , mc_uniform.cube_length);
+    let position = vec3<i32>(get_cell_index(global_id.x));
 
     let p0 = position;
     let p3 = position + vec3<i32>(0 , 1 , 0);
