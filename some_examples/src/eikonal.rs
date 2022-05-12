@@ -1,6 +1,9 @@
+use std::mem::size_of;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use jaankaup_core::input::*;
+use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use jaankaup_core::template::{
         WGPUFeatures,
         WGPUConfiguration,
@@ -21,7 +24,7 @@ use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::render_object::draw;
+use jaankaup_core::render_object::{draw, draw_indirect};
 
 /// Max number of arrows for gpu debugger.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -41,16 +44,23 @@ const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 /// Name for the fire tower mesh (assets/models/wood.obj).
 const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-/// FMM global dimensions.
-const FMM_GLOBAL_X: usize = 16; 
-const FMM_GLOBAL_Y: usize = 16; 
-const FMM_GLOBAL_Z: usize = 16; 
+/// Mc global dimensions. 
+const FMM_GLOBAL_X: usize = 32; 
+const FMM_GLOBAL_Y: usize = 32; 
+const FMM_GLOBAL_Z: usize = 32; 
 
-/// FMM inner dimensions.
+/// Mc inner dimensions.
 const FMM_INNER_X: usize = 4; 
 const FMM_INNER_Y: usize = 4; 
 const FMM_INNER_Z: usize = 4; 
 
+const MC_OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
+                                    FMM_GLOBAL_Y *
+                                    FMM_GLOBAL_Z *
+                                    FMM_INNER_X *
+                                    FMM_INNER_Y *
+                                    FMM_INNER_Z *
+                                    size_of::<f32>()) as u32 * 16;
 
 /// Features and limits for Eikonal application.
 struct EikonalFeatures {}
@@ -88,6 +98,7 @@ struct Eikonal {
     buffers: HashMap<String, wgpu::Buffer>,
     triangle_meshes: HashMap<String, TriangleMesh>,
     noise_maker: NoiseMaker,
+    marching_cubes: MarchingCubes,
 //++    pub render_object_vvvvnnnn: RenderObject, 
 //++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvc: RenderObject,
@@ -189,10 +200,53 @@ impl Application for Eikonal {
 
         let noise_maker = NoiseMaker::init(
                 &configuration.device,
-                &"main".to_string(),
-                [16, 16, 16],
+                &"land_scape".to_string(),
+                [32, 32, 32],
                 [4, 4, 4],
                 [0.0, 0.0, 0.0]
+        );
+
+        let mc_params = McParams {
+                base_position: [0.0, 0.0, 0.0, 1.0],
+                isovalue: 0.0,
+                cube_length: 1.0,
+                future_usage1: 0.0,
+                future_usage2: 0.0,
+                noise_global_dimension: [FMM_GLOBAL_X.try_into().unwrap(),
+                                         FMM_GLOBAL_Y.try_into().unwrap(),
+                                         FMM_GLOBAL_Z.try_into().unwrap(),
+                                         0
+                ],
+                noise_local_dimension: [FMM_INNER_X.try_into().unwrap(),
+                                        FMM_INNER_Y.try_into().unwrap(),
+                                        FMM_INNER_Z.try_into().unwrap(),
+                                        0
+                ],
+        };
+
+        buffers.insert(
+            "mc_output".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Mc output buffer"),
+                size: MC_OUTPUT_BUFFER_SIZE as u64, 
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        );
+
+        let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("mc compute shader"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),
+                        }
+        );
+
+        let mc_instance = MarchingCubes::init_with_noise_buffer(
+            &configuration.device,
+            &mc_params,
+            &mc_shader,
+            noise_maker.get_buffer(),
+            &buffers.get(&"mc_output".to_string()).unwrap(),
         );
 
         Self {
@@ -208,6 +262,7 @@ impl Application for Eikonal {
             buffers: buffers,
             triangle_meshes: triangle_meshes,
             noise_maker: noise_maker,
+            marching_cubes: mc_instance,
         }
     }
 
@@ -233,6 +288,8 @@ impl Application for Eikonal {
 
         let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
 
+        let mut clear = true;
+
         draw(&mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
@@ -240,12 +297,29 @@ impl Application for Eikonal {
              &self.triangle_mesh_renderer.get_render_object().pipeline,
              &fire_tower.get_buffer(),
              0..fire_tower.get_triangle_count() * 3, 
-             true
+             clear
+        );
+        
+        clear = false;
+
+        draw_indirect(
+             &mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.triangle_mesh_bindgroups,
+             &self.triangle_mesh_renderer.get_render_object().pipeline,
+             &self.buffers.get("mc_output").unwrap(),
+             self.marching_cubes.get_draw_indirect_buffer(),
+             0,
+             clear
         );
 
         queue.submit(Some(encoder.finish())); 
 
         self.screen.prepare_for_rendering();
+
+        // Reset counter.
+        self.marching_cubes.reset_counter_value(device, queue);
     }
 
     #[allow(unused)]
@@ -263,6 +337,28 @@ impl Application for Eikonal {
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
+        let val = (((input.get_time() / 5000000) as f32) * 0.0015).sin() * 5.0;
+        let value = (((input.get_time() / 5000000) as f32) * 0.0015).cos() * 0.35;
+
+        let time = (input.get_time() as f64 / 50000000.0) as f32;
+
+        self.noise_maker.update_time(&queue, time);
+        self.noise_maker.update_value(&queue, value);
+
+        let total_grid_count = FMM_GLOBAL_X *
+                               FMM_GLOBAL_Y *
+                               FMM_GLOBAL_Z *
+                               FMM_INNER_X *
+                               FMM_INNER_Y *
+                               FMM_INNER_Z;
+
+        let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
+
+        self.noise_maker.dispatch(&mut encoder_command);
+        self.marching_cubes.dispatch(&mut encoder_command, total_grid_count as u32 / 256, 1, 1);
+
+        // Submit compute.
+        queue.submit(Some(encoder_command.finish()));
     }
 }
 

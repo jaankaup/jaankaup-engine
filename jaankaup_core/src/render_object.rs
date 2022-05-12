@@ -146,7 +146,7 @@ impl RenderObject {
                 topology: topology,
                 strip_index_format: None,
                 front_face: if ccw { wgpu::FrontFace::Ccw } else { wgpu::FrontFace::Cw },
-                cull_mode: Some(wgpu::Face::Back),
+                cull_mode: None, //Some(wgpu::Face::Back),
                 // cull_mode: Some(wgpu::Face::Front),
                 unclipped_depth: false, // ???
                 polygon_mode: wgpu::PolygonMode::Fill,

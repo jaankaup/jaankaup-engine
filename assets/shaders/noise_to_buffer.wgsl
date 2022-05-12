@@ -304,8 +304,6 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
 
 fn get_cell_index(global_index: u32) -> vec3<u32> {
 
-    // let block_count = noise_params.global_dim.x * noise_params.global_dim.y * noise_params.global_dim.z;
-
     let stride = noise_params.local_dim.x * noise_params.local_dim.y * noise_params.local_dim.z;
 
     let block_index = global_index / stride;
@@ -339,11 +337,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let actual_global_id = local_id.x + offset * 4u * work_group_id.x;
 
-    // let c0 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id))       , 1.0);
-    // let c1 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset)) , 1.0);
-    // let c2 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 2u)) , 1.0);
-    // let c3 = vec4<f32>(vec3<f32>(decode3Dmorton32(actual_global_id + offset * 3u)) , 1.0);
-
     let c0 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id))       , 1.0);
     let c1 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset)) , 1.0);
     let c2 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 2u)) , 1.0);
@@ -358,19 +351,32 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     noise_output_data.output_data[actual_global_id + offset]      = ball1 + cnoise(c1 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
     noise_output_data.output_data[actual_global_id + offset * 2u] = ball2 + cnoise(c2 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
     noise_output_data.output_data[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
+}
 
-    //++ let c0 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id))       , 1.0);
-    //++ let c1 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset)) , 1.0);
-    //++ let c2 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 2u)) , 1.0);
-    //++ let c3 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 3u)) , 1.0);
 
-    //++ noise_output_data.output_data[actual_global_id]               = f32(actual_global_id);
-    //++ noise_output_data.output_data[actual_global_id + offset]      = f32(actual_global_id + offset);
-    //++ noise_output_data.output_data[actual_global_id + offset * 2u] = f32(actual_global_id + offset * 2u);
-    //++ noise_output_data.output_data[actual_global_id + offset * 3u] = f32(actual_global_id + offset * 3u);
+@compute
+@workgroup_size(256,1,1)
+fn land_scape(@builtin(local_invocation_id)    local_id: vec3<u32>,
+              @builtin(workgroup_id) work_group_id: vec3<u32>,
+              @builtin(global_invocation_id)   global_id: vec3<u32>,
+              @builtin(local_invocation_index) local_index: u32) {
 
-    //++ noise_output_data.output_data[actual_global_id]               = f32(c0.x);
-    //++ noise_output_data.output_data[actual_global_id + offset]      = f32(c1.x);
-    //++ noise_output_data.output_data[actual_global_id + offset * 2u] = f32(c2.x);
-    //++ noise_output_data.output_data[actual_global_id + offset * 3u] = f32(c3.x);
+    let offset = 256u;
+
+    let actual_global_id = local_id.x + offset * 4u * work_group_id.x;
+
+    let c0 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id))       , 1.0);
+    let c1 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset)) , 1.0);
+    let c2 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 2u)) , 1.0);
+    let c3 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 3u)) , 1.0);
+
+    let noise0 = c0.y * 0.2 - 1.0; // + cnoise(c0 * 0.1);
+    let noise1 = c1.y * 0.2 - 1.0; // + cnoise(c1 * 0.1);
+    let noise2 = c2.y * 0.2 - 1.0; // + cnoise(c2 * 0.1);
+    let noise3 = c3.y * 0.2 - 1.0; // + cnoise(c3 * 0.1);
+
+    noise_output_data.output_data[actual_global_id]               = noise0;
+    noise_output_data.output_data[actual_global_id + offset]      = noise1;
+    noise_output_data.output_data[actual_global_id + offset * 2u] = noise2;
+    noise_output_data.output_data[actual_global_id + offset * 3u] = noise3;
 }
