@@ -144,15 +144,20 @@ impl MarchingCubes {
         );
     }
 
-    pub fn update_mc_params(&mut self, queue: &wgpu::Queue, isovalue: f32) {
+    pub fn update_mc_params(&mut self, queue: &wgpu::Queue, mc_params: McParams) {
 
-        self.mc_params.isovalue = isovalue;
+        // self.mc_params.isovalue = isovalue;
+        self.mc_params = mc_params;
 
         queue.write_buffer(
             &self.mc_params_buffer,
             0,
             bytemuck::cast_slice(&[self.mc_params ])
         );
+    }
+
+    pub fn get_mc_params(&self) -> McParams {
+        self.mc_params
     }
 
     pub fn init_with_noise_buffer(device: &wgpu::Device,

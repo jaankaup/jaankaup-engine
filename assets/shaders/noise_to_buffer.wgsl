@@ -5,6 +5,10 @@ struct NoiseParams {
     value: f32,
     position: vec3<f32>,
     value2: f32,
+    value3: f32,
+    value4: f32,
+    value5: f32,
+    value6: f32,
 };
 
 struct Output {
@@ -159,102 +163,102 @@ fn cnoise(P: vec4<f32>) -> f32 {
 
 // Noise functions copied from https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83 and converted to wgsl.
 
-//++ fn hash(n: f32) -> f32 {
-//++     return fract(sin(n) * 10000.0);
-//++ }
-//++ 
-//++ fn hash_v2(p: vec2<f32>) -> f32 {
-//++     return fract(10000.0 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x))));
-//++ }
-//++ 
-//++ fn noise(x: f32) -> f32 {
-//++     let i: f32 = floor(x);
-//++     let f: f32 = fract(x);
-//++     let u: f32 = f * f * (3.0 - 2.0 * f);
-//++     return mix(hash(i), hash(i + 1.0), u);
-//++ }
-//++ 
-//++ fn noise2(x: vec2<f32>) -> f32 {
-//++ 
-//++ 	let i: vec2<f32> = floor(x);
-//++ 	let f: vec2<f32> = fract(x);
-//++ 
-//++ 	// Four corners in 2D of a tile
-//++ 	let a: f32 = hash_v2(i);
-//++ 	let b: f32 = hash_v2(i + vec2<f32>(1.0, 0.0));
-//++ 	let c: f32 = hash_v2(i + vec2<f32>(0.0, 1.0));
-//++ 	let d: f32 = hash_v2(i + vec2<f32>(1.0, 1.0));
-//++ 
-//++ 	let u: vec2<f32> = f * f * (3.0 - 2.0 * f);
-//++ 	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-//++ }
-//++ 
-//++ fn noise3(x: vec3<f32>) -> f32 {
-//++ 
-//++ 	let st = vec3<f32>(110.0, 241.0, 171.0);
-//++ 
-//++ 	let i = floor(x);
-//++ 	let f = fract(x);
-//++ 
-//++     	let n = dot(i, st);
-//++ 
-//++ 
-//++ 	let u = f * f * (3.0 - 2.0 * f);
-//++ 	return mix(mix(mix( hash(n + dot(st, vec3<f32>(0.0, 0.0, 0.0))), hash(n + dot(st, vec3<f32>(1.0, 0.0, 0.0))), u.x),
-//++                    mix( hash(n + dot(st, vec3<f32>(0.0, 1.0, 0.0))), hash(n + dot(st, vec3<f32>(1.0, 1.0, 0.0))), u.x), u.y),
-//++                mix(mix( hash(n + dot(st, vec3<f32>(0.0, 0.0, 1.0))), hash(n + dot(st, vec3<f32>(1.0, 0.0, 1.0))), u.x),
-//++                    mix( hash(n + dot(st, vec3<f32>(0.0, 1.0, 1.0))), hash(n + dot(st, vec3<f32>(1.0, 1.0, 1.0))), u.x), u.y), u.z);
-//++ }
-//++ 
-//++ let NUM_OCTAVES: u32 = 5u;
-//++ 
-//++ fn fbm(x: f32) -> f32 {
-//++ 
-//++     var v: f32 = 0.0;
-//++     var a: f32 = 0.5;
-//++     var xx: f32 = x; 
-//++     let shift: f32 = 100.0;
-//++     for (var i: u32 = 0u; i < NUM_OCTAVES; i = i + 1u) {
-//++     	v = a + a * noise(xx);
-//++     	xx = xx * 2.0 + shift;
-//++     	a = a * 0.5;
-//++     }
-//++     return v;
-//++ }
-//++ 
-//++ 
-//++ fn fbm2(x: vec2<f32>) -> f32 {
-//++ 
-//++     let shift = vec2<f32>(100.0);
-//++     let rot = mat2x2<f32>(vec2<f32>(cos(0.5), sin(0.5)), vec2<f32>(-sin(0.5), cos(0.50)));
-//++     
-//++     var v: f32 = 0.0;
-//++     var a: f32 = 0.5;
-//++     var xx: vec2<f32> = x; 
-//++     
-//++     for (var i: u32 = 0u; i < NUM_OCTAVES; i = i + 1u) {
-//++         v = v + a * noise2(xx);
-//++         xx = rot * xx * 2.0 + shift;
-//++         a = a * 0.5;
-//++     }
-//++     return v;
-//++ }
-//++ 
-//++ fn fbm3(x: vec3<f32>) -> f32 {
-//++ 
-//++     let shift: f32 = 100.0;
-//++ 
-//++     var v: f32 = 0.0;
-//++     var a: f32 = 0.5;
-//++     var xx: vec3<f32> = x; 
-//++ 
-//++     for (var i: u32 = 0u; i < NUM_OCTAVES; i = i + 1u) {
-//++     	v = a + a * noise3(xx);
-//++     	xx = xx * 2.0 + shift;
-//++     	a = a * 0.5;
-//++     }
-//++     return v;
-//++ }
+fn hash(n: f32) -> f32 {
+    return fract(sin(n) * 10000.0);
+}
+
+fn hash_v2(p: vec2<f32>) -> f32 {
+    return fract(10000.0 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x))));
+}
+
+fn noise(x: f32) -> f32 {
+    let i: f32 = floor(x);
+    let f: f32 = fract(x);
+    let u: f32 = f * f * (3.0 - 2.0 * f);
+    return mix(hash(i), hash(i + 1.0), u);
+}
+
+fn noise2(x: vec2<f32>) -> f32 {
+
+	let i: vec2<f32> = floor(x);
+	let f: vec2<f32> = fract(x);
+
+	// Four corners in 2D of a tile
+	let a: f32 = hash_v2(i);
+	let b: f32 = hash_v2(i + vec2<f32>(1.0, 0.0));
+	let c: f32 = hash_v2(i + vec2<f32>(0.0, 1.0));
+	let d: f32 = hash_v2(i + vec2<f32>(1.0, 1.0));
+
+	let u: vec2<f32> = f * f * (3.0 - 2.0 * f);
+	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+fn noise3(x: vec3<f32>) -> f32 {
+
+	let st = vec3<f32>(110.0, 241.0, 171.0);
+
+	let i = floor(x);
+	let f = fract(x);
+
+    	let n = dot(i, st);
+
+
+	let u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(mix( hash(n + dot(st, vec3<f32>(0.0, 0.0, 0.0))), hash(n + dot(st, vec3<f32>(1.0, 0.0, 0.0))), u.x),
+                   mix( hash(n + dot(st, vec3<f32>(0.0, 1.0, 0.0))), hash(n + dot(st, vec3<f32>(1.0, 1.0, 0.0))), u.x), u.y),
+               mix(mix( hash(n + dot(st, vec3<f32>(0.0, 0.0, 1.0))), hash(n + dot(st, vec3<f32>(1.0, 0.0, 1.0))), u.x),
+                   mix( hash(n + dot(st, vec3<f32>(0.0, 1.0, 1.0))), hash(n + dot(st, vec3<f32>(1.0, 1.0, 1.0))), u.x), u.y), u.z);
+}
+
+let NUM_OCTAVES: u32 = 5u;
+
+fn fbm(x: f32) -> f32 {
+
+    var v: f32 = 0.0;
+    var a: f32 = 0.5;
+    var xx: f32 = x; 
+    let shift: f32 = 100.0;
+    for (var i: u32 = 0u; i < NUM_OCTAVES; i = i + 1u) {
+    	v = a + a * noise(xx);
+    	xx = xx * 2.0 + shift;
+    	a = a * 0.5;
+    }
+    return v;
+}
+
+
+fn fbm2(x: vec2<f32>) -> f32 {
+
+    let shift = vec2<f32>(100.0);
+    let rot = mat2x2<f32>(vec2<f32>(cos(0.5), sin(0.5)), vec2<f32>(-sin(0.5), cos(0.50)));
+    
+    var v: f32 = 0.0;
+    var a: f32 = 0.5;
+    var xx: vec2<f32> = x; 
+    
+    for (var i: u32 = 0u; i < NUM_OCTAVES; i = i + 1u) {
+        v = v + a * noise2(xx);
+        xx = rot * xx * 2.0 + shift;
+        a = a * 0.5;
+    }
+    return v;
+}
+
+fn fbm3(x: vec3<f32>) -> f32 {
+
+    let shift: f32 = 100.0;
+
+    var v: f32 = 0.0;
+    var a: f32 = 0.5;
+    var xx: vec3<f32> = x; 
+
+    for (var i: u32 = 0u; i < NUM_OCTAVES; i = i + 1u) {
+    	v = a + a * noise3(xx);
+    	xx = xx * 2.0 + shift;
+    	a = a * 0.5;
+    }
+    return v;
+}
 
 fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   var x  = index;
@@ -353,6 +357,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     noise_output_data.output_data[actual_global_id + offset * 3u] = ball3 + cnoise(c3 * 0.2 * wave_height_factor + noise_velocity * 0.01) * 1300.0;
 }
 
+fn create_land_noise(v: vec3<f32>) -> f32 {
+    return v.y - 22.5 * noise_params.value2 * noise3((v.zyx * noise_params.value3 + noise_params.position) * 0.01) - 0.5;
+    // let noise_a = fbm(v.z * 1.2);
+    // let noise_b = noise3(v.zyx * 1.1);
+    // let noise_c = noise((v.x + 5.0) * 1.1);
+    // let noise_d = fbm2(v.yy * 0.2);
+    // let heko = abs(6.0*fbm3(v*0.4));
+    // let something = 1.5 * noise_a - 2.45 * noise_b - 4.5 * sin(v.z * 0.2);
+    // return v.y + 0.62 * something - 0.1 * heko - 2.5 * noise_c + 5.0 * noise_d - 6.0;
+}
+
+fn create_small_noise(v: vec3<f32>) -> f32 {
+    return noise_params.value5 * noise_params.value4 * cnoise(vec4<f32>(v.xyz * 0.1, 0.5));
+}
+
 
 @compute
 @workgroup_size(256,1,1)
@@ -363,6 +382,8 @@ fn land_scape(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let offset = 256u;
 
+    // let scene_center = vec4<f32>(position.x, position.y, 0.0, 0.0); //vec4<f32>(vec3<f32>(noise_params.global_dim * noise_params.local_dim), 0.0) * 0.5;
+
     let actual_global_id = local_id.x + offset * 4u * work_group_id.x;
 
     let c0 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id))       , 1.0);
@@ -370,13 +391,42 @@ fn land_scape(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let c2 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 2u)) , 1.0);
     let c3 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 3u)) , 1.0);
 
-    let noise0 = c0.y * 0.2 - 1.0; // + cnoise(c0 * 0.1);
-    let noise1 = c1.y * 0.2 - 1.0; // + cnoise(c1 * 0.1);
-    let noise2 = c2.y * 0.2 - 1.0; // + cnoise(c2 * 0.1);
-    let noise3 = c3.y * 0.2 - 1.0; // + cnoise(c3 * 0.1);
+    let noise0 = create_land_noise(c0.xyz) - create_small_noise(c0.xyz) + noise_params.position.y;
+    let noise1 = create_land_noise(c1.xyz) - create_small_noise(c1.xyz) + noise_params.position.y;
+    let noise2 = create_land_noise(c2.xyz) - create_small_noise(c2.xyz) + noise_params.position.y;
+    let noise3 = create_land_noise(c3.xyz) - create_small_noise(c3.xyz) + noise_params.position.y;
 
     noise_output_data.output_data[actual_global_id]               = noise0;
     noise_output_data.output_data[actual_global_id + offset]      = noise1;
     noise_output_data.output_data[actual_global_id + offset * 2u] = noise2;
     noise_output_data.output_data[actual_global_id + offset * 3u] = noise3;
+
+
+    // let cnoise_0a = noise_params.value3 * cnoise(c0 * 0.1); 
+    // let cnoise_0b = noise_params.value3 * cnoise(100.0 * c0 * 0.1); 
+    // let cnoise_0c = noise_params.value3 * cnoise(200.0 * c0 * 0.1); 
+    // let cnoise_0d = noise_params.value3 * cnoise(300.0 * c0 * 0.1); 
+    // let cnoise_1a = noise_params.value3 * cnoise(c1 * 0.1); 
+    // let cnoise_1b = noise_params.value3 * cnoise(100.0 + c1 * 0.1); 
+    // let cnoise_1c = noise_params.value3 * cnoise(200.0 + c1 * 0.1); 
+    // let cnoise_1d = noise_params.value3 * cnoise(300.0 + c1 * 0.1); 
+    // let cnoise_2a = noise_params.value3 * cnoise(c2 * 0.1); 
+    // let cnoise_2b = noise_params.value3 * cnoise(100.0 + c2 * 0.1); 
+    // let cnoise_2c = noise_params.value3 * cnoise(200.0 + c2 * 0.1); 
+    // let cnoise_2d = noise_params.value3 * cnoise(300.0 + c2 * 0.1); 
+    // let cnoise_3a = noise_params.value3 * cnoise(c3 * 0.1); 
+    // let cnoise_3b = noise_params.value3 * cnoise(100.0 + c3 * 0.1); 
+    // let cnoise_3c = noise_params.value3 * cnoise(200.0 + c3 * 0.1); 
+    // let cnoise_3d = noise_params.value3 * cnoise(300.0 + c3 * 0.1); 
+
+    // let noise_fbm3_0 = noise_params.value4 * fbm3(c0.xyz * (1.0 / noise_params.value4));
+    // let noise_fbm3_1 = noise_params.value4 * fbm3(c1.xyz * (1.0 / noise_params.value4));
+    // let noise_fbm3_2 = noise_params.value4 * fbm3(c2.xyz * (1.0 / noise_params.value4));
+    // let noise_fbm3_3 = noise_params.value4 * fbm3(c3.xyz * (1.0 / noise_params.value4));
+
+    // let noise0 = c0.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_0;
+    // let noise1 = c1.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_1;
+    // let noise2 = c2.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_2;
+    // let noise3 = c3.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_3;
+
 }

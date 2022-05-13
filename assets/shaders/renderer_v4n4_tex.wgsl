@@ -7,11 +7,7 @@ struct Camera {
 @binding(0)
 var<uniform> camerauniform: Camera;
 
-@group(0) @binding(1)
-var<uniform> light: Light;
-
-@group(0) @binding(2)
-var<uniform> other_params: RenderParams;
+// Textures.
 
 @group(1)
 @binding(0)

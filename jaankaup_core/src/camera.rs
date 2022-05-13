@@ -258,5 +258,9 @@ impl Camera {
         let view = cgmath::Matrix4::look_at_rh(pos3, view3, self.up);
         view
     }
+
+    pub fn get_position(&self) -> [f32; 3] {
+        [self.pos.x, self.pos.y, self.pos.z]
+    }
 }
 

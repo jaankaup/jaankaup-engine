@@ -19,7 +19,7 @@ use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
-use jaankaup_core::shaders::{Render_VVVVNNNN_camera, NoiseMaker};
+use jaankaup_core::shaders::{Render_VVVVNNNN_camera, Render_VVVVNNNN_camera_textures2, NoiseMaker};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
@@ -94,11 +94,17 @@ struct Eikonal {
     light: LightBuffer,
     render_params: RenderParamBuffer,
     triangle_mesh_renderer: Render_VVVVNNNN_camera,
+    triangle_mesh_renderer_tex2: Render_VVVVNNNN_camera_textures2,
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+    triangle_mesh_bindgroups_tex2: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     triangle_meshes: HashMap<String, TriangleMesh>,
     noise_maker: NoiseMaker,
     marching_cubes: MarchingCubes,
+    selected_noise: usize,
+    noise_params: [f32; 5],
+    textures: HashMap<String, Texture>,
+    y_coord: f32,
 //++    pub render_object_vvvvnnnn: RenderObject, 
 //++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvc: RenderObject,
@@ -117,7 +123,6 @@ struct Eikonal {
 //++    pub compute_bind_groups_initial_band_points: Vec<wgpu::BindGroup>,
 //++    pub buffers: HashMap<String, wgpu::Buffer>,
 //++    pub camera: Camera,
-//++    pub keys: KeyboardManager,
 //++    pub triangle_mesh_draw_count: u32,
 //++    pub draw_triangle_mesh: bool,
 //++    pub once: bool,
@@ -133,6 +138,10 @@ struct Eikonal {
 impl Application for Eikonal {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
+
+        let selected_noise = 0;
+        let noise_params = [1.0, 1.0, 1.0, 1.0, 1.0];
+        let y_coord = 0.0;
 
         // Log adapter info.
         log_adapter_info(&configuration.adapter);
@@ -172,10 +181,30 @@ impl Application for Eikonal {
         // RenderObject for basic triangle mesh rendering.
         let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
 
+        // RenderObject for basic triangle mesh rendering with 2 textures.
+        let triangle_mesh_renderer_tex2 = Render_VVVVNNNN_camera_textures2::init(&configuration.device, &configuration.sc_desc);
+
         // Create bindgroups for triangle_mesh_renderer.
         let triangle_mesh_bindgroups = 
                 triangle_mesh_renderer.create_bingroups(
                     &configuration.device, &mut camera, &light, &render_params
+                );
+
+        // Textures hash map.
+        let mut textures: HashMap<String, Texture> = HashMap::new();
+
+        // Create textures for this application.
+        create_textures(&configuration, &mut textures);
+
+        // Create bindgroups for triangle_mesh_renderer.
+        let triangle_mesh_bindgroups_tex2 = 
+                triangle_mesh_renderer_tex2.create_bingroups(
+                    &configuration.device,
+                    &mut camera,
+                    &light,
+                    &render_params,
+                    textures.get("rock").unwrap(),
+                    textures.get("grass").unwrap(),
                 );
 
         // Buffer hash_map.
@@ -190,7 +219,7 @@ impl Application for Eikonal {
                          include_str!("../../assets/models/wood.obj")[..].to_string(),
                          FIRE_TOWER_MESH,
                          2.0,
-                         [5.0, -2.0, 5.0],
+                         [25.0, -2.0, 25.0],
                          [11, 0, 155]
         );
 
@@ -203,12 +232,19 @@ impl Application for Eikonal {
                 &"land_scape".to_string(),
                 [32, 32, 32],
                 [4, 4, 4],
-                [0.0, 0.0, 0.0]
+                [0.0, 0.0, 0.0],
+                0.0,
+                0.0,
+                noise_params[0],
+                noise_params[1],
+                noise_params[2],
+                noise_params[3],
+                noise_params[4],
         );
 
         let mc_params = McParams {
                 base_position: [0.0, 0.0, 0.0, 1.0],
-                isovalue: 0.0,
+                isovalue: 0.5,
                 cube_length: 1.0,
                 future_usage1: 0.0,
                 future_usage2: 0.0,
@@ -258,11 +294,17 @@ impl Application for Eikonal {
             light: light,
             render_params: render_params,
             triangle_mesh_renderer: triangle_mesh_renderer,
+            triangle_mesh_renderer_tex2,
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+            triangle_mesh_bindgroups_tex2: triangle_mesh_bindgroups_tex2,
             buffers: buffers,
             triangle_meshes: triangle_meshes,
             noise_maker: noise_maker,
             marching_cubes: mc_instance,
+            selected_noise: selected_noise,
+            noise_params: noise_params,
+            textures: textures,
+            y_coord: y_coord,
         }
     }
 
@@ -306,8 +348,8 @@ impl Application for Eikonal {
              &mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
-             &self.triangle_mesh_bindgroups,
-             &self.triangle_mesh_renderer.get_render_object().pipeline,
+             &self.triangle_mesh_bindgroups_tex2,
+             &self.triangle_mesh_renderer_tex2.get_render_object().pipeline,
              &self.buffers.get("mc_output").unwrap(),
              self.marching_cubes.get_draw_indirect_buffer(),
              0,
@@ -337,6 +379,28 @@ impl Application for Eikonal {
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
+        // TODO: something better
+        if self.keyboard_manager.test_key(&Key::Key1, input) { self.selected_noise = 0; }
+        if self.keyboard_manager.test_key(&Key::Key2, input) { self.selected_noise = 1; }
+        if self.keyboard_manager.test_key(&Key::Key3, input) { self.selected_noise = 2; }
+        if self.keyboard_manager.test_key(&Key::Key4, input) { self.selected_noise = 3; }
+        if self.keyboard_manager.test_key(&Key::Key5, input) { self.selected_noise = 4; }
+        if self.keyboard_manager.test_key(&Key::Up, input)   { self.y_coord = self.y_coord + 0.1; }
+        if self.keyboard_manager.test_key(&Key::Down, input) { self.y_coord = self.y_coord - 0.1; }
+        // if self.keyboard_manager.test_key(&Key::LEFT, input) { self.selected_noise = 4; }
+        // if self.keyboard_manager.test_key(&Key::RIGHT, input){ self.noise_params[self.selected_noise] = self.noise_params[self.selected_noise] + 0.01; }
+        if self.keyboard_manager.test_key(&Key::O, input) { self.noise_params[self.selected_noise] = self.noise_params[self.selected_noise] - 0.01;;}
+        if self.keyboard_manager.test_key(&Key::P, input) { self.noise_params[self.selected_noise] = self.noise_params[self.selected_noise] + 0.01;;}
+
+        match self.selected_noise {
+            0 => { self.noise_maker.update_value2(queue, self.noise_params[0]); },
+            1 => { self.noise_maker.update_value3(queue, self.noise_params[1]); },
+            2 => { self.noise_maker.update_value4(queue, self.noise_params[2]); },
+            3 => { self.noise_maker.update_value5(queue, self.noise_params[3]); },
+            4 => { self.noise_maker.update_value6(queue, self.noise_params[4]); },
+            _ => {}
+        }
+
         let val = (((input.get_time() / 5000000) as f32) * 0.0015).sin() * 5.0;
         let value = (((input.get_time() / 5000000) as f32) * 0.0015).cos() * 0.35;
 
@@ -344,6 +408,7 @@ impl Application for Eikonal {
 
         self.noise_maker.update_time(&queue, time);
         self.noise_maker.update_value(&queue, value);
+
 
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
@@ -359,6 +424,35 @@ impl Application for Eikonal {
 
         // Submit compute.
         queue.submit(Some(encoder_command.finish()));
+
+        let mut position = self.noise_maker.get_position();
+        position[1] = self.y_coord;
+        self.noise_maker.update_position(&queue, position);
+
+        //++ let mut mc_params = self.marching_cubes.get_mc_params();
+        //++ let camera_pos = self.camera.get_position();
+        //++ mc_params.base_position = [20.0,
+        //++                            0.0,
+        //++                            20.0,
+        //++                            0.0];
+        //++ self.marching_cubes.update_mc_params(queue, mc_params);
+
+        //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
+
+        //++ self.noise_maker.dispatch(&mut encoder_command);
+        //++ self.marching_cubes.dispatch(&mut encoder_command, total_grid_count as u32 / 256, 1, 1);
+
+        //++ // Submit compute.
+        //++ queue.submit(Some(encoder_command.finish()));
+
+        //++ self.noise_maker.update_position(&queue, [0.0, 0.0, 0.0]);
+        //++ let mut mc_params = self.marching_cubes.get_mc_params();
+        //++ let camera_pos = self.camera.get_position();
+        //++ mc_params.base_position = [0.0,
+        //++                            0.0,
+        //++                            0.0,
+        //++                            0.0];
+        //++ self.marching_cubes.update_mc_params(queue, mc_params);
     }
 }
 
@@ -406,12 +500,16 @@ fn create_keyboard_manager() -> KeyboardManager {
 
         let mut keys = KeyboardManager::init();
 
-        keys.register_key(Key::P, 200.0);
-        keys.register_key(Key::Key1, 200.0);
-        keys.register_key(Key::Key2, 200.0);
-        keys.register_key(Key::Key3, 200.0);
-        keys.register_key(Key::Key4, 200.0);
-        keys.register_key(Key::Key0, 200.0);
+        keys.register_key(Key::Up, 5.0);
+        keys.register_key(Key::Down, 5.0);
+        keys.register_key(Key::P, 5.0);
+        keys.register_key(Key::O, 5.0);
+        keys.register_key(Key::Key1, 20.0);
+        keys.register_key(Key::Key2, 20.0);
+        keys.register_key(Key::Key3, 20.0);
+        keys.register_key(Key::Key4, 20.0);
+        keys.register_key(Key::Key5, 20.0);
+        keys.register_key(Key::Key0, 20.0);
         keys.register_key(Key::N, 200.0);
         
         keys
@@ -450,4 +548,45 @@ fn load_vvvnnn_mesh(device: &wgpu::Device,
                                        &triangle_mesh_wood,
                                        buffer_name,
                                        triangle_mesh_draw_count)
+}
+
+fn create_textures(configuration: &WGPUConfiguration, textures: &mut HashMap<String, Texture>) {
+    log::info!("Creating textures.");
+    let grass_texture = Texture::create_from_bytes(
+        &configuration.queue,
+        &configuration.device,
+        &configuration.sc_desc,
+        1,
+        &include_bytes!("../../assets/textures/grass1.png")[..],
+        None);
+    let rock_texture = Texture::create_from_bytes(
+        &configuration.queue,
+        &configuration.device,
+        &configuration.sc_desc,
+        1,
+        &include_bytes!("../../assets/textures/slime2.png")[..],
+        None);
+    let slime_texture = Texture::create_from_bytes(
+        &configuration.queue,
+        &configuration.device,
+        &configuration.sc_desc,
+        1,
+        &include_bytes!("../../assets/textures/xXqQP0.png")[..],
+        //&include_bytes!("../../assets/textures/slime.png")[..],
+        None);
+    let slime_texture2 = Texture::create_from_bytes(
+        &configuration.queue,
+        &configuration.device,
+        &configuration.sc_desc,
+        1,
+        //&include_bytes!("../../assets/textures/slime2.png")[..],
+        //&include_bytes!("../../assets/textures/xXqQP0.png")[..],
+        &include_bytes!("../../assets/textures/luava.png")[..],
+        None);
+    log::info!("Textures created OK.");
+    
+    textures.insert("grass".to_string(), grass_texture);
+    textures.insert("rock".to_string(), rock_texture);
+    textures.insert("slime".to_string(), slime_texture);
+    textures.insert("slime2".to_string(), slime_texture2);
 }
