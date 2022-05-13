@@ -97,6 +97,7 @@ struct Eikonal {
     triangle_mesh_renderer_tex2: Render_VVVVNNNN_camera_textures2,
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     triangle_mesh_bindgroups_tex2: Vec<wgpu::BindGroup>,
+    triangle_mesh_bindgroups_tex2b: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     triangle_meshes: HashMap<String, TriangleMesh>,
     noise_maker: NoiseMaker,
@@ -105,6 +106,7 @@ struct Eikonal {
     noise_params: [f32; 5],
     textures: HashMap<String, Texture>,
     y_coord: f32,
+    texture_setup: bool,
 //++    pub render_object_vvvvnnnn: RenderObject, 
 //++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
 //++    pub render_object_vvvc: RenderObject,
@@ -142,12 +144,13 @@ impl Application for Eikonal {
         let selected_noise = 0;
         let noise_params = [1.0, 1.0, 1.0, 1.0, 1.0];
         let y_coord = 0.0;
+        let texture_setup = true;
 
         // Log adapter info.
         log_adapter_info(&configuration.adapter);
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 10.0), -89.0, 0.0);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
@@ -163,19 +166,19 @@ impl Application for Eikonal {
         // Light source for triangle meshes.
         let light = LightBuffer::create(
                       &configuration.device,
-                      [10.0, 20.0, 10.0], // pos
+                      [25.0, 55.0, 25.0], // pos
                       // [25, 25, 130],  // spec
                       [25, 25, 130],  // spec
                       [255,200,255], // light 
                       55.0,
-                      0.15,
+                      0.35,
                       0.000013
         );
 
         // Scale_factor for triangle meshes.
         let render_params = RenderParamBuffer::create(
                     &configuration.device,
-                    4.0
+                    1.0
         );
 
         // RenderObject for basic triangle mesh rendering.
@@ -207,6 +210,16 @@ impl Application for Eikonal {
                     textures.get("grass").unwrap(),
                 );
 
+        let triangle_mesh_bindgroups_tex2b = 
+                triangle_mesh_renderer_tex2.create_bingroups(
+                    &configuration.device,
+                    &mut camera,
+                    &light,
+                    &render_params,
+                    textures.get("rock").unwrap(),
+                    textures.get("slime2").unwrap(),
+                );
+
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
@@ -219,7 +232,7 @@ impl Application for Eikonal {
                          include_str!("../../assets/models/wood.obj")[..].to_string(),
                          FIRE_TOWER_MESH,
                          2.0,
-                         [25.0, -2.0, 25.0],
+                         [50.0, 25.0, 50.0],
                          [11, 0, 155]
         );
 
@@ -297,6 +310,7 @@ impl Application for Eikonal {
             triangle_mesh_renderer_tex2,
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             triangle_mesh_bindgroups_tex2: triangle_mesh_bindgroups_tex2,
+            triangle_mesh_bindgroups_tex2b: triangle_mesh_bindgroups_tex2b,
             buffers: buffers,
             triangle_meshes: triangle_meshes,
             noise_maker: noise_maker,
@@ -305,6 +319,7 @@ impl Application for Eikonal {
             noise_params: noise_params,
             textures: textures,
             y_coord: y_coord,
+            texture_setup: texture_setup,
         }
     }
 
@@ -335,8 +350,10 @@ impl Application for Eikonal {
         draw(&mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
-             &self.triangle_mesh_bindgroups,
-             &self.triangle_mesh_renderer.get_render_object().pipeline,
+             // &self.triangle_mesh_bindgroups,
+             // &self.triangle_mesh_renderer.get_render_object().pipeline,
+             if self.texture_setup { &self.triangle_mesh_bindgroups_tex2 } else { &self.triangle_mesh_bindgroups_tex2b },
+             &self.triangle_mesh_renderer_tex2.get_render_object().pipeline,
              &fire_tower.get_buffer(),
              0..fire_tower.get_triangle_count() * 3, 
              clear
@@ -348,7 +365,7 @@ impl Application for Eikonal {
              &mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
-             &self.triangle_mesh_bindgroups_tex2,
+             if self.texture_setup { &self.triangle_mesh_bindgroups_tex2 } else { &self.triangle_mesh_bindgroups_tex2b },
              &self.triangle_mesh_renderer_tex2.get_render_object().pipeline,
              &self.buffers.get("mc_output").unwrap(),
              self.marching_cubes.get_draw_indirect_buffer(),
@@ -385,12 +402,13 @@ impl Application for Eikonal {
         if self.keyboard_manager.test_key(&Key::Key3, input) { self.selected_noise = 2; }
         if self.keyboard_manager.test_key(&Key::Key4, input) { self.selected_noise = 3; }
         if self.keyboard_manager.test_key(&Key::Key5, input) { self.selected_noise = 4; }
-        if self.keyboard_manager.test_key(&Key::Up, input)   { self.y_coord = self.y_coord + 0.1; }
-        if self.keyboard_manager.test_key(&Key::Down, input) { self.y_coord = self.y_coord - 0.1; }
+        if self.keyboard_manager.test_key(&Key::Up, input)   { self.y_coord = self.y_coord - 0.1; }
+        if self.keyboard_manager.test_key(&Key::Down, input) { self.y_coord = self.y_coord + 0.1; }
         // if self.keyboard_manager.test_key(&Key::LEFT, input) { self.selected_noise = 4; }
         // if self.keyboard_manager.test_key(&Key::RIGHT, input){ self.noise_params[self.selected_noise] = self.noise_params[self.selected_noise] + 0.01; }
         if self.keyboard_manager.test_key(&Key::O, input) { self.noise_params[self.selected_noise] = self.noise_params[self.selected_noise] - 0.01;;}
         if self.keyboard_manager.test_key(&Key::P, input) { self.noise_params[self.selected_noise] = self.noise_params[self.selected_noise] + 0.01;;}
+        if self.keyboard_manager.test_key(&Key::Space, input) { self.texture_setup = !self.texture_setup;}
 
         match self.selected_noise {
             0 => { self.noise_maker.update_value2(queue, self.noise_params[0]); },
@@ -429,13 +447,11 @@ impl Application for Eikonal {
         position[1] = self.y_coord;
         self.noise_maker.update_position(&queue, position);
 
-        //++ let mut mc_params = self.marching_cubes.get_mc_params();
-        //++ let camera_pos = self.camera.get_position();
-        //++ mc_params.base_position = [20.0,
-        //++                            0.0,
-        //++                            20.0,
-        //++                            0.0];
-        //++ self.marching_cubes.update_mc_params(queue, mc_params);
+        let mut mc_params = self.marching_cubes.get_mc_params();
+        let camera_pos = self.camera.get_position();
+        mc_params.base_position[1] = self.y_coord;
+        mc_params.isovalue = 20.0;
+        self.marching_cubes.update_mc_params(queue, mc_params);
 
         //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
 
@@ -511,6 +527,7 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Key5, 20.0);
         keys.register_key(Key::Key0, 20.0);
         keys.register_key(Key::N, 200.0);
+        keys.register_key(Key::Space, 50.0);
         
         keys
 }
@@ -557,14 +574,14 @@ fn create_textures(configuration: &WGPUConfiguration, textures: &mut HashMap<Str
         &configuration.device,
         &configuration.sc_desc,
         1,
-        &include_bytes!("../../assets/textures/grass1.png")[..],
+        &include_bytes!("../../assets/textures/grass2.png")[..],
         None);
     let rock_texture = Texture::create_from_bytes(
         &configuration.queue,
         &configuration.device,
         &configuration.sc_desc,
         1,
-        &include_bytes!("../../assets/textures/slime2.png")[..],
+        &include_bytes!("../../assets/textures/rock.png")[..],
         None);
     let slime_texture = Texture::create_from_bytes(
         &configuration.queue,

@@ -358,7 +358,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 }
 
 fn create_land_noise(v: vec3<f32>) -> f32 {
-    return v.y - 22.5 * noise_params.value2 * noise3((v.zyx * noise_params.value3 + noise_params.position) * 0.01) - 0.5;
+    return v.y - 22.5 * noise_params.value2 * noise3(v.zyx * noise_params.value3 * 0.01) - 0.5;
+    //return v.y - 22.5 * noise_params.value2 * noise3((v.zyx * noise_params.value3 + noise_params.position) * 0.01) - 0.5;
     // let noise_a = fbm(v.z * 1.2);
     // let noise_b = noise3(v.zyx * 1.1);
     // let noise_c = noise((v.x + 5.0) * 1.1);
@@ -391,10 +392,10 @@ fn land_scape(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let c2 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 2u)) , 1.0);
     let c3 = vec4<f32>(vec3<f32>(get_cell_index(actual_global_id + offset * 3u)) , 1.0);
 
-    let noise0 = create_land_noise(c0.xyz) - create_small_noise(c0.xyz) + noise_params.position.y;
-    let noise1 = create_land_noise(c1.xyz) - create_small_noise(c1.xyz) + noise_params.position.y;
-    let noise2 = create_land_noise(c2.xyz) - create_small_noise(c2.xyz) + noise_params.position.y;
-    let noise3 = create_land_noise(c3.xyz) - create_small_noise(c3.xyz) + noise_params.position.y;
+    let noise0 = create_land_noise(c0.xyz) - create_small_noise(c0.xyz); // + noise_params.position.y;
+    let noise1 = create_land_noise(c1.xyz) - create_small_noise(c1.xyz); // + noise_params.position.y;
+    let noise2 = create_land_noise(c2.xyz) - create_small_noise(c2.xyz); // + noise_params.position.y;
+    let noise3 = create_land_noise(c3.xyz) - create_small_noise(c3.xyz); // + noise_params.position.y;
 
     noise_output_data.output_data[actual_global_id]               = noise0;
     noise_output_data.output_data[actual_global_id + offset]      = noise1;
