@@ -3,6 +3,19 @@ struct Camera {
     camera_pos: vec4<f32>,
 };
 
+struct Light {
+    light_pos: vec3<f32>,
+    material_shininess: f32,
+    material_spec_color: vec3<f32>,
+    ambient_coeffience: f32,
+    light_color: vec3<f32>,
+    attentuation_factor: f32,
+};
+
+struct RenderParams {
+    scale_factor: f32,
+};
+
 @group(0)
 @binding(0)
 var<uniform> camerauniform: Camera;
@@ -40,12 +53,9 @@ fn rgb2hsv(c: vec3<f32>) -> vec3<f32> {
 }
 
 fn hsv2rgb(c: vec3<f32>) -> vec3<f32>  {
-    //vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
     let K: vec4<f32> = vec4<f32>(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    //vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
     let p: vec3<f32> = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
     return c.z * mix(K.xxx, clamp(p - K.xxx, vec3<f32>(0.0), vec3<f32>(1.0)), c.yyy);
-    //return vec3<f32>(1.0, 2.0, 3.0);
 }
 
 struct VertexOutput {
@@ -62,14 +72,6 @@ fn vs_main(@location(0) pos: vec4<f32>, @location(1) nor: vec4<f32>) -> VertexOu
     out_data.nor = nor;
     return out_data;
 }
-
-// Ligth/material properties.
-//++ let light_pos: vec3<f32> = vec3<f32>(50.0, 110.0, 53.0);
-//++ let light_color: vec3<f32> = vec3<f32>(0.8, 0.3, 0.3);
-//++ let material_spec_color: vec3<f32> = vec3<f32>(0.5, 0.1, 0.1);
-//++ let material_shininess: f32 = 55.0;
-//++ let ambient_coeffience: f32 = 0.15;
-//++ let attentuation_factor: f32 = 0.0013;
 
 @fragment
 fn fs_main(in_data: VertexOutput) -> @location(0) vec4<f32> {
@@ -106,7 +108,7 @@ fn fs_main(in_data: VertexOutput) -> @location(0) vec4<f32> {
     // var distance_to_light: f32 = distance(in_data.pos.xyz, light_pos); 
     // var attentuation: f32 = 1.0 / (1.0 + attentuation_factor * pow(distance_to_light,2.0));
     // 
-    // var fin_dataal_color: vec4<f32> = vec4<f32>(ambient_component + attentuation * (diffuse_component + specular_component) , 1.0);
+    // var final_color: vec4<f32> = vec4<f32>(ambient_component + attentuation * (diffuse_component + specular_component) , 1.0);
 
     // return fin_dataal_color;
 
@@ -125,7 +127,15 @@ fn fs_main(in_data: VertexOutput) -> @location(0) vec4<f32> {
 
     var offset_factor: f32 = 0.5;
     
-    var surface_color: vec3<f32> = in_data.col; 
+    var coord1: vec2<f32> = in_data.pos.xy*offset_factor;
+    var coord2: vec2<f32> = in_data.pos.xz*offset_factor;
+    var coord3: vec2<f32> = in_data.pos.yz*offset_factor + in_data.pos.xz*offset_factor*offset_factor;
+    
+    var surfaceColor_grass: vec3<f32> = textureSample(t_diffuse1, s_diffuse1, offset_factor * (coord1 + coord3) / 59.0).xyz;
+    var surfaceColor_rock:  vec3<f32>  = textureSample(t_diffuse2, s_diffuse2, 1.1 * (coord1 + coord2 - coord3) / 13.0).xyz;
+    var surface_color: vec3<f32> = mix(
+        surfaceColor_rock, surfaceColor_grass,
+        vec3<f32>(clamp(0.4*in_data.nor.x + 0.6*in_data.nor.y, 0.0, 1.0)));
 
     var specular_component: vec3<f32> = specular_coeffient * light.material_spec_color * light.light_color;
     var ambient_component:  vec3<f32> = light.ambient_coeffience * light.light_color * surface_color.xyz;

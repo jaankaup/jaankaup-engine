@@ -768,26 +768,26 @@ impl GpuDebugger {
 
             //++ // Get the number of indirect dispatches.
 
-            //++++ let charparams_result = to_vec::<CharParams>(
-            //++++     &device,
-            //++++     &queue,
-            //++++     self.buffers.get(&"char_params".to_string()).unwrap(),
-            //++++     0,
-            //++++     (size_of::<CharParams>()) as wgpu::BufferAddress,
-            //++++     spawner,
-            //++++ );
+            let charparams_result = to_vec::<CharParams>(
+                &device,
+                &queue,
+                self.buffers.get(&"char_params".to_string()).unwrap(),
+                0,
+                (size_of::<CharParams>()) as wgpu::BufferAddress,
+                spawner,
+            );
 
             // println!("{:?}", charparams_result[0]);
 
             //if 0 > 0 {
-            // if charparams_result[0].vertices_so_far > 0 {
-            if true {
+            if charparams_result[0].vertices_so_far > 0 {
+            // if true {
 
                 // Create point data from number elements and draw.
                 let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
 
-                //++ for i in 0..(charparams_result[0].draw_index + 1) {
-                for i in 0..64 {
+                for i in 0..(charparams_result[0].draw_index + 1) {
+                // for i in 0..64 {
 
                     // let mut encoder_char = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("numbers encoder") });
                     self.compute_object_char.dispatch_indirect(

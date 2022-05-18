@@ -77,8 +77,8 @@ impl WGPUFeatures for EikonalFeatures {
 
     fn required_limits() -> wgpu::Limits {
         let mut limits = wgpu::Limits::default();
-        limits.max_compute_invocations_per_workgroup = 1024;
-        limits.max_compute_workgroup_size_x = 1024;
+        // limits.max_compute_invocations_per_workgroup = 1024;
+        // limits.max_compute_workgroup_size_x = 1024;
         limits.max_storage_buffers_per_shader_stage = 10;
         limits
     }
@@ -87,7 +87,7 @@ impl WGPUFeatures for EikonalFeatures {
 /// Eikonal solver. A Fast marching method (GPU) for solving the eikonal equation.
 struct Eikonal {
     camera: Camera,
-    gpu_debugger: GpuDebugger,
+    // gpu_debugger: GpuDebugger,
     gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
@@ -155,7 +155,7 @@ impl Application for Eikonal {
         camera.set_movement_sensitivity(0.02);
 
         // Gpu debugger.
-        let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
+        // let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
 
         // Gpu timer.
         let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
@@ -300,7 +300,7 @@ impl Application for Eikonal {
 
         Self {
             camera: camera,
-            gpu_debugger: gpu_debugger,
+            // gpu_debugger: gpu_debugger,
             gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),

@@ -11,8 +11,8 @@ input_debug = []
 texture_debug = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="8e62ca05381fed4f89fabf3eea8340f2f347c31f" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c226a10329f8c3283b995cccda21f4881b1ce6b1" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="36f8d83e5c6ccf021a3160c810aa966ad6861ecd" }
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="c608ee0bbea3132efc410f06bb9e76b4584e49a3" }
 winit = { version = "0.26"}
 async-executor = "1.0"
 cgmath = "0.18"
@@ -32,8 +32,8 @@ simple_logger = "1.16.0"
 # version = "0.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2.79" # remember to change version in wiki as well
-web-sys = { version = "0.3.53", features = [
+wasm-bindgen = "0.2.80"
+web-sys = { version = "0.3.57", features = [
     "Document",
     "Navigator",
     "Node",
@@ -158,8 +158,8 @@ web-sys = { version = "0.3.53", features = [
     "Window",
     "Location",
 ]}
-js-sys = "0.3.50"
-wasm-bindgen-futures = "0.4.23"
+js-sys = "0.3.57"
+wasm-bindgen-futures = "0.4.30"
 wasm-timer = "0.2.5"
 console_error_panic_hook = "0.1.6"
 console_log = "0.1.2"

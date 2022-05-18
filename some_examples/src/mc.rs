@@ -9,7 +9,8 @@ use jaankaup_core::template::{
         Spawner,
 };
 use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups, draw, draw_indirect, DrawIndirect};
-use jaankaup_core::shaders::{NoiseMaker,NoiseParams};
+use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
+use jaankaup_core::shaders::{Render_VVVVNNNN_camera_textures2, NoiseMaker,NoiseParams};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::buffer::{buffer_from_data, to_vec};
@@ -88,8 +89,9 @@ impl WGPUFeatures for McAppFeatures {
 // State for this application.
 struct McApp {
     pub screen: ScreenTexture, 
-    pub render_object: RenderObject, 
-    pub render_bind_groups: Vec<wgpu::BindGroup>,
+    light: LightBuffer,
+    triangle_mesh_renderer_tex2: Render_VVVVNNNN_camera_textures2,
+    triangle_mesh_bindgroups_tex2: Vec<wgpu::BindGroup>,
     // pub noise_compute_object: ComputeObject, 
     // pub noise_compute_bind_groups: Vec<wgpu::BindGroup>,
     pub textures: HashMap<String, Texture>,
@@ -108,19 +110,19 @@ impl McApp {
 
         fn create_textures(configuration: &WGPUConfiguration, textures: &mut HashMap<String, Texture>) {
         log::info!("Creating textures.");
-        let grass_texture = Texture::create_from_bytes(
+        let lava_texture = Texture::create_from_bytes(
             &configuration.queue,
             &configuration.device,
             &configuration.sc_desc,
             1,
-            &include_bytes!("../../assets/textures/slime.png")[..],
+            &include_bytes!("../../assets/textures/lava.png")[..],
             None);
-        let rock_texture = Texture::create_from_bytes(
+        let lava2_texture = Texture::create_from_bytes(
             &configuration.queue,
             &configuration.device,
             &configuration.sc_desc,
             1,
-            &include_bytes!("../../assets/textures/slime2.png")[..],
+            &include_bytes!("../../assets/textures/lava2.png")[..],
             None);
         let slime_texture = Texture::create_from_bytes(
             &configuration.queue,
@@ -130,7 +132,7 @@ impl McApp {
             &include_bytes!("../../assets/textures/xXqQP0.png")[..],
             //&include_bytes!("../../assets/textures/slime.png")[..],
             None);
-        let slime_texture2 = Texture::create_from_bytes(
+        let lava3_texture = Texture::create_from_bytes(
             &configuration.queue,
             &configuration.device,
             &configuration.sc_desc,
@@ -141,10 +143,10 @@ impl McApp {
             None);
         log::info!("Textures created OK.");
 
-        textures.insert("grass".to_string(), grass_texture);
-        textures.insert("rock".to_string(), rock_texture);
+        textures.insert("lava".to_string(), lava_texture);
+        textures.insert("lava2".to_string(), lava2_texture);
         textures.insert("slime".to_string(), slime_texture);
-        textures.insert("slime2".to_string(), slime_texture2);
+        textures.insert("lava3".to_string(), lava3_texture);
     }
 }
 
@@ -166,6 +168,24 @@ impl Application for McApp {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
         let mut textures: HashMap<String, Texture> = HashMap::new();
 
+        // Scale_factor for triangle meshes.
+        let render_params = RenderParamBuffer::create(
+                    &configuration.device,
+                    1.0
+        );
+
+        // Light source for triangle meshes.
+        let light = LightBuffer::create(
+                      &configuration.device,
+                      [25.0, 55.0, 25.0], // pos
+                      // [25, 25, 130],  // spec
+                      [255, 25, 25],  // spec
+                      [255,100,100], // light 
+                      55.0,
+                      0.35,
+                      0.000013
+        );
+
         let mut keys = KeyboardManager::init();
 
         // Camera.
@@ -173,117 +193,20 @@ impl Application for McApp {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.02);
 
-        let render_object =
-                RenderObject::init(
-                    &configuration.device,
-                    &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("renderer_v4n4.wgsl"),
-                        source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
-                    
-                    }),
-                    &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
-                    &vec![
-                        // Group 0
-                        vec![wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                    },
-                                count: None,
-                            },
-                        ],
-                        // Group 1
-                        vec![wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Texture {
-                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                    view_dimension: wgpu::TextureViewDimension::D2,
-                                    multisampled: false,
-                                },
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Texture {
-                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                    view_dimension: wgpu::TextureViewDimension::D2,
-                                    multisampled: false,
-                                },
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                                count: None,
-                            }
-                        ]
-                    ],
-                    Some("vvvvnnnn renderer with camera."),
-                    false,
-                    wgpu::PrimitiveTopology::TriangleList
-        );
-
         McApp::create_textures(&configuration, &mut textures);
 
-        let render_bind_groups = create_bind_groups(
-                                     &configuration.device,
-                                     &render_object.bind_group_layout_entries,
-                                     &render_object.bind_group_layouts,
-                                     &vec![
-                                         vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                                 buffer: &camera.get_camera_uniform(&configuration.device),
-                                                 offset: 0,
-                                                 size: None,
-                                         })],
-                                        vec![&wgpu::BindingResource::TextureView(&textures.get("slime").unwrap().view),
-                                             &wgpu::BindingResource::Sampler(&textures.get("slime").unwrap().sampler),
-                                             &wgpu::BindingResource::TextureView(&textures.get("slime2").unwrap().view),
-                                             &wgpu::BindingResource::Sampler(&textures.get("slime2").unwrap().sampler)
-                                        ]
-                                     ]
-        );
+        // RenderObject for basic triangle mesh rendering with 2 textures.
+        let triangle_mesh_renderer_tex2 = Render_VVVVNNNN_camera_textures2::init(&configuration.device, &configuration.sc_desc);
 
-        println!("Creating compute object.");
-
-        //++ let noise_params = NoiseParams {
-        //++     global_dim: [GLOBAL_NOISE_X_DIMENSION, GLOBAL_NOISE_Y_DIMENSION, GLOBAL_NOISE_Z_DIMENSION],
-        //++     time: 0.0,
-        //++     local_dim: [LOCAL_NOISE_X_DIMENSION, LOCAL_NOISE_Y_DIMENSION, LOCAL_NOISE_Z_DIMENSION],
-        //++     value: 0.0,
-        //++ };
-
-        //++ buffers.insert(
-        //++     "noise_params".to_string(),
-        //++     buffer_from_data::<NoiseParams>(
-        //++     &configuration.device,
-        //++     &vec![noise_params],
-        //++     wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //++     None)
-        //++ );
-
-        //++ buffers.insert(
-        //++     "noise_output".to_string(),
-        //++     configuration.device.create_buffer(&wgpu::BufferDescriptor {
-        //++         label: Some("Noise output buffer"),
-        //++         size: NOISE_BUFFER_SIZE as u64, 
-        //++         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //++         mapped_at_creation: false,
-        //++     })
-        //++ );
+        let triangle_mesh_bindgroups_tex2 = 
+                triangle_mesh_renderer_tex2.create_bingroups(
+                    &configuration.device,
+                    &mut camera,
+                    &light,
+                    &render_params,
+                    textures.get("lava3").unwrap(),
+                    textures.get("lava").unwrap(),
+                );
 
         buffers.insert(
             "mc_output".to_string(),
@@ -294,7 +217,6 @@ impl Application for McApp {
                 mapped_at_creation: false,
             })
         );
-        
 
         ///// The mc struct. /////
 
@@ -316,7 +238,21 @@ impl Application for McApp {
                 ],
         };
 
-        println!("compiling mc shader");
+        let noise_maker = NoiseMaker::init(
+                &configuration.device,
+                &"main".to_string(),
+                [32, 32, 32],
+                [4, 4, 4],
+                [0.0, 0.0, 0.0],
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+        );
+
         let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("mc compute shader"),
                         source: wgpu::ShaderSource::Wgsl(
@@ -324,19 +260,10 @@ impl Application for McApp {
                         }
         );
 
-        let noise_maker = NoiseMaker::init(
-                &configuration.device,
-                &"main".to_string(),
-                [32, 32, 32],
-                [4, 4, 4],
-                [0.0, 0.0, 0.0]
-        );
-
         let mc_instance = MarchingCubes::init_with_noise_buffer(
             &configuration.device,
             &mc_params,
             &mc_shader,
-            //&buffers.get(&"noise_output".to_string()).unwrap(),
             noise_maker.get_buffer(),
             &buffers.get(&"mc_output".to_string()).unwrap(),
         );
@@ -384,8 +311,9 @@ impl Application for McApp {
 
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            render_object: render_object,
-            render_bind_groups: render_bind_groups,
+            light: light,
+            triangle_mesh_renderer_tex2: triangle_mesh_renderer_tex2,
+            triangle_mesh_bindgroups_tex2: triangle_mesh_bindgroups_tex2,
             //++ noise_compute_object: noise_compute_object,
             //++ noise_compute_bind_groups: noise_compute_bind_groups,
             textures: textures,
@@ -424,13 +352,14 @@ impl Application for McApp {
              &mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_bind_groups,
-             &self.render_object.pipeline,
+             &self.triangle_mesh_bindgroups_tex2,
+             &self.triangle_mesh_renderer_tex2.get_render_object().pipeline,
              &self.buffers.get("mc_output").unwrap(),
              self.marching_cubes.get_draw_indirect_buffer(),
              0,
              clear
         );
+
         queue.submit(Some(encoder.finish()));
 
         self.screen.prepare_for_rendering();
