@@ -33,3 +33,7 @@ path = "src/fmm.rs"
 [[example]]
 name = "mc_terrain"
 path = "src/mc_terrain.rs"
+
+[[example]]
+name = "fast_marching_method"
+path = "src/fast_marching_method.rs"
