@@ -31,5 +31,5 @@ name = "fmm"
 path = "src/fmm.rs"
 
 [[example]]
-name = "eikonal"
-path = "src/eikonal.rs"
+name = "mc_terrain"
+path = "src/mc_terrain.rs"

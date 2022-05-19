@@ -62,10 +62,10 @@ const MC_OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
                                     FMM_INNER_Z *
                                     size_of::<f32>()) as u32 * 16;
 
-/// Features and limits for Eikonal application.
-struct EikonalFeatures {}
+/// Features and limits for McTerrain application.
+struct McTerrainFeatures {}
 
-impl WGPUFeatures for EikonalFeatures {
+impl WGPUFeatures for McTerrainFeatures {
 
     fn optional_features() -> wgpu::Features {
         wgpu::Features::TIMESTAMP_QUERY
@@ -85,8 +85,8 @@ impl WGPUFeatures for EikonalFeatures {
     }
 }
 
-/// Eikonal solver. A Fast marching method (GPU) for solving the eikonal equation.
-struct Eikonal {
+/// McTerrain solver. A Fast marching method (GPU) for solving the eikonal equation.
+struct McTerrain {
     camera: Camera,
     // gpu_debugger: GpuDebugger,
     gpu_timer: Option<GpuTimer>,
@@ -138,7 +138,7 @@ struct Eikonal {
 //++    pub other_render_params: OtherRenderParams,
 }
 
-impl Application for Eikonal {
+impl Application for McTerrain {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
@@ -475,7 +475,7 @@ impl Application for Eikonal {
 
 fn main() {
     
-    jaankaup_core::template::run_loop::<Eikonal, BasicLoop, EikonalFeatures>(); 
+    jaankaup_core::template::run_loop::<McTerrain, BasicLoop, McTerrainFeatures>(); 
     println!("Finished...");
 }
 
