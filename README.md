@@ -16,6 +16,8 @@ $ cargo run --example curves (some space-filling curve visualizations)
 
 $ cargo run --example mc (marching cubes test, compiles to wasm)
 
+$ cargo run --example mc_terrain (marching cubes terrain editor, compiles to wasm)
+
 $ cargo run --example basic (a textured cube, compiles to wasm)
 
 $ cargo run --example visualizer (just testing aabb:s, arrows and numbers)
