@@ -14,6 +14,7 @@ pub mod histogram;
 pub mod gpu_timer;
 pub mod render_things;
 pub mod shaders;
+pub mod fmm_things;
 pub use wgpu;
 pub use winit;
 pub use log;
