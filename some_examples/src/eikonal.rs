@@ -81,6 +81,7 @@ impl WGPUFeatures for EikonalFeatures {
         // limits.max_compute_workgroup_size_x = 1024;
         limits.max_storage_buffers_per_shader_stage = 10;
         limits
+        //++ wgpu::Limits::downlevel_webgl2_defaults()
     }
 }
 

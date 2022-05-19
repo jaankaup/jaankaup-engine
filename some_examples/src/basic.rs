@@ -18,6 +18,8 @@ use jaankaup_core::log;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_models::cube::create_cube;
+use jaankaup_core::shaders::{Render_VVVVNNNN_camera, Render_VVVVNNNN_camera_textures2};
+use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 //use bytemuck::{Pod,Zeroable};
 
 struct BasicFeatures {}
@@ -30,17 +32,22 @@ impl WGPUFeatures for BasicFeatures {
         // wgpu::Features::SPIRV_SHADER_PASSTHROUGH
     }
     fn required_limits() -> wgpu::Limits {
-        let mut limits = wgpu::Limits::default();
-        limits.max_storage_buffers_per_shader_stage = 8;
-        limits
+        // let mut limits = wgpu::Limits::default();
+        // limits.max_storage_buffers_per_shader_stage = 8;
+        // limits
+        wgpu::Limits::downlevel_webgl2_defaults()
     }
 }
 
 // State for this application.
 struct BasicApp {
     pub screen: ScreenTexture, 
-    pub render_object: RenderObject, 
-    pub bind_groups: Vec<wgpu::BindGroup>,
+    //++ pub render_object: RenderObject, 
+    //++ pub bind_groups: Vec<wgpu::BindGroup>,
+    light: LightBuffer,
+    render_params: RenderParamBuffer,
+    triangle_mesh_renderer_tex2: Render_VVVVNNNN_camera_textures2,
+    triangle_mesh_bindgroups_tex2: Vec<wgpu::BindGroup>,
     pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
     pub camera: Camera,
@@ -102,6 +109,10 @@ impl Application for BasicApp {
         log::info!("creating texture: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
         let (grass2, rock, lava, luava) = Self::create_textures(&configuration);
 
+        // Camera.
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 5.0, 10.0), -90.0, 0.0);
+        camera.set_rotation_sensitivity(0.2);
+
         let mut textures: HashMap<String, Texture> = HashMap::new();
         textures.insert("grass".to_string(), grass2);
         textures.insert("rock".to_string(), rock);
@@ -111,96 +122,47 @@ impl Application for BasicApp {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
         buffers.insert("cube".to_string(), create_cube(&configuration.device, false));
 
-        let render_object =
-                RenderObject::init(
+        // Light source for triangle meshes.
+        let light = LightBuffer::create(
+                      &configuration.device,
+                      [25.0, 55.0, 25.0], // pos
+                      // [25, 25, 130],  // spec
+                      [25, 25, 130],  // spec
+                      [255,200,255], // light 
+                      55.0,
+                      0.35,
+                      0.000013
+        );
+
+        // Scale_factor for triangle meshes.
+        let render_params = RenderParamBuffer::create(
                     &configuration.device,
-                    &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("renderer_v4n4_module"),
-                        source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4.wgsl"))),
-                            //Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_wasm.wgsl"))),
-                    }),
-                    &vec![wgpu::VertexFormat::Float32x4, wgpu::VertexFormat::Float32x4],
-                    &vec![
-                        // Group 0
-                        vec![wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                    },
-                                count: None,
-                            },
-                        ],
-                        // Group 1
-                        vec![wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Texture {
-                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                    view_dimension: wgpu::TextureViewDimension::D2,
-                                    multisampled: false,
-                                },
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 2,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Texture {
-                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                    view_dimension: wgpu::TextureViewDimension::D2,
-                                    multisampled: false,
-                                },
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 3,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                                count: None,
-                            }
-                        ] // Set 1
-                    ],
-                    Some("Basic vvvvnnnn renderer with camera."),
-                    true,
-                    wgpu::PrimitiveTopology::TriangleList
+                    1.0
         );
 
-        // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 5.0, 10.0), -90.0, 0.0);
-        camera.set_rotation_sensitivity(0.2);
+        // RenderObject for basic triangle mesh rendering.
+        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
 
-        // Create bind groups for basic render pipeline and grass/rock textures.
-        let bind_groups = create_bind_groups(
-                                &configuration.device,
-                                &render_object.bind_group_layout_entries,
-                                &render_object.bind_group_layouts,
-                                &vec![
-                                    vec![&wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                            buffer: &camera.get_camera_uniform(&configuration.device),
-                                            offset: 0,
-                                            size: None,
-                                    })],
-                                    vec![&wgpu::BindingResource::TextureView(&textures.get("grass").unwrap().view),
-                                         &wgpu::BindingResource::Sampler(&textures.get("grass").unwrap().sampler),
-                                         &wgpu::BindingResource::TextureView(&textures.get("rock").unwrap().view),
-                                         &wgpu::BindingResource::Sampler(&textures.get("rock").unwrap().sampler)]
-                                ]
-        );
+        // RenderObject for basic triangle mesh rendering with 2 textures.
+        let triangle_mesh_renderer_tex2 = Render_VVVVNNNN_camera_textures2::init(&configuration.device, &configuration.sc_desc);
+
+        // Create bindgroups for triangle_mesh_renderer.
+        let triangle_mesh_bindgroups_tex2 = 
+                triangle_mesh_renderer_tex2.create_bingroups(
+                    &configuration.device,
+                    &mut camera,
+                    &light,
+                    &render_params,
+                    textures.get("rock").unwrap(),
+                    textures.get("grass").unwrap(),
+                );
  
         BasicApp {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            render_object: render_object,
-            bind_groups,
+            light: light,
+            render_params: render_params,
+            triangle_mesh_renderer_tex2,
+            triangle_mesh_bindgroups_tex2: triangle_mesh_bindgroups_tex2,
             _textures: textures,
             buffers: buffers,
             camera: camera,
@@ -228,12 +190,13 @@ impl Application for BasicApp {
         // Ownership?
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Draw the cube.
         draw(&mut encoder,
              &view,
              self.screen.depth_texture.as_ref().unwrap(),
-             &self.bind_groups,
-             &self.render_object.pipeline,
+             // &self.triangle_mesh_bindgroups,
+             // &self.triangle_mesh_renderer.get_render_object().pipeline,
+             &self.triangle_mesh_bindgroups_tex2,
+             &self.triangle_mesh_renderer_tex2.get_render_object().pipeline,
              &self.buffers.get("cube").unwrap(),
              0..36, // TODO: Cube 
              true
