@@ -1,6 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use crate::impl_convert;
 use crate::misc::Convert2Vec;
+use crate::buffer::buffer_from_data;
 
 /// Tag value for Far cell.
 const FAR: u32      = 0;
@@ -36,7 +37,51 @@ struct ComputationalDomain {
 impl_convert!{FMMCell}
 impl_convert!{ComputationalDomain}
 
-struct ComputationalDomainBuffer {
+/// A struct for Computational domain data, operations and buffer.
+pub struct ComputationalDomainBuffer {
     computational_domain: ComputationalDomain,
     buffer: wgpu::Buffer,
+}
+
+impl ComputationalDomainBuffer {
+    
+    /// Initialize and create ComputationalDomainBuffer object.
+    pub fn create(device: &wgpu::Device,
+                  global_dimension: [u32; 3],
+                  local_dimension: [u32; 3]) -> Self {
+
+        // TODO: asserts
+
+        let domain = ComputationalDomain {
+            global_dimension,
+            local_dimension,
+        };
+
+        let buf = buffer_from_data::<ComputationalDomain>(
+                  &device,
+                  &vec![domain],
+                  wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                  Some("Computational domain wgpu::buffer.")
+        );
+
+        Self {
+            computational_domain: domain,
+            buffer: buf,
+        }
+    }
+
+    /// Update buffer.
+    fn update(&self, queue: &wgpu::Queue) {
+        
+        queue.write_buffer(
+            &self.buffer,
+            0,
+            bytemuck::cast_slice(&[self.computational_domain])
+        );
+    }
+
+    pub fn update_global_dimension(&mut self, queue: &wgpu::Queue, global_dimension: [u32; 3]) {
+        // TODO: asserts
+        self.computational_domain.global_dimension = global_dimension;
+    }
 }

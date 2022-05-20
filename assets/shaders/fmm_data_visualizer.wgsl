@@ -23,7 +23,7 @@ struct Char {
 };
 
 let FONT_SIZE = 0.015;
-let AABB_SIZE = 0.06;
+let AABB_SIZE = 0.26;
 
 // FMM tags
 // 0 :: Far
@@ -294,13 +294,26 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     0u
     );
 
+    var position_u32_temp = decode3Dmorton32(global_id.x); // * 0.25;
+    // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) % 4u; 
+    let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
+    let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
+    let permutation_color1 = rgba_u32(0u, 255u, 0u, 255u);
+    let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
+    let permutation_color3 = rgba_u32(0u, 155u, 155u, 255u);
+
     if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
 
-        visualize_cell(position, col);
-        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+        if (permutation_number == 0u) { visualize_cell(position, permutation_color0);} 
+        if (permutation_number == 1u) { visualize_cell(position, permutation_color1);} 
+        if (permutation_number == 2u) { visualize_cell(position, permutation_color2);} 
+        if (permutation_number == 3u) { visualize_cell(position, permutation_color3);} 
 
-            output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
-         }
+        // visualize_cell(position, col);
+        // if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+
+        //     output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+        //  }
     }
     if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
         visualize_cell(position, col);
