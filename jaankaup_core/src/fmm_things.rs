@@ -85,3 +85,7 @@ impl ComputationalDomainBuffer {
         self.computational_domain.global_dimension = global_dimension;
     }
 }
+
+pub struct DomainTester {
+
+};

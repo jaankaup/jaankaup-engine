@@ -295,8 +295,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     );
 
     var position_u32_temp = decode3Dmorton32(global_id.x); // * 0.25;
-    // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) % 4u; 
-    let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
+    let permutation_number = (2u * position_u32_temp.x +  13u * position_u32_temp.y + 17u * position_u32_temp.z) % 4u; 
+    // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
+    // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
     let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
     let permutation_color1 = rgba_u32(0u, 255u, 0u, 255u);
     let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
