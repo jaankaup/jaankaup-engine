@@ -1,10 +1,10 @@
 // TODO: add padding to Rust struct.
-struct ComputationalDomain {
+struct Computationaldomain {
     global_dimension: array<u32, 3>,
     local_dimension:  array<u32, 3>,
 };
 
-/// Parameters for permutations.
+/// parameters for permutations.
 struct Permutation {
     mod: u32,
     x_factor: u32,  
@@ -42,11 +42,13 @@ struct Arrow {
     size:  f32,
 };
 
-@group(0) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;
-@group(0) @binding(1) var<storage,read_write> output_char: array<Char>;
-@group(0) @binding(2) var<storage,read_write> output_arrow: array<Arrow>;
-@group(0) @binding(3) var<storage,read_write> output_aabb: array<AABB>;
-@group(0) @binding(4) var<storage,read_write> output_aabb_wire: array<AABB>;
+@group(0) @binding(0) var<storage,read_write> computational_domain: ComputationalDomain;
+@group(0) @binding(1) var<storage,read_write> permutations: array<Permutation>;
+@group(0) @binding(2) var<storage,read_write> counter: array<atomic<u32>>;
+@group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
+@group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
+@group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
+@group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 /// xy-plane indexing. (x,y,z) => index
 fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
