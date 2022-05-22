@@ -200,6 +200,13 @@ impl Application for TestProject {
             &surface
         );
 
+        let buf = buffer_from_data::<f32>(
+                  &device,
+                  &vec![1.0,2.0,3.0,2.0,4.0],
+                  wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                  Some("Computational domain wgpu::buffer.")
+        );
+
         let mut encoder = device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
@@ -211,17 +218,17 @@ impl Application for TestProject {
 
         let mut clear = true;
 
-        // draw(&mut encoder,
-        //      &view,
-        //      self.screen.depth_texture.as_ref().unwrap(),
-        //      if self.texture_setup { &self.triangle_mesh_bindgroups_tex2 } else { &self.triangle_mesh_bindgroups_tex2b },
-        //      &self.triangle_mesh_renderer_tex2.get_render_object().pipeline,
-        //      &fire_tower.get_buffer(),
-        //      0..fire_tower.get_triangle_count() * 3, 
-        //      clear
-        // );
-        // 
-        // clear = false;
+        draw(&mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.triangle_mesh_bindgroups,
+             &self.triangle_mesh_renderer.get_render_object().pipeline,
+             &fire_tower.get_buffer(),
+             0..fire_tower.get_triangle_count() * 3, 
+             clear
+        );
+        
+        clear = false;
 
         queue.submit(Some(encoder.finish())); 
 

@@ -1,7 +1,7 @@
 // TODO: add padding to Rust struct.
 struct ComputationalDomain {
-    global_dimension: array<u32, 3>,
-    local_dimension:  array<u32, 3>,
+    global_dimension: vec3<u32>,
+    local_dimension:  vec3<u32>,
 };
 
 /// parameters for permutations.
@@ -50,6 +50,43 @@ struct Arrow {
 @group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
 @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
 
+fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
+    var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
+        x_temp = (x_temp | (x_temp <<  8u)) & 0x0300F00Fu;
+        x_temp = (x_temp | (x_temp <<  4u)) & 0x030C30C3u;
+        x_temp = (x_temp | (x_temp <<  2u)) & 0x09249249u;
+
+    var y_temp = (y      | (y      << 16u)) & 0x030000FFu;
+        y_temp = (y_temp | (y_temp <<  8u)) & 0x0300F00Fu;
+        y_temp = (y_temp | (y_temp <<  4u)) & 0x030C30C3u;
+        y_temp = (y_temp | (y_temp <<  2u)) & 0x09249249u;
+
+    var z_temp = (z      | (z      << 16u)) & 0x030000FFu;
+        z_temp = (z_temp | (z_temp <<  8u)) & 0x0300F00Fu;
+        z_temp = (z_temp | (z_temp <<  4u)) & 0x030C30C3u;
+        z_temp = (z_temp | (z_temp <<  2u)) & 0x09249249u;
+
+    return x_temp | (y_temp << 1u) | (z_temp << 2u);
+}
+
+fn get_third_bits32(m: u32) -> u32 {
+    var x = m & 0x9249249u;
+    x = (x ^ (x >> 2u))  & 0x30c30c3u;
+    x = (x ^ (x >> 4u))  & 0x0300f00fu;
+    x = (x ^ (x >> 8u))  & 0x30000ffu;
+    x = (x ^ (x >> 16u)) & 0x000003ffu;
+
+    return x;
+}
+
+fn decode3Dmorton32(m: u32) -> vec3<u32> {
+    return vec3<u32>(
+        get_third_bits32(m),
+        get_third_bits32(m >> 1u),
+        get_third_bits32(m >> 2u)
+   );
+}
+
 /// xy-plane indexing. (x,y,z) => index
 fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   var x  = index;
@@ -69,21 +106,21 @@ fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
 }
 
 /// Get cell index based on domain dimension.
-//++ fn get_cell_index(global_index: u32) -> vec3<u32> {
-//++ 
-//++     let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
-//++     let block_index = global_index / stride;
-//++     let block_position = index_to_uvec3(block_index, mc_uniform.noise_global_dimension.x, mc_uniform.noise_global_dimension.y) * mc_uniform.noise_local_dimension;
-//++ 
-//++     // Calculate local position.
-//++     let local_index = global_index - block_index * stride;
-//++ 
-//++     let local_position = decode3Dmorton32(local_index);
-//++ 
-//++     let cell_position = block_position + local_position;
-//++ 
-//++     return cell_position; 
-//++ }
+fn get_cell_index(global_index: u32) -> vec3<u32> {
+
+    let stride = computational_domain.local_dimension.x * computational_domain.local_dimension.y * computational_domain.local_dimension.z;
+    let block_index = global_index / stride;
+    let block_position = index_to_uvec3(block_index, computational_domain.global_dimension.x, computational_domain.global_dimension.y) * computational_domain.local_dimension;
+
+    // Calculate local position.
+    let local_index = global_index - block_index * stride;
+
+    let local_position = decode3Dmorton32(local_index);
+
+    let cell_position = block_position + local_position;
+
+    return cell_position; 
+}
 
 @compute
 @workgroup_size(64,1,1)

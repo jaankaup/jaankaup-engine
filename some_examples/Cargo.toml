@@ -39,5 +39,5 @@ name = "fast_marching_method"
 path = "src/fast_marching_method.rs"
 
 [[example]]
-name = "domain_tester"
+name = "test"
 path = "src/test.rs"
