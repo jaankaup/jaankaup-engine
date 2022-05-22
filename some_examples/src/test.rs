@@ -101,11 +101,16 @@ use jaankaup_core::input::*;
         buffers: HashMap<String, wgpu::Buffer>,
         triangle_meshes: HashMap<String, TriangleMesh>,
         domain_tester: DomainTester,
+        aabb_size: f32,
+        font_size: f32,
     }
 
     impl Application for TestProject {
 
         fn init(configuration: &WGPUConfiguration) -> Self {
+
+            let aabb_size: f32 = 0.15;
+            let font_size: f32 = 0.016;
 
             // Log adapter info.
             log_adapter_info(&configuration.adapter);
@@ -169,6 +174,8 @@ use jaankaup_core::input::*;
                 &gpu_debugger,
                 [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
                 [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+                0.15,
+                0.016,
                 &permutations
                 );
 
@@ -202,6 +209,8 @@ use jaankaup_core::input::*;
                 buffers: buffers,
                 triangle_meshes: triangle_meshes,
                 domain_tester: domain_tester,
+                aabb_size: aabb_size,
+                font_size: font_size,
             }
     }
 
@@ -279,6 +288,23 @@ use jaankaup_core::input::*;
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
+        if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) { 
+            if self.font_size - 0.0005 > 0.0 && self.aabb_size - 0.01 > 0.0 {
+                self.font_size = self.font_size - 0.0005;
+                self.aabb_size = self.aabb_size - 0.01;
+                self.domain_tester.update_font_size(queue, self.font_size);
+                self.domain_tester.update_aabb_size(queue, self.aabb_size);
+            }
+        }
+
+        if self.keyboard_manager.test_key(&Key::NumpadAdd, input) {
+              self.font_size = self.font_size + 0.0005;
+              self.aabb_size = self.aabb_size + 0.01;
+              self.domain_tester.update_font_size(queue, self.font_size);
+              self.domain_tester.update_aabb_size(queue, self.aabb_size);
+        }
+
+
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
                                FMM_GLOBAL_Z *
@@ -341,28 +367,6 @@ fn create_gpu_debugger(device: &wgpu::Device,
         )
 }
 
-/// Initialize and create KeyboardManager. Register all the keys that are used in the application.
-/// Registered keys: P, N, Key1, Key2, Key3, Key4, Key0
-fn create_keyboard_manager() -> KeyboardManager {
-
-        let mut keys = KeyboardManager::init();
-
-        keys.register_key(Key::Up, 5.0);
-        keys.register_key(Key::Down, 5.0);
-        keys.register_key(Key::P, 5.0);
-        keys.register_key(Key::O, 5.0);
-        keys.register_key(Key::Key1, 20.0);
-        keys.register_key(Key::Key2, 20.0);
-        keys.register_key(Key::Key3, 20.0);
-        keys.register_key(Key::Key4, 20.0);
-        keys.register_key(Key::Key5, 20.0);
-        keys.register_key(Key::Key0, 20.0);
-        keys.register_key(Key::N, 200.0);
-        keys.register_key(Key::Space, 50.0);
-        
-        keys
-}
-
 /// Load a wavefront mesh and store it to hash_map. Drop texture coordinates.
 fn load_vvvnnn_mesh(device: &wgpu::Device,
                     data: String,
@@ -396,4 +400,15 @@ fn load_vvvnnn_mesh(device: &wgpu::Device,
                                        &triangle_mesh_wood,
                                        buffer_name,
                                        triangle_mesh_draw_count)
+}
+
+/// Initialize and create KeyboardManager. Register all the keys that are used in the application.
+fn create_keyboard_manager() -> KeyboardManager {
+
+        let mut keys = KeyboardManager::init();
+
+        keys.register_key(Key::NumpadSubtract, 50.0);
+        keys.register_key(Key::NumpadAdd, 50.0);
+        
+        keys
 }

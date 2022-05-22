@@ -1,9 +1,9 @@
 // TODO: add padding to Rust struct.
 struct ComputationalDomain {
     global_dimension: vec3<u32>,
-    padding: u32,
+    aabb_size: f32,
     local_dimension:  vec3<u32>,
-    padding2: u32,
+    font_size: f32,
 };
 
 /// parameters for permutations.
@@ -44,6 +44,7 @@ struct Arrow {
     size:  f32,
 };
 
+let FONT_SIZE = 0.015;
 let AABB_SIZE = 0.26;
 
 @group(0) @binding(0) var<uniform> computational_domain: ComputationalDomain;
@@ -53,6 +54,84 @@ let AABB_SIZE = 0.26;
 @group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
 @group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
 @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
+
+struct ModF {
+    fract: f32,
+    whole: f32,
+};
+
+fn myTruncate(f: f32) -> f32 {
+    return select(f32( i32( floor(f) ) ), f32( i32( ceil(f) ) ), f < 0.0); 
+}
+
+fn my_modf(f: f32) -> ModF {
+    let iptr = trunc(f);
+    let fptr = f - iptr;
+    return ModF (
+        select(fptr, (-1.0)*fptr, f < 0.0),
+        iptr
+    );
+}
+
+/// if the given integer is < 0, return 0. Otherwise 1 is returned.
+fn the_sign_of_i32(n: i32) -> u32 {
+    return (u32(n) >> 31u);
+    //return 1u ^ (u32(n) >> 31u);
+}
+
+fn abs_i32(n: i32) -> u32 {
+    let mask = u32(n) >> 31u;
+    return (u32(n) + mask) ^ mask;
+}
+
+fn log2_u32(n: u32) -> u32 {
+
+    var v = n;
+    var r = (u32((v > 0xFFFFu))) << 4u;
+    var shift = 0u;
+
+    v  = v >> r;
+    shift = (u32((v > 0xFFu))) << 3u;
+
+    v = v >> shift;
+    r = r | shift;
+
+    shift = (u32(v > 0xFu)) << 2u;
+    v = v >> shift;
+    r = r | shift;
+
+    shift = (u32(v > 0x3u)) << 1u;
+    v = v >> shift;
+    r = r | shift;
+    r = r | (v >> 1u);
+    return r;
+}
+
+var<private> PowersOf10: array<u32, 10> = array<u32, 10>(1u, 10u, 100u, 1000u, 10000u, 100000u, 1000000u, 10000000u, 100000000u, 1000000000u);
+
+// NOT defined if u == 0u.
+fn log10_u32(n: u32) -> u32 {
+    
+    var v = n;
+    var r: u32;
+    var t: u32;
+    
+    t = (log2_u32(v) + 1u) * 1233u >> 12u;
+    r = t - u32(v < PowersOf10[t]);
+    return r;
+}
+
+fn number_of_chars_i32(n: i32) -> u32 {
+
+    if (n == 0) { return 1u; }
+    return the_sign_of_i32(n) + log10_u32(u32(abs(n))) + 1u;
+} 
+
+fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
+
+    let m = my_modf(f);
+    return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u;
+}
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
     var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
@@ -102,6 +181,19 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   return vec3<u32>(x, y, z);
 }
 
+var<private> NumberOfExtraChars: array<u32, 5> = array<u32, 5>(0u, 0u, 2u, 2u, 2u);
+
+fn number_of_chars_data(data: vec4<f32>, vec_dim_count: u32, number_of_decimals: u32) -> u32 {
+    
+    // Calculate all possible char counts to avoid branches.
+    let a = number_of_chars_f32(data.x, number_of_decimals) * u32(vec_dim_count >= 1u);
+    let b = number_of_chars_f32(data.y, number_of_decimals) * u32(vec_dim_count >= 2u);
+    let c = number_of_chars_f32(data.z, number_of_decimals) * u32(vec_dim_count >= 3u);
+    let d = number_of_chars_f32(data.w, number_of_decimals) * u32(vec_dim_count >= 4u);
+
+    return a + b + c + d + NumberOfExtraChars[vec_dim_count]; 
+}
+
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
     return ((*coord).x >= 0 && (*coord).x < 64) &&
@@ -138,12 +230,30 @@ fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
 
-fn visualize_cell(position: vec3<f32>, color: u32) {
+fn visualize_cell(position: vec3<f32>, color: u32, global_id: u32) {
     output_aabb[atomicAdd(&counter[2], 1u)] =
           AABB (
-              vec4<f32>(position - vec3<f32>(AABB_SIZE), bitcast<f32>(color)),
-              vec4<f32>(position + vec3<f32>(AABB_SIZE), 0.0),
+              vec4<f32>(position - vec3<f32>(computational_domain.aabb_size), bitcast<f32>(color)),
+              vec4<f32>(position + vec3<f32>(computational_domain.aabb_size), 0.0),
           );
+
+    //let color_text = rgba_u32(155u, 0u, 155u, 255u);
+    let color_text = rgba_u32(255u, 255u, 255u, 255u);
+
+    let value = vec4<f32>(f32(global_id), 0.0, 0.0, 0.0);
+    let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
+    let element_position = position - vec3<f32>(f32(total_number_of_chars) * computational_domain.font_size * 0.5, 0.0, (-1.0) * computational_domain.aabb_size - 0.001);
+    let renderable_element = Char (
+                    element_position,
+                    computational_domain.font_size,
+                    value,
+                    1u,
+                    color_text,
+                    1u,
+                    0u
+    );
+
+    output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
 }
 
 @compute
@@ -174,13 +284,13 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
     let permutation_color3 = rgba_u32(0u, 155u, 155u, 255u);
 
-    var col = 0u;
-    if (permutation_number == 0u) { col =  permutation_color0; }
-    else if (permutation_number == 1u) { col = permutation_color1; }
-    else if (permutation_number == 2u) { col = permutation_color2; }
-    else if (permutation_number == 3u) { col = permutation_color3; }
+    // var col = 0u;
+    // if (permutation_number == 0u) { col =  permutation_color0; }
+    // else if (permutation_number == 1u) { col = permutation_color1; }
+    // else if (permutation_number == 2u) { col = permutation_color2; }
+    // else if (permutation_number == 3u) { col = permutation_color3; }
 
-//    var col = select(select(select(select(0u, permutation_color3, permutation_number == 3u), permutation_color2, permutation_number == 2u), permutation_color1, permutation_number == 1u), permutation_color0, permutation_number == 0u);
+    var col = select(select(select(select(0u, permutation_color3, permutation_number == 3u), permutation_color2, permutation_number == 2u), permutation_color1, permutation_number == 1u), permutation_color0, permutation_number == 0u);
 
     // col = select(0u, permutation_color1, permutation_number == 1u);
     // col = select(0u, permutation_color2, permutation_number == 2u);
@@ -191,6 +301,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // col = select(0u, permutation_color2, permutation_number == 2u);
     // col = select(0u, permutation_color3, permutation_number == 3u);
 
-    visualize_cell(vec3<f32>(index), col);
+    visualize_cell(vec3<f32>(index), col, global_id.x);
     
 }

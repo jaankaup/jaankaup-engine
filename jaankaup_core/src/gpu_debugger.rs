@@ -173,7 +173,7 @@ impl GpuDebugger {
         );
 
         let arrow_aabb_params = ArrowAabbParams {
-            max_number_of_vertices: 123 as u32,
+            max_number_of_vertices: 2000 as u32,
             // max_number_of_vertices: VERTEX_BUFFER_SIZE as u32,
             iterator_start_index: 0,
             iterator_end_index: 0,

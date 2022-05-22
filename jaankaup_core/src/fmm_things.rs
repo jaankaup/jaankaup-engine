@@ -49,9 +49,9 @@ struct FMMCell {
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct ComputationalDomain {
     global_dimension: [u32; 3],
-    padding: u32,
+    aabb_size: f32,
     local_dimension:  [u32; 3],
-    padding2: u32,
+    font_size: f32,
 }
 
 impl_convert!{FMMCell}
@@ -68,15 +68,17 @@ impl ComputationalDomainBuffer {
     /// Initialize and create ComputationalDomainBuffer object.
     pub fn create(device: &wgpu::Device,
                   global_dimension: [u32; 3],
-                  local_dimension: [u32; 3]) -> Self {
+                  local_dimension: [u32; 3],
+                  aabb_size: f32,
+                  font_size: f32) -> Self {
 
         // TODO: asserts
 
         let domain = ComputationalDomain {
             global_dimension: global_dimension,
-            padding: 0,
+            aabb_size: aabb_size,
             local_dimension: local_dimension,
-            padding2: 0,
+            font_size: font_size,
         };
 
         let buf = buffer_from_data::<ComputationalDomain>(
@@ -113,6 +115,7 @@ impl ComputationalDomainBuffer {
     pub fn get_computational_domain(&self) -> ComputationalDomain {
         self.computational_domain
     }
+
 }
 
 pub struct DomainTester {
@@ -128,6 +131,8 @@ impl DomainTester {
                 gpu_debugger: &GpuDebugger,
                 global_dimension: [u32; 3],
                 local_dimension: [u32; 3],
+                aabb_size: f32,
+                font_size: f32,
                 permutations: &Vec<Permutation>,
                 ) -> Self {
 
@@ -141,7 +146,9 @@ impl DomainTester {
         let computational_domain_buffer = ComputationalDomainBuffer::create(
                   device,
                   global_dimension,
-                  local_dimension
+                  local_dimension,
+                  aabb_size,
+                  font_size,
         );
 
         let permutations_buffer = buffer_from_data::<Permutation>(
@@ -208,6 +215,16 @@ impl DomainTester {
         }
     }
 
+    pub fn update_font_size(&mut self, queue: &wgpu::Queue, font_size: f32) {
+        self.computational_domain_buffer.computational_domain.font_size = font_size; 
+        self.computational_domain_buffer.update(queue);
+    }
+
+    pub fn update_aabb_size(&mut self, queue: &wgpu::Queue, aabb_size: f32) {
+        self.computational_domain_buffer.computational_domain.aabb_size = aabb_size; 
+        self.computational_domain_buffer.update(queue);
+    }
+
     pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
 
         let global_dimension = self.computational_domain_buffer.get_computational_domain().global_dimension;
@@ -220,13 +237,6 @@ impl DomainTester {
                         local_dimension[0] *
                         local_dimension[1] *
                         local_dimension[2];
-        println!("global_dimension[0] == {}", global_dimension[0]);
-        println!("global_dimension[1] == {}", global_dimension[1]);
-        println!("global_dimension[2] == {}", global_dimension[2]);
-        println!("local_dimension[0] == {}", local_dimension[0]);
-        println!("local_dimension[1] == {}", local_dimension[1]);
-        println!("local_dimension[2] == {}", local_dimension[2]);
-        println!("total_grid_count == {}", total_grid_count);
 
         self.compute_object.dispatch(
             &self.bind_groups,
