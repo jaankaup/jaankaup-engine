@@ -25,7 +25,7 @@ use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::fmm_things::{DomainTester};
+use jaankaup_core::fmm_things::{DomainTester, Permutation};
 
     /// Max number of arrows for gpu debugger.
     const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -151,8 +151,25 @@ impl Application for TestProject {
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
+        // Permutations.
+        let mut permutations: Vec<Permutation> = Vec::new();
+
+        permutations.push(
+            Permutation { modulo: 3, x_factor: 2,  y_factor: 13,  z_factor: 17, }
+        );
+
+        // let permutation_number = (2u * position_u32_temp.x +  13u * position_u32_temp.y + 17u * position_u32_temp.z) % 4u; 
+        // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
+        // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
+        
         // The DomainTester.
-        let domain_tester = DomainTester::init(&configuration.device, &gpu_debugger);
+        let domain_tester = DomainTester::init(
+            &configuration.device,
+            &gpu_debugger,
+            [16, 16, 16],
+            [4, 4, 4],
+            &permutations
+            );
 
         // Container for triangle meshes.
         let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();

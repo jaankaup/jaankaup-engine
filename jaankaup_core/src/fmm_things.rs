@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use crate::render_object::ComputeObject;
-use crate::common_functions::create_uniform_bindgroup_layout;
-use crate::common_functions::create_buffer_bindgroup_layout;
+use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
 use crate::gpu_debugger::GpuDebugger;
 use bytemuck::{Pod, Zeroable};
 use crate::impl_convert;
@@ -22,6 +21,14 @@ const KNOWN: u32    = 3;
 
 /// Tag value for a cell outside the computational domain.
 const OUTSIDE: u32  = 4;
+
+/// parameters for permutations.
+pub struct Permutation {
+    pub modulo: u32,
+    pub x_factor: u32,  
+    pub y_factor: u32,  
+    pub z_factor: u32,  
+}
 
 /// Basic data for the fast marching method.
 #[repr(C)]
@@ -92,13 +99,16 @@ impl ComputationalDomainBuffer {
 }
 
 pub struct DomainTester {
-
+    computational_domain_buffer: ComputationalDomainBuffer,
 }
 
 impl DomainTester {
 
     pub fn init(device: &wgpu::Device,
-                gpu_debugger: &GpuDebugger
+                gpu_debugger: &GpuDebugger,
+                global_dimension: [u32; 3],
+                local_dimension: [u32; 3],
+                permutations: &Vec<Permutation>,
                 ) -> Self {
 
         let shader = &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -106,6 +116,12 @@ impl DomainTester {
                       source: wgpu::ShaderSource::Wgsl(
                           Cow::Borrowed(include_str!("../../assets/shaders/domain_test.wgsl"))),
                       }
+        );
+
+        let computational_domain_buffer = ComputationalDomainBuffer::create(
+                  device,
+                  global_dimension,
+                  local_dimension
         );
 
         let compute_object =
@@ -140,7 +156,9 @@ impl DomainTester {
                     &"main".to_string()
         );
 
-        Self {}
+        Self {
+            computational_domain_buffer
+        }
 
     }
 }
