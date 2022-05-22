@@ -27,33 +27,35 @@ use jaankaup_core::input::*;
     use jaankaup_core::common_functions::encode_rgba_u32;
     use jaankaup_core::fmm_things::{DomainTester, Permutation};
 
-        /// Max number of arrows for gpu debugger.
-        const MAX_NUMBER_OF_ARROWS:     usize = 40960;
+    /// Max number of arrows for gpu debugger.
+    const MAX_NUMBER_OF_ARROWS:     usize = 40960;
 
-        /// Max number of aabbs for gpu debugger.
-        const MAX_NUMBER_OF_AABBS:      usize = 262144;
+    /// Max number of aabbs for gpu debugger.
+    const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
-        /// Max number of box frames for gpu debugger.
-        const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+    /// Max number of box frames for gpu debugger.
+    const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 
-        /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-        const MAX_NUMBER_OF_CHARS:      usize = 262144;
+    /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
+    const MAX_NUMBER_OF_CHARS:      usize = 262144;
 
-        /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
-        const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
+    /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
+    const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
     /// Name for the fire tower mesh (assets/models/wood.obj).
     const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
     /// Global dimensions. 
-    const FMM_GLOBAL_X: usize = 32; 
-    const FMM_GLOBAL_Y: usize = 32; 
-    const FMM_GLOBAL_Z: usize = 32; 
+    const FMM_GLOBAL_X: usize = 16; 
+    const FMM_GLOBAL_Y: usize = 16; 
+    const FMM_GLOBAL_Z: usize = 16; 
 
     /// Inner dimensions.
     const FMM_INNER_X: usize = 4; 
     const FMM_INNER_Y: usize = 4; 
     const FMM_INNER_Z: usize = 4; 
+
+    const TOTAL_INDICES: usize = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 
     const OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
                                      FMM_GLOBAL_Y *
@@ -165,8 +167,8 @@ use jaankaup_core::input::*;
             let domain_tester = DomainTester::init(
                 &configuration.device,
                 &gpu_debugger,
-                [16, 16, 16],
-                [4, 4, 4],
+                [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
+                [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
                 &permutations
                 );
 

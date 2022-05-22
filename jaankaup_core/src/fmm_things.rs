@@ -1,4 +1,7 @@
 use crate::render_object::create_bind_groups;
+use crate::common_functions::{
+    udiv_up_safe32,
+};
 use std::borrow::Cow;
 use crate::render_object::ComputeObject;
 use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
@@ -217,11 +220,18 @@ impl DomainTester {
                         local_dimension[0] *
                         local_dimension[1] *
                         local_dimension[2];
+        println!("global_dimension[0] == {}", global_dimension[0]);
+        println!("global_dimension[1] == {}", global_dimension[1]);
+        println!("global_dimension[2] == {}", global_dimension[2]);
+        println!("local_dimension[0] == {}", local_dimension[0]);
+        println!("local_dimension[1] == {}", local_dimension[1]);
+        println!("local_dimension[2] == {}", local_dimension[2]);
+        println!("total_grid_count == {}", total_grid_count);
 
         self.compute_object.dispatch(
             &self.bind_groups,
             encoder,
-            total_grid_count / 1024, 1, 1, Some("Domain tester dispatch")
+            udiv_up_safe32(total_grid_count, 1024), 1, 1, Some("Domain tester dispatch")
         );
     }
 }

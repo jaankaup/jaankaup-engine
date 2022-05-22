@@ -1,7 +1,9 @@
 // TODO: add padding to Rust struct.
 struct ComputationalDomain {
     global_dimension: vec3<u32>,
+    padding: u32,
     local_dimension:  vec3<u32>,
+    padding2: u32,
 };
 
 /// parameters for permutations.
@@ -41,6 +43,8 @@ struct Arrow {
     color: u32,
     size:  f32,
 };
+
+let AABB_SIZE = 0.26;
 
 @group(0) @binding(0) var<uniform> computational_domain: ComputationalDomain;
 @group(0) @binding(1) var<storage,read_write> permutations: array<Permutation>;
@@ -105,12 +109,19 @@ fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
            ((*coord).z >= 0 && (*coord).z < 64); 
 }
 
+fn get_group_coordinate(global_index: u32) -> vec3<u32> {
+    let stride = computational_domain.local_dimension.x * computational_domain.local_dimension.y * computational_domain.local_dimension.z;
+    let block_index = global_index / stride;
+    return index_to_uvec3(block_index, computational_domain.global_dimension.x, computational_domain.global_dimension.y);
+}
+
 /// Get cell index based on domain dimension.
 fn get_cell_index(global_index: u32) -> vec3<u32> {
 
     let stride = computational_domain.local_dimension.x * computational_domain.local_dimension.y * computational_domain.local_dimension.z;
     let block_index = global_index / stride;
     let block_position = index_to_uvec3(block_index, computational_domain.global_dimension.x, computational_domain.global_dimension.y) * computational_domain.local_dimension;
+    // let block_position = index_to_uvec3(block_index, computational_domain.global_dimension.x, computational_domain.global_dimension.y) * computational_domain.local_dimension;
 
     // Calculate local position.
     let local_index = global_index - block_index * stride;
@@ -122,6 +133,19 @@ fn get_cell_index(global_index: u32) -> vec3<u32> {
     return cell_position; 
 }
 
+// Encode "rgba" to u32.
+fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
+  return (r << 24u) | (g << 16u) | (b  << 8u) | a;
+}
+
+fn visualize_cell(position: vec3<f32>, color: u32) {
+    output_aabb[atomicAdd(&counter[2], 1u)] =
+          AABB (
+              vec4<f32>(position - vec3<f32>(AABB_SIZE), bitcast<f32>(color)),
+              vec4<f32>(position + vec3<f32>(AABB_SIZE), 0.0),
+          );
+}
+
 @compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -130,10 +154,43 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let total_count = computational_domain.local_dimension.x *
                       computational_domain.local_dimension.y *
+                      computational_domain.local_dimension.z *
                       computational_domain.global_dimension.x *
                       computational_domain.global_dimension.y *
                       computational_domain.global_dimension.z;
 
     if (global_id.x >= total_count) { return; }
 
+    let index = get_cell_index(global_id.x);
+    
+    let group_coord = get_group_coordinate(global_id.x);
+
+    let permutation_number = (2u * group_coord.x +  13u * group_coord.y + 17u * group_coord.z) % 4u; 
+    // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
+    // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
+
+    let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
+    let permutation_color1 = rgba_u32(0u, 255u, 0u, 255u);
+    let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
+    let permutation_color3 = rgba_u32(0u, 155u, 155u, 255u);
+
+    var col = 0u;
+    if (permutation_number == 0u) { col =  permutation_color0; }
+    else if (permutation_number == 1u) { col = permutation_color1; }
+    else if (permutation_number == 2u) { col = permutation_color2; }
+    else if (permutation_number == 3u) { col = permutation_color3; }
+
+//    var col = select(select(select(select(0u, permutation_color3, permutation_number == 3u), permutation_color2, permutation_number == 2u), permutation_color1, permutation_number == 1u), permutation_color0, permutation_number == 0u);
+
+    // col = select(0u, permutation_color1, permutation_number == 1u);
+    // col = select(0u, permutation_color2, permutation_number == 2u);
+    // col = select(0u, permutation_color3, permutation_number == 3u);
+
+    // var col = select(0u, permutation_color0, permutation_number == 0u);
+    // col = select(0u, permutation_color1, permutation_number == 1u);
+    // col = select(0u, permutation_color2, permutation_number == 2u);
+    // col = select(0u, permutation_color3, permutation_number == 3u);
+
+    visualize_cell(vec3<f32>(index), col);
+    
 }
