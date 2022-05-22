@@ -1,3 +1,7 @@
+use std::borrow::Cow;
+use crate::render_object::ComputeObject;
+use crate::common_functions::create_uniform_bindgroup_layout;
+use crate::common_functions::create_buffer_bindgroup_layout;
 use crate::gpu_debugger::GpuDebugger;
 use bytemuck::{Pod, Zeroable};
 use crate::impl_convert;
@@ -97,7 +101,7 @@ impl DomainTester {
                 gpu_debugger: &GpuDebugger
                 ) -> Self {
 
-        let shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let shader = &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                       label: Some("domain_tester.wgsl"),
                       source: wgpu::ShaderSource::Wgsl(
                           Cow::Borrowed(include_str!("../../assets/shaders/domain_test.wgsl"))),

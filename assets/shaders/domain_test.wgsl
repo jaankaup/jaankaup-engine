@@ -1,12 +1,12 @@
 // TODO: add padding to Rust struct.
-struct Computationaldomain {
+struct ComputationalDomain {
     global_dimension: array<u32, 3>,
     local_dimension:  array<u32, 3>,
 };
 
 /// parameters for permutations.
 struct Permutation {
-    mod: u32,
+    modulo: u32,
     x_factor: u32,  
     y_factor: u32,  
     z_factor: u32,  
@@ -69,21 +69,21 @@ fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
 }
 
 /// Get cell index based on domain dimension.
-fn get_cell_index(global_index: u32) -> vec3<u32> {
-
-    let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
-    let block_index = global_index / stride;
-    let block_position = index_to_uvec3(block_index, mc_uniform.noise_global_dimension.x, mc_uniform.noise_global_dimension.y) * mc_uniform.noise_local_dimension;
-
-    // Calculate local position.
-    let local_index = global_index - block_index * stride;
-
-    let local_position = decode3Dmorton32(local_index);
-
-    let cell_position = block_position + local_position;
-
-    return cell_position; 
-}
+//++ fn get_cell_index(global_index: u32) -> vec3<u32> {
+//++ 
+//++     let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
+//++     let block_index = global_index / stride;
+//++     let block_position = index_to_uvec3(block_index, mc_uniform.noise_global_dimension.x, mc_uniform.noise_global_dimension.y) * mc_uniform.noise_local_dimension;
+//++ 
+//++     // Calculate local position.
+//++     let local_index = global_index - block_index * stride;
+//++ 
+//++     let local_position = decode3Dmorton32(local_index);
+//++ 
+//++     let cell_position = block_position + local_position;
+//++ 
+//++     return cell_position; 
+//++ }
 
 @compute
 @workgroup_size(64,1,1)

@@ -11,6 +11,7 @@ use jaankaup_core::template::{
         BasicLoop,
         Spawner,
 };
+use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObject, create_bind_groups};
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
 use jaankaup_core::buffer::{buffer_from_data};
@@ -24,22 +25,22 @@ use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::render_object::{draw, draw_indirect};
+use jaankaup_core::fmm_things::{DomainTester};
 
-/// Max number of arrows for gpu debugger.
-const MAX_NUMBER_OF_ARROWS:     usize = 40960;
+    /// Max number of arrows for gpu debugger.
+    const MAX_NUMBER_OF_ARROWS:     usize = 40960;
 
-/// Max number of aabbs for gpu debugger.
-const MAX_NUMBER_OF_AABBS:      usize = 262144;
+    /// Max number of aabbs for gpu debugger.
+    const MAX_NUMBER_OF_AABBS:      usize = 262144;
 
-/// Max number of box frames for gpu debugger.
-const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+    /// Max number of box frames for gpu debugger.
+    const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 
-/// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-const MAX_NUMBER_OF_CHARS:      usize = 262144;
+    /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
+    const MAX_NUMBER_OF_CHARS:      usize = 262144;
 
-/// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
-const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
+    /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
+    const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
 const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
@@ -84,7 +85,7 @@ impl WGPUFeatures for TestProjectFeatures {
     }
 }
 
-/// TestProject solver. A Fast marching method (GPU) for solving the eikonal equation.
+/// The purpose of this application is to test modules and functions.
 struct TestProject {
     camera: Camera,
     gpu_debugger: GpuDebugger,
@@ -97,6 +98,7 @@ struct TestProject {
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     triangle_meshes: HashMap<String, TriangleMesh>,
+    domain_tester: DomainTester,
 }
 
 impl Application for TestProject {
@@ -124,7 +126,6 @@ impl Application for TestProject {
         let light = LightBuffer::create(
                       &configuration.device,
                       [25.0, 55.0, 25.0], // pos
-                      // [25, 25, 130],  // spec
                       [25, 25, 130],  // spec
                       [255,200,255], // light 
                       55.0,
@@ -149,6 +150,9 @@ impl Application for TestProject {
 
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
+
+        // The DomainTester.
+        let domain_tester = DomainTester::init(&configuration.device, &gpu_debugger);
 
         // Container for triangle meshes.
         let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
@@ -179,6 +183,7 @@ impl Application for TestProject {
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
             triangle_meshes: triangle_meshes,
+            domain_tester: domain_tester,
         }
     }
 

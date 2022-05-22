@@ -37,3 +37,7 @@ path = "src/mc_terrain.rs"
 [[example]]
 name = "fast_marching_method"
 path = "src/fast_marching_method.rs"
+
+[[example]]
+name = "domain_tester"
+path = "src/test.rs"
