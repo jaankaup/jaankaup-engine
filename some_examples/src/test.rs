@@ -3,205 +3,204 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use jaankaup_core::input::*;
-use jaankaup_algorithms::mc::{McParams, MarchingCubes};
-use jaankaup_core::template::{
-        WGPUFeatures,
-        WGPUConfiguration,
-        Application,
-        BasicLoop,
-        Spawner,
-};
-use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObject, create_bind_groups};
-use jaankaup_core::{wgpu, log};
-use jaankaup_core::winit;
-use jaankaup_core::buffer::{buffer_from_data};
-use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
-use jaankaup_core::camera::Camera;
-use jaankaup_core::gpu_debugger::GpuDebugger;
-use jaankaup_core::gpu_timer::GpuTimer;
-use jaankaup_core::screen::ScreenTexture;
-use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
-use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
-use jaankaup_core::texture::Texture;
-use jaankaup_core::aabb::Triangle_vvvvnnnn;
-use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::fmm_things::{DomainTester, Permutation};
+    use jaankaup_algorithms::mc::{McParams, MarchingCubes};
+    use jaankaup_core::template::{
+            WGPUFeatures,
+            WGPUConfiguration,
+            Application,
+            BasicLoop,
+            Spawner,
+    };
+    use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObject, create_bind_groups};
+    use jaankaup_core::{wgpu, log};
+    use jaankaup_core::winit;
+    use jaankaup_core::buffer::{buffer_from_data};
+    use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
+    use jaankaup_core::camera::Camera;
+    use jaankaup_core::gpu_debugger::GpuDebugger;
+    use jaankaup_core::gpu_timer::GpuTimer;
+    use jaankaup_core::screen::ScreenTexture;
+    use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
+    use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
+    use jaankaup_core::texture::Texture;
+    use jaankaup_core::aabb::Triangle_vvvvnnnn;
+    use jaankaup_core::common_functions::encode_rgba_u32;
+    use jaankaup_core::fmm_things::{DomainTester, Permutation};
 
-    /// Max number of arrows for gpu debugger.
-    const MAX_NUMBER_OF_ARROWS:     usize = 40960;
+        /// Max number of arrows for gpu debugger.
+        const MAX_NUMBER_OF_ARROWS:     usize = 40960;
 
-    /// Max number of aabbs for gpu debugger.
-    const MAX_NUMBER_OF_AABBS:      usize = 262144;
+        /// Max number of aabbs for gpu debugger.
+        const MAX_NUMBER_OF_AABBS:      usize = 262144;
 
-    /// Max number of box frames for gpu debugger.
-    const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+        /// Max number of box frames for gpu debugger.
+        const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 
-    /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-    const MAX_NUMBER_OF_CHARS:      usize = 262144;
+        /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
+        const MAX_NUMBER_OF_CHARS:      usize = 262144;
 
-    /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
-    const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
+        /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
+        const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
-/// Name for the fire tower mesh (assets/models/wood.obj).
-const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
+    /// Name for the fire tower mesh (assets/models/wood.obj).
+    const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-/// Global dimensions. 
-const FMM_GLOBAL_X: usize = 32; 
-const FMM_GLOBAL_Y: usize = 32; 
-const FMM_GLOBAL_Z: usize = 32; 
+    /// Global dimensions. 
+    const FMM_GLOBAL_X: usize = 32; 
+    const FMM_GLOBAL_Y: usize = 32; 
+    const FMM_GLOBAL_Z: usize = 32; 
 
-/// Inner dimensions.
-const FMM_INNER_X: usize = 4; 
-const FMM_INNER_Y: usize = 4; 
-const FMM_INNER_Z: usize = 4; 
+    /// Inner dimensions.
+    const FMM_INNER_X: usize = 4; 
+    const FMM_INNER_Y: usize = 4; 
+    const FMM_INNER_Z: usize = 4; 
 
-const OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
-                                 FMM_GLOBAL_Y *
-                                 FMM_GLOBAL_Z *
-                                 FMM_INNER_X *
-                                 FMM_INNER_Y *
-                                 FMM_INNER_Z *
-                                 size_of::<f32>()) as u32 * 16;
+    const OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
+                                     FMM_GLOBAL_Y *
+                                     FMM_GLOBAL_Z *
+                                     FMM_INNER_X *
+                                     FMM_INNER_Y *
+                                     FMM_INNER_Z *
+                                     size_of::<f32>()) as u32 * 16;
 
-/// Features and limits for TestProject application.
-struct TestProjectFeatures {}
+    /// Features and limits for TestProject application.
+    struct TestProjectFeatures {}
 
-impl WGPUFeatures for TestProjectFeatures {
+    impl WGPUFeatures for TestProjectFeatures {
 
-    fn optional_features() -> wgpu::Features {
-        wgpu::Features::TIMESTAMP_QUERY
+        fn optional_features() -> wgpu::Features {
+            wgpu::Features::TIMESTAMP_QUERY
+        }
+
+        fn required_features() -> wgpu::Features {
+            wgpu::Features::empty()
+        }
+
+        fn required_limits() -> wgpu::Limits {
+            let mut limits = wgpu::Limits::default();
+            limits.max_compute_invocations_per_workgroup = 1024;
+            limits.max_compute_workgroup_size_x = 1024;
+            limits.max_storage_buffers_per_shader_stage = 10;
+            limits
+        }
     }
 
-    fn required_features() -> wgpu::Features {
-        wgpu::Features::empty()
+    /// The purpose of this application is to test modules and functions.
+    struct TestProject {
+        camera: Camera,
+        gpu_debugger: GpuDebugger,
+        gpu_timer: Option<GpuTimer>,
+        keyboard_manager: KeyboardManager,
+        screen: ScreenTexture, 
+        light: LightBuffer,
+        render_params: RenderParamBuffer,
+        triangle_mesh_renderer: Render_VVVVNNNN_camera,
+        triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+        buffers: HashMap<String, wgpu::Buffer>,
+        triangle_meshes: HashMap<String, TriangleMesh>,
+        domain_tester: DomainTester,
     }
 
-    fn required_limits() -> wgpu::Limits {
-        let mut limits = wgpu::Limits::default();
-        limits.max_compute_invocations_per_workgroup = 1024;
-        limits.max_compute_workgroup_size_x = 1024;
-        limits.max_storage_buffers_per_shader_stage = 10;
-        limits
-    }
-}
+    impl Application for TestProject {
 
-/// The purpose of this application is to test modules and functions.
-struct TestProject {
-    camera: Camera,
-    gpu_debugger: GpuDebugger,
-    gpu_timer: Option<GpuTimer>,
-    keyboard_manager: KeyboardManager,
-    screen: ScreenTexture, 
-    light: LightBuffer,
-    render_params: RenderParamBuffer,
-    triangle_mesh_renderer: Render_VVVVNNNN_camera,
-    triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
-    buffers: HashMap<String, wgpu::Buffer>,
-    triangle_meshes: HashMap<String, TriangleMesh>,
-    domain_tester: DomainTester,
-}
+        fn init(configuration: &WGPUConfiguration) -> Self {
 
-impl Application for TestProject {
+            // Log adapter info.
+            log_adapter_info(&configuration.adapter);
 
-    fn init(configuration: &WGPUConfiguration) -> Self {
+            // Camera.
+            let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
+            camera.set_rotation_sensitivity(0.4);
+            camera.set_movement_sensitivity(0.02);
 
-        // Log adapter info.
-        log_adapter_info(&configuration.adapter);
+            // Gpu debugger.
+            let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
 
-        // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
-        camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.02);
+            // Gpu timer.
+            let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
 
-        // Gpu debugger.
-        let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
+            // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
+            let mut keyboard_manager = create_keyboard_manager();
 
-        // Gpu timer.
-        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
-
-        // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
-        let mut keyboard_manager = create_keyboard_manager();
-
-        // Light source for triangle meshes.
-        let light = LightBuffer::create(
-                      &configuration.device,
-                      [25.0, 55.0, 25.0], // pos
-                      [25, 25, 130],  // spec
-                      [255,200,255], // light 
-                      55.0,
-                      0.35,
-                      0.000013
-        );
-
-        // Scale_factor for triangle meshes.
-        let render_params = RenderParamBuffer::create(
-                    &configuration.device,
-                    1.0
-        );
-
-        // RenderObject for basic triangle mesh rendering.
-        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
-
-        // Create bindgroups for triangle_mesh_renderer.
-        let triangle_mesh_bindgroups = 
-                triangle_mesh_renderer.create_bingroups(
-                    &configuration.device, &mut camera, &light, &render_params
-                );
-
-        // Buffer hash_map.
-        let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
-
-        // Permutations.
-        let mut permutations: Vec<Permutation> = Vec::new();
-
-        permutations.push(
-            Permutation { modulo: 3, x_factor: 2,  y_factor: 13,  z_factor: 17, }
-        );
-
-        // let permutation_number = (2u * position_u32_temp.x +  13u * position_u32_temp.y + 17u * position_u32_temp.z) % 4u; 
-        // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
-        // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
-        
-        // The DomainTester.
-        let domain_tester = DomainTester::init(
-            &configuration.device,
-            &gpu_debugger,
-            [16, 16, 16],
-            [4, 4, 4],
-            &permutations
+            // Light source for triangle meshes.
+            let light = LightBuffer::create(
+                          &configuration.device,
+                          [25.0, 55.0, 25.0], // pos
+                          [25, 25, 130],  // spec
+                          [255,200,255], // light 
+                          55.0,
+                          0.35,
+                          0.000013
             );
 
-        // Container for triangle meshes.
-        let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
+            // Scale_factor for triangle meshes.
+            let render_params = RenderParamBuffer::create(
+                        &configuration.device,
+                        1.0
+            );
 
-        // Load fire tower mesh.
-        let fire_tower_mesh = load_vvvnnn_mesh(
-                         &configuration.device,
-                         include_str!("../../assets/models/wood.obj")[..].to_string(),
-                         FIRE_TOWER_MESH,
-                         2.0,
-                         [50.0, 25.0, 50.0],
-                         [11, 0, 155]
-        );
+            // RenderObject for basic triangle mesh rendering.
+            let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
 
-        triangle_meshes.insert(
-            FIRE_TOWER_MESH.to_string(),
-            fire_tower_mesh);
+            // Create bindgroups for triangle_mesh_renderer.
+            let triangle_mesh_bindgroups = 
+                    triangle_mesh_renderer.create_bingroups(
+                        &configuration.device, &mut camera, &light, &render_params
+                    );
 
-        Self {
-            camera: camera,
-            gpu_debugger: gpu_debugger,
-            gpu_timer: gpu_timer,
-            keyboard_manager: keyboard_manager,
-            screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            light: light,
-            render_params: render_params,
-            triangle_mesh_renderer: triangle_mesh_renderer,
-            triangle_mesh_bindgroups: triangle_mesh_bindgroups,
-            buffers: buffers,
-            triangle_meshes: triangle_meshes,
-            domain_tester: domain_tester,
-        }
+            // Buffer hash_map.
+            let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
+
+            // Permutations.
+            let mut permutations: Vec<Permutation> = Vec::new();
+
+            permutations.push(Permutation { modulo: 3, x_factor: 2,  y_factor: 13,  z_factor: 17, });
+            permutations.push(Permutation { modulo: 3, x_factor: 5,  y_factor: 13,  z_factor: 17, });
+
+            // let permutation_number = (2u * position_u32_temp.x +  13u * position_u32_temp.y + 17u * position_u32_temp.z) % 4u; 
+            // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
+            // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
+            
+            // The DomainTester.
+            let domain_tester = DomainTester::init(
+                &configuration.device,
+                &gpu_debugger,
+                [16, 16, 16],
+                [4, 4, 4],
+                &permutations
+                );
+
+            // Container for triangle meshes.
+            let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
+
+            // Load fire tower mesh.
+            let fire_tower_mesh = load_vvvnnn_mesh(
+                             &configuration.device,
+                             include_str!("../../assets/models/wood.obj")[..].to_string(),
+                             FIRE_TOWER_MESH,
+                             2.0,
+                             [50.0, 25.0, 50.0],
+                             [11, 0, 155]
+            );
+
+            triangle_meshes.insert(
+                FIRE_TOWER_MESH.to_string(),
+                fire_tower_mesh);
+
+            Self {
+                camera: camera,
+                gpu_debugger: gpu_debugger,
+                gpu_timer: gpu_timer,
+                keyboard_manager: keyboard_manager,
+                screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
+                light: light,
+                render_params: render_params,
+                triangle_mesh_renderer: triangle_mesh_renderer,
+                triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+                buffers: buffers,
+                triangle_meshes: triangle_meshes,
+                domain_tester: domain_tester,
+            }
     }
 
     fn render(&mut self,
@@ -249,6 +248,17 @@ impl Application for TestProject {
 
         queue.submit(Some(encoder.finish())); 
 
+        self.gpu_debugger.render(
+                  &device,
+                  &queue,
+                  &view,
+                  self.screen.depth_texture.as_ref().unwrap(),
+                  &mut clear,
+                  spawner
+        );
+
+        self.gpu_debugger.reset_element_counters(&queue);
+
         self.screen.prepare_for_rendering();
     }
 
@@ -273,6 +283,16 @@ impl Application for TestProject {
                                FMM_INNER_X *
                                FMM_INNER_Y *
                                FMM_INNER_Z;
+
+        let mut encoder = device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Domain tester encoder"),
+        });
+
+        self.domain_tester.dispatch(&mut encoder);
+
+        queue.submit(Some(encoder.finish())); 
+
 
         //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
 

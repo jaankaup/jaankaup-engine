@@ -42,7 +42,7 @@ struct Arrow {
     size:  f32,
 };
 
-@group(0) @binding(0) var<storage,read_write> computational_domain: ComputationalDomain;
+@group(0) @binding(0) var<uniform> computational_domain: ComputationalDomain;
 @group(0) @binding(1) var<storage,read_write> permutations: array<Permutation>;
 @group(0) @binding(2) var<storage,read_write> counter: array<atomic<u32>>;
 @group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
@@ -123,9 +123,17 @@ fn get_cell_index(global_index: u32) -> vec3<u32> {
 }
 
 @compute
-@workgroup_size(64,1,1)
+@workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
+
+    let total_count = computational_domain.local_dimension.x *
+                      computational_domain.local_dimension.y *
+                      computational_domain.global_dimension.x *
+                      computational_domain.global_dimension.y *
+                      computational_domain.global_dimension.z;
+
+    if (global_id.x >= total_count) { return; }
 
 }

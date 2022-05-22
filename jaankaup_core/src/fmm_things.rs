@@ -1,3 +1,4 @@
+use crate::render_object::create_bind_groups;
 use std::borrow::Cow;
 use crate::render_object::ComputeObject;
 use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
@@ -23,6 +24,8 @@ const KNOWN: u32    = 3;
 const OUTSIDE: u32  = 4;
 
 /// parameters for permutations.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct Permutation {
     pub modulo: u32,
     pub x_factor: u32,  
@@ -41,9 +44,11 @@ struct FMMCell {
 /// A struct for 3d grid general information.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct ComputationalDomain {
+pub struct ComputationalDomain {
     global_dimension: [u32; 3],
+    padding: u32,
     local_dimension:  [u32; 3],
+    padding2: u32,
 }
 
 impl_convert!{FMMCell}
@@ -65,8 +70,10 @@ impl ComputationalDomainBuffer {
         // TODO: asserts
 
         let domain = ComputationalDomain {
-            global_dimension,
-            local_dimension,
+            global_dimension: global_dimension,
+            padding: 0,
+            local_dimension: local_dimension,
+            padding2: 0,
         };
 
         let buf = buffer_from_data::<ComputationalDomain>(
@@ -96,10 +103,20 @@ impl ComputationalDomainBuffer {
         // TODO: asserts
         self.computational_domain.global_dimension = global_dimension;
     }
+
+    pub fn get_buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
+    pub fn get_computational_domain(&self) -> ComputationalDomain {
+        self.computational_domain
+    }
 }
 
 pub struct DomainTester {
     computational_domain_buffer: ComputationalDomainBuffer,
+    compute_object: ComputeObject,
+    bind_groups: Vec<wgpu::BindGroup>,
+    permutations_buffer: wgpu::Buffer,
 }
 
 impl DomainTester {
@@ -124,6 +141,13 @@ impl DomainTester {
                   local_dimension
         );
 
+        let permutations_buffer = buffer_from_data::<Permutation>(
+                  &device,
+                  permutations,
+                  wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                  Some("Permutations wgpu::buffer.")
+        );
+
         let compute_object =
                 ComputeObject::init(
                     &device,
@@ -131,11 +155,11 @@ impl DomainTester {
                     Some("DomainTester Compute object"),
                     &vec![
                         vec![
-                            // @group(0) @binding(0) var<storage,read_write> computational_domain: ComputationalDomain;
+                            // @group(0) @binding(0) var<uniform> computational_domain: ComputationalDomain;
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
                             // @group(0) @binding(1) var<storage,read_write> permutations: array<Permutation>;
-                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(2) var<storage,read_write> counter: array<atomic<u32>>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
@@ -156,9 +180,48 @@ impl DomainTester {
                     &"main".to_string()
         );
 
-        Self {
-            computational_domain_buffer
-        }
+        let bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                    &computational_domain_buffer.get_buffer().as_entire_binding(),
+                    &permutations_buffer.as_entire_binding(),
+                    &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
+        );
 
+        Self {
+            computational_domain_buffer,
+            compute_object: compute_object, 
+            bind_groups: bind_groups,
+            permutations_buffer: permutations_buffer,
+        }
+    }
+
+    pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
+
+        let global_dimension = self.computational_domain_buffer.get_computational_domain().global_dimension;
+        let local_dimension = self.computational_domain_buffer.get_computational_domain().local_dimension;
+
+        let total_grid_count =
+                        global_dimension[0] *
+                        global_dimension[1] *
+                        global_dimension[2] *
+                        local_dimension[0] *
+                        local_dimension[1] *
+                        local_dimension[2];
+
+        self.compute_object.dispatch(
+            &self.bind_groups,
+            encoder,
+            total_grid_count / 1024, 1, 1, Some("Domain tester dispatch")
+        );
     }
 }
