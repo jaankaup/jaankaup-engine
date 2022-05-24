@@ -34,24 +34,21 @@ pub fn read_pc_data(file: &String) -> Vec<VVVC> {
             if let Ok(li) = line {
                 let mut sp = li.split(" ").collect::<Vec<&str>>();
 
-                let vec_a = Vector3::<f64>::new(sp[0].parse::<f64>().unwrap(),
-                                                sp[2].parse::<f64>().unwrap(),
-                                                sp[1].parse::<f64>().unwrap()
-                );
-                
-                // println!("{:?}", [vec_a.x, vec_a.y, vec_a.z]);
+                let x = sp[0].parse::<f64>().unwrap();
+                let y = sp[2].parse::<f64>().unwrap();
+                let z = sp[1].parse::<f64>().unwrap();
+
+                let v = Vector3::<f64>::new(x, y, z);
 
                 if first_time {
-                    aabb = BBox64 { min: Vector3::<f64>::new(vec_a.x, vec_a.y, vec_a.z), max: Vector3::<f64>::new(vec_a.x, vec_a.y, vec_a.z), };
+                    aabb = BBox64 { min: v, max: v, };
                     first_time = false;
                 }
 
-                aabb.expand(&vec_a);
+                aabb.expand(&v);
 
                 result.push(VVVC64 {
-                    position: [sp[0].parse::<f64>().unwrap(),
-                               sp[2].parse::<f64>().unwrap(),
-                               sp[1].parse::<f64>().unwrap()],
+                    position: [x, y, z],
                     color: encode_rgba_u32(sp[3].parse::<u32>().unwrap(), sp[4].parse::<u32>().unwrap(), sp[5].parse::<u32>().unwrap(), 255),
                 });
             }

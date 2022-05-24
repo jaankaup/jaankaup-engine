@@ -291,7 +291,6 @@ fn visualize_cell(position: vec3<f32>, color: u32, global_id: u32, draw_number: 
         );
         output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
     }
-
 }
 
 fn load_neighbors(coord: vec3<u32>) {

@@ -112,8 +112,6 @@ use jaankaup_core::input::*;
         render_object_vvvc: RenderObject,
         render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
         point_count: u32,
-        start_index: u32,
-        step_size: u32,
     }
 
     impl Application for TestProject {
@@ -231,11 +229,12 @@ use jaankaup_core::input::*;
                 fire_tower_mesh);
 
 
-            let (point_count, buf) = load_pc_data(&configuration.device, &"../../cloud_data.asc".to_string());
+            let point_count = 0;
+            //++ let (point_count, buf) = load_pc_data(&configuration.device, &"../../cloud_data.asc".to_string());
 
-            println!("point_count == {}", point_count);
+            //++ println!("point_count == {}", point_count);
 
-            buffers.insert("pc_data".to_string(), buf);
+            //++ buffers.insert("pc_data".to_string(), buf);
 
             // vvvc
             let render_object_vvvc =
@@ -287,8 +286,6 @@ use jaankaup_core::input::*;
                 render_object_vvvc: render_object_vvvc,
                 render_bind_groups_vvvc: render_bind_groups_vvvc,
                 point_count: point_count,
-                start_index: start_index,
-                step_size: step_size,
             }
     }
 
@@ -335,36 +332,30 @@ use jaankaup_core::input::*;
 
         // println!("{}", self.point_count);
 
-        // if self.start_index + 2 * self.step_size < self.point_count {
-        //     self.start_index = self.start_index + self.step_size;
-        // }
-        // else { self.start_index = 0; }
-
-        draw(&mut encoder,
-             &view,
-             &self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_bind_groups_vvvc,
-             &self.render_object_vvvc.pipeline,
-             &self.buffers.get("pc_data").unwrap(),
-             // self.start_index..self.start_index+self.step_size,
-             0..self.point_count,
-             clear
-        );
+        //++ draw(&mut encoder,
+        //++      &view,
+        //++      &self.screen.depth_texture.as_ref().unwrap(),
+        //++      &self.render_bind_groups_vvvc,
+        //++      &self.render_object_vvvc.pipeline,
+        //++      &self.buffers.get("pc_data").unwrap(),
+        //++      0..self.point_count,
+        //++      clear
+        //++ );
         
-        clear = false;
+        //++ clear = false;
 
         queue.submit(Some(encoder.finish())); 
 
-        // self.gpu_debugger.render(
-        //           &device,
-        //           &queue,
-        //           &view,
-        //           self.screen.depth_texture.as_ref().unwrap(),
-        //           &mut clear,
-        //           spawner
-        // );
+        self.gpu_debugger.render(
+                  &device,
+                  &queue,
+                  &view,
+                  self.screen.depth_texture.as_ref().unwrap(),
+                  &mut clear,
+                  spawner
+        );
 
-        // self.gpu_debugger.reset_element_counters(&queue);
+        self.gpu_debugger.reset_element_counters(&queue);
 
         self.screen.prepare_for_rendering();
     }
@@ -411,14 +402,14 @@ use jaankaup_core::input::*;
                                FMM_INNER_Y *
                                FMM_INNER_Z;
 
-        // let mut encoder = device.create_command_encoder(
-        //     &wgpu::CommandEncoderDescriptor {
-        //         label: Some("Domain tester encoder"),
-        // });
+        let mut encoder = device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Domain tester encoder"),
+        });
 
-        // self.domain_tester.dispatch(&mut encoder);
+        self.domain_tester.dispatch(&mut encoder);
 
-        // queue.submit(Some(encoder.finish())); 
+        queue.submit(Some(encoder.finish())); 
     }
 }
 
