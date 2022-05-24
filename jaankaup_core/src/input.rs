@@ -415,6 +415,7 @@ impl KeyboardManager {
     }
 
     pub fn register_key(&mut self, key: Key, threshold: f64) {
+        println!("registering....");
         self.keys.insert(key, (0.0, threshold)); 
     }
 
@@ -427,11 +428,11 @@ impl KeyboardManager {
 
             match state_key {
                 Some(InputState::Pressed(_)) => {
-                    let delta = (input.get_time_delta() / 1000000) as f64;
+                    let delta = (input.get_time_delta() as f64 / 1000000.0) as f64;
                     v.0 = delta;
                 }
                 Some(InputState::Down(_, _)) => {
-                    let delta = (input.get_time_delta() / 1000000) as f64;
+                    let delta = (input.get_time_delta() as f64 / 1000000.0) as f64;
                     v.0 = v.0 + delta;
                     if v.0 > v.1 {
                         v.0 = v.0 - v.1;

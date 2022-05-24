@@ -375,6 +375,9 @@ use jaankaup_core::input::*;
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
+        if self.keyboard_manager.test_key(&Key::Key1, input) {
+            println!("1 pressed");
+        }
         if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) { 
             if self.font_size - 0.0005 > 0.0 && self.aabb_size - 0.01 > 0.0 {
                 self.font_size = self.font_size - 0.0005;
