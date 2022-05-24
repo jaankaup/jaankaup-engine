@@ -196,15 +196,52 @@ fn number_of_chars_data(data: vec4<f32>, vec_dim_count: u32, number_of_decimals:
 
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
-    return ((*coord).x >= 0 && (*coord).x < 64) &&
-           ((*coord).y >= 0 && (*coord).y < 64) &&
-           ((*coord).z >= 0 && (*coord).z < 64); 
+    return ((*coord).x >= 0 && (*coord).x < i32(computational_domain.local_dimension.x * computational_domain.global_dimension.x)) &&
+           ((*coord).y >= 0 && (*coord).y < i32(computational_domain.local_dimension.y * computational_domain.global_dimension.y)) &&
+           ((*coord).z >= 0 && (*coord).z < i32(computational_domain.local_dimension.z * computational_domain.global_dimension.z)); 
+}
+
+fn get_block_coordinate(block_index: u32) -> vec3<u32> {
+    return index_to_uvec3(block_index, computational_domain.global_dimension.x, computational_domain.global_dimension.y);
 }
 
 fn get_group_coordinate(global_index: u32) -> vec3<u32> {
     let stride = computational_domain.local_dimension.x * computational_domain.local_dimension.y * computational_domain.local_dimension.z;
     let block_index = global_index / stride;
     return index_to_uvec3(block_index, computational_domain.global_dimension.x, computational_domain.global_dimension.y);
+}
+
+fn get_global_block_position(v: vec3<u32>) -> vec3<u32> {
+    let stride = computational_domain.local_dimension.x * computational_domain.local_dimension.y * computational_domain.local_dimension.z;
+
+    let xOffset = 1u;
+    let yOffset = computational_domain.global_dimension.x;
+    let zOffset = yOffset * computational_domain.global_dimension.y;
+
+    let global_coordinate = vec3<u32>(v) / computational_domain.local_dimension;
+
+    return global_coordinate;
+}
+
+fn get_cell_mem_location(v: vec3<u32>) -> u32 {
+
+    let stride = computational_domain.local_dimension.x * computational_domain.local_dimension.y * computational_domain.local_dimension.z;
+
+    let xOffset = 1u;
+    let yOffset = computational_domain.global_dimension.x;
+    let zOffset = yOffset * computational_domain.global_dimension.y;
+
+    let global_coordinate = vec3<u32>(v) / computational_domain.local_dimension;
+
+    let global_index = (global_coordinate.x * xOffset +
+                        global_coordinate.y * yOffset +
+                        global_coordinate.z * zOffset) * stride;
+
+    let local_coordinate = vec3<u32>(v) - global_coordinate * computational_domain.local_dimension;
+
+    let local_index = encode3Dmorton32(local_coordinate.x, local_coordinate.y, local_coordinate.z);
+
+    return global_index + local_index; 
 }
 
 /// Get cell index based on domain dimension.
@@ -230,30 +267,65 @@ fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
 
-fn visualize_cell(position: vec3<f32>, color: u32, global_id: u32) {
+fn visualize_cell(position: vec3<f32>, color: u32, global_id: u32, draw_number: bool) {
     output_aabb[atomicAdd(&counter[2], 1u)] =
           AABB (
               vec4<f32>(position - vec3<f32>(computational_domain.aabb_size), bitcast<f32>(color)),
               vec4<f32>(position + vec3<f32>(computational_domain.aabb_size), 0.0),
           );
 
-    //let color_text = rgba_u32(155u, 0u, 155u, 255u);
-    let color_text = rgba_u32(255u, 255u, 255u, 255u);
+    if (draw_number) {
+        let color_text = rgba_u32(255u, 255u, 255u, 255u);
 
-    let value = vec4<f32>(f32(global_id), 0.0, 0.0, 0.0);
-    let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
-    let element_position = position - vec3<f32>(f32(total_number_of_chars) * computational_domain.font_size * 0.5, 0.0, (-1.0) * computational_domain.aabb_size - 0.001);
-    let renderable_element = Char (
-                    element_position,
-                    computational_domain.font_size,
-                    value,
-                    1u,
-                    color_text,
-                    1u,
-                    0u
-    );
+        let value = vec4<f32>(f32(global_id), 0.0, 0.0, 0.0);
+        let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
+        let element_position = position - vec3<f32>(f32(total_number_of_chars) * computational_domain.font_size * 0.5, 0.0, (-1.0) * computational_domain.aabb_size - 0.001);
+        let renderable_element = Char (
+                        element_position,
+                        computational_domain.font_size,
+                        value,
+                        1u,
+                        color_text,
+                        1u,
+                        0u
+        );
+        output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+    }
 
-    output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+}
+
+fn load_neighbors(coord: vec3<u32>) {
+
+    var neighbor_0_coord = vec3<i32>(coord) + vec3<i32>(1, 0, 0);
+    var neighbor_1_coord = vec3<i32>(coord) - vec3<i32>(1, 0, 0);
+    var neighbor_2_coord = vec3<i32>(coord) + vec3<i32>(0, 1, 0);
+    var neighbor_3_coord = vec3<i32>(coord) - vec3<i32>(0, 1, 0);
+    var neighbor_4_coord = vec3<i32>(coord) + vec3<i32>(0, 0, 1);
+    var neighbor_5_coord = vec3<i32>(coord) - vec3<i32>(0, 0, 1);
+
+    var neighbor_0_coord_u32 = coord + vec3<u32>(1u, 0u, 0u);
+    var neighbor_1_coord_u32 = coord - vec3<u32>(1u, 0u, 0u);
+    var neighbor_2_coord_u32 = coord + vec3<u32>(0u, 1u, 0u);
+    var neighbor_3_coord_u32 = coord - vec3<u32>(0u, 1u, 0u);
+    var neighbor_4_coord_u32 = coord + vec3<u32>(0u, 0u, 1u);
+    var neighbor_5_coord_u32 = coord - vec3<u32>(0u, 0u, 1u);
+
+    var cell_index0 = encode3Dmorton32(neighbor_0_coord_u32.x, neighbor_0_coord_u32.y, neighbor_0_coord_u32.z);
+    var cell_index1 = encode3Dmorton32(neighbor_1_coord_u32.x, neighbor_1_coord_u32.y, neighbor_1_coord_u32.z);
+    var cell_index2 = encode3Dmorton32(neighbor_2_coord_u32.x, neighbor_2_coord_u32.y, neighbor_2_coord_u32.z);
+    var cell_index3 = encode3Dmorton32(neighbor_3_coord_u32.x, neighbor_3_coord_u32.y, neighbor_3_coord_u32.z);
+    var cell_index4 = encode3Dmorton32(neighbor_4_coord_u32.x, neighbor_4_coord_u32.y, neighbor_4_coord_u32.z);
+    var cell_index5 = encode3Dmorton32(neighbor_5_coord_u32.x, neighbor_5_coord_u32.y, neighbor_5_coord_u32.z);
+
+    var inside0 = isInside(&neighbor_0_coord);
+    var inside1 = isInside(&neighbor_1_coord);
+    var inside2 = isInside(&neighbor_2_coord);
+    var inside3 = isInside(&neighbor_3_coord);
+    var inside4 = isInside(&neighbor_4_coord);
+    var inside5 = isInside(&neighbor_5_coord);
+
+    // In which global index?  
+
 }
 
 @compute
@@ -262,18 +334,24 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    let total_count = computational_domain.local_dimension.x *
-                      computational_domain.local_dimension.y *
-                      computational_domain.local_dimension.z *
-                      computational_domain.global_dimension.x *
-                      computational_domain.global_dimension.y *
-                      computational_domain.global_dimension.z;
+    let total_block_count = computational_domain.global_dimension.x *
+                            computational_domain.global_dimension.y *
+                            computational_domain.global_dimension.z;
 
-    if (global_id.x >= total_count) { return; }
+    //++ let total_count = computational_domain.local_dimension.x *
+    //++                   computational_domain.local_dimension.y *
+    //++                   computational_domain.local_dimension.z *
+    //++                   computational_domain.global_dimension.x *
+    //++                   computational_domain.global_dimension.y *
+    //++                   computational_domain.global_dimension.z;
 
-    let index = get_cell_index(global_id.x);
+    //++ if (global_id.x >= total_count) { return; }
+    if (global_id.x >= total_block_count) { return; }
+
+    let group_coord = get_block_coordinate(global_id.x);
+    //++ let index = get_cell_index(global_id.x);
     
-    let group_coord = get_group_coordinate(global_id.x);
+    //++ let group_coord = get_group_coordinate(global_id.x);
 
     let permutation_number = (2u * group_coord.x +  13u * group_coord.y + 17u * group_coord.z) % 4u; 
     // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
@@ -300,7 +378,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // col = select(0u, permutation_color1, permutation_number == 1u);
     // col = select(0u, permutation_color2, permutation_number == 2u);
     // col = select(0u, permutation_color3, permutation_number == 3u);
+    visualize_cell(vec3<f32>(group_coord), col, global_id.x, false);
 
-    visualize_cell(vec3<f32>(index), col, global_id.x);
+    //if (permutation_number == 0u) {
+    //    visualize_cell(vec3<f32>(index), col, global_id.x);
+    //}
     
 }

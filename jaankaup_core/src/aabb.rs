@@ -14,6 +14,27 @@ pub struct BBox4 {
 unsafe impl bytemuck::Zeroable for BBox4 {}
 unsafe impl bytemuck::Pod for BBox4 {}
 
+// This is stupid. TODO: type param.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct BBox64 {
+    pub min: Vector3<f64>,
+    pub max: Vector3<f64>,
+}
+
+unsafe impl bytemuck::Zeroable for BBox64 {}
+unsafe impl bytemuck::Pod for BBox64 {}
+
+impl BBox64 {
+
+    /// Expand BBox to include point p.
+    pub fn expand(&mut self, p: &Vector3<f64>) {
+        self.min = Vector3::<f64>::new(self.min.x.min(p.x), self.min.y.min(p.y), self.min.z.min(p.z));
+        self.max = Vector3::<f64>::new(self.max.x.max(p.x), self.max.y.max(p.y), self.max.z.max(p.z));
+    }
+}
+
+
 /// A struct for aabb.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]

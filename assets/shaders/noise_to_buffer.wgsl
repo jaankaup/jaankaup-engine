@@ -359,14 +359,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 fn create_land_noise(v: vec3<f32>) -> f32 {
     return v.y - 22.5 * noise_params.value2 * noise3(v.zyx * noise_params.value3 * 0.01) - 0.5;
-    //return v.y - 22.5 * noise_params.value2 * noise3((v.zyx * noise_params.value3 + noise_params.position) * 0.01) - 0.5;
-    // let noise_a = fbm(v.z * 1.2);
-    // let noise_b = noise3(v.zyx * 1.1);
-    // let noise_c = noise((v.x + 5.0) * 1.1);
-    // let noise_d = fbm2(v.yy * 0.2);
-    // let heko = abs(6.0*fbm3(v*0.4));
-    // let something = 1.5 * noise_a - 2.45 * noise_b - 4.5 * sin(v.z * 0.2);
-    // return v.y + 0.62 * something - 0.1 * heko - 2.5 * noise_c + 5.0 * noise_d - 6.0;
 }
 
 fn create_small_noise(v: vec3<f32>) -> f32 {
@@ -401,33 +393,5 @@ fn land_scape(@builtin(local_invocation_id)    local_id: vec3<u32>,
     noise_output_data.output_data[actual_global_id + offset]      = noise1;
     noise_output_data.output_data[actual_global_id + offset * 2u] = noise2;
     noise_output_data.output_data[actual_global_id + offset * 3u] = noise3;
-
-
-    // let cnoise_0a = noise_params.value3 * cnoise(c0 * 0.1); 
-    // let cnoise_0b = noise_params.value3 * cnoise(100.0 * c0 * 0.1); 
-    // let cnoise_0c = noise_params.value3 * cnoise(200.0 * c0 * 0.1); 
-    // let cnoise_0d = noise_params.value3 * cnoise(300.0 * c0 * 0.1); 
-    // let cnoise_1a = noise_params.value3 * cnoise(c1 * 0.1); 
-    // let cnoise_1b = noise_params.value3 * cnoise(100.0 + c1 * 0.1); 
-    // let cnoise_1c = noise_params.value3 * cnoise(200.0 + c1 * 0.1); 
-    // let cnoise_1d = noise_params.value3 * cnoise(300.0 + c1 * 0.1); 
-    // let cnoise_2a = noise_params.value3 * cnoise(c2 * 0.1); 
-    // let cnoise_2b = noise_params.value3 * cnoise(100.0 + c2 * 0.1); 
-    // let cnoise_2c = noise_params.value3 * cnoise(200.0 + c2 * 0.1); 
-    // let cnoise_2d = noise_params.value3 * cnoise(300.0 + c2 * 0.1); 
-    // let cnoise_3a = noise_params.value3 * cnoise(c3 * 0.1); 
-    // let cnoise_3b = noise_params.value3 * cnoise(100.0 + c3 * 0.1); 
-    // let cnoise_3c = noise_params.value3 * cnoise(200.0 + c3 * 0.1); 
-    // let cnoise_3d = noise_params.value3 * cnoise(300.0 + c3 * 0.1); 
-
-    // let noise_fbm3_0 = noise_params.value4 * fbm3(c0.xyz * (1.0 / noise_params.value4));
-    // let noise_fbm3_1 = noise_params.value4 * fbm3(c1.xyz * (1.0 / noise_params.value4));
-    // let noise_fbm3_2 = noise_params.value4 * fbm3(c2.xyz * (1.0 / noise_params.value4));
-    // let noise_fbm3_3 = noise_params.value4 * fbm3(c3.xyz * (1.0 / noise_params.value4));
-
-    // let noise0 = c0.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_0;
-    // let noise1 = c1.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_1;
-    // let noise2 = c2.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_2;
-    // let noise3 = c3.y * 0.1 - 1.0 + cnoise_0a - noise_params.value3 * noise_fbm3_3;
 
 }

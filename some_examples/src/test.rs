@@ -1,3 +1,7 @@
+use jaankaup_core::pc_parser::VVVC;
+use jaankaup_core::pc_parser::read_pc_data;
+use jaankaup_core::common_functions::create_uniform_bindgroup_layout;
+use itertools::Itertools;
 use std::mem::size_of;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -44,6 +48,8 @@ use jaankaup_core::input::*;
 
     /// Name for the fire tower mesh (assets/models/wood.obj).
     const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
+
+    const CLOUD_DATA: &'static str = "CLOUD_DATA";
 
     /// Global dimensions. 
     const FMM_GLOBAL_X: usize = 16; 
@@ -103,6 +109,11 @@ use jaankaup_core::input::*;
         domain_tester: DomainTester,
         aabb_size: f32,
         font_size: f32,
+        render_object_vvvc: RenderObject,
+        render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
+        point_count: u32,
+        start_index: u32,
+        step_size: u32,
     }
 
     impl Application for TestProject {
@@ -111,6 +122,9 @@ use jaankaup_core::input::*;
 
             let aabb_size: f32 = 0.15;
             let font_size: f32 = 0.016;
+
+            let start_index = 0;
+            let step_size = 1024;
 
             // Log adapter info.
             log_adapter_info(&configuration.adapter);
@@ -161,6 +175,26 @@ use jaankaup_core::input::*;
             // Permutations.
             let mut permutations: Vec<Permutation> = Vec::new();
 
+            // Create different permutations such that (a*x + b*y + c*) % d where
+            //
+            // a, b and c are prime numbers, a != b != c, and a % d != , b % d != 0, c % d != 0.
+            //
+
+            // 2 	3 	5 	7 	11 	13 	17 	19 	23 	29 	31 	37 	41 	43 	47 	53 	59 	61 	67 	71 
+            // 73 	79 	83 	89 	97 	101 	103 	107 	109 	113 	127 	131 	137 	139 	149 	151 	157 	163 	167 	173
+
+            let primes = vec![2, 3,	5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+
+            let perms = (0..5).permutations(3).collect_vec();
+            //++ let mut blah: Vec<[i32; 3]> = Vec::new();
+            //++ for mut elem in perms.clone() {
+            //++     elem.sort();
+            //++     //blah.append([elem[0] as i32, elem[1] as i32, elem[2] as i32]);
+            //++     blah.append([1,2,3]);
+            //++     // blah.append(elem);
+            //++ }
+            // println!("{:?}", perms);
+
             permutations.push(Permutation { modulo: 3, x_factor: 2,  y_factor: 13,  z_factor: 17, });
             permutations.push(Permutation { modulo: 3, x_factor: 5,  y_factor: 13,  z_factor: 17, });
 
@@ -196,6 +230,45 @@ use jaankaup_core::input::*;
                 FIRE_TOWER_MESH.to_string(),
                 fire_tower_mesh);
 
+
+            let (point_count, buf) = load_pc_data(&configuration.device, &"../../cloud_data.asc".to_string());
+
+            println!("point_count == {}", point_count);
+
+            buffers.insert("pc_data".to_string(), buf);
+
+            // vvvc
+            let render_object_vvvc =
+                    RenderObject::init(
+                        &configuration.device,
+                        &configuration.sc_desc,
+                        &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                            label: Some("renderer_v3c1.wgsl"),
+                            source: wgpu::ShaderSource::Wgsl(
+                                Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
+
+                        }),
+                        &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
+                        &vec![
+                            vec![
+                                create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
+                            ],
+                        ],
+                        Some("Debug visualizator vvvc renderer with camera."),
+                        true,
+                        wgpu::PrimitiveTopology::PointList
+            );
+            let render_bind_groups_vvvc = create_bind_groups(
+                                         &configuration.device,
+                                         &render_object_vvvc.bind_group_layout_entries,
+                                         &render_object_vvvc.bind_group_layouts,
+                                         &vec![
+                                              vec![
+                                                  &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                             ]
+                                         ]
+            );
+
             Self {
                 camera: camera,
                 gpu_debugger: gpu_debugger,
@@ -211,6 +284,11 @@ use jaankaup_core::input::*;
                 domain_tester: domain_tester,
                 aabb_size: aabb_size,
                 font_size: font_size,
+                render_object_vvvc: render_object_vvvc,
+                render_bind_groups_vvvc: render_bind_groups_vvvc,
+                point_count: point_count,
+                start_index: start_index,
+                step_size: step_size,
             }
     }
 
@@ -227,12 +305,12 @@ use jaankaup_core::input::*;
             &surface
         );
 
-        let buf = buffer_from_data::<f32>(
-                  &device,
-                  &vec![1.0,2.0,3.0,2.0,4.0],
-                  wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-                  Some("Computational domain wgpu::buffer.")
-        );
+        // let buf = buffer_from_data::<f32>(
+        //           &device,
+        //           &vec![1.0,2.0,3.0,2.0,4.0],
+        //           wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+        //           Some("Computational domain wgpu::buffer.")
+        // );
 
         let mut encoder = device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
@@ -241,17 +319,35 @@ use jaankaup_core::input::*;
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
+        // let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
 
         let mut clear = true;
 
+        // draw(&mut encoder,
+        //      &view,
+        //      self.screen.depth_texture.as_ref().unwrap(),
+        //      &self.triangle_mesh_bindgroups,
+        //      &self.triangle_mesh_renderer.get_render_object().pipeline,
+        //      &fire_tower.get_buffer(),
+        //      0..fire_tower.get_triangle_count() * 3, 
+        //      clear
+        // );
+
+        // println!("{}", self.point_count);
+
+        // if self.start_index + 2 * self.step_size < self.point_count {
+        //     self.start_index = self.start_index + self.step_size;
+        // }
+        // else { self.start_index = 0; }
+
         draw(&mut encoder,
              &view,
-             self.screen.depth_texture.as_ref().unwrap(),
-             &self.triangle_mesh_bindgroups,
-             &self.triangle_mesh_renderer.get_render_object().pipeline,
-             &fire_tower.get_buffer(),
-             0..fire_tower.get_triangle_count() * 3, 
+             &self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_bind_groups_vvvc,
+             &self.render_object_vvvc.pipeline,
+             &self.buffers.get("pc_data").unwrap(),
+             // self.start_index..self.start_index+self.step_size,
+             0..self.point_count,
              clear
         );
         
@@ -259,16 +355,16 @@ use jaankaup_core::input::*;
 
         queue.submit(Some(encoder.finish())); 
 
-        self.gpu_debugger.render(
-                  &device,
-                  &queue,
-                  &view,
-                  self.screen.depth_texture.as_ref().unwrap(),
-                  &mut clear,
-                  spawner
-        );
+        // self.gpu_debugger.render(
+        //           &device,
+        //           &queue,
+        //           &view,
+        //           self.screen.depth_texture.as_ref().unwrap(),
+        //           &mut clear,
+        //           spawner
+        // );
 
-        self.gpu_debugger.reset_element_counters(&queue);
+        // self.gpu_debugger.reset_element_counters(&queue);
 
         self.screen.prepare_for_rendering();
     }
@@ -295,6 +391,8 @@ use jaankaup_core::input::*;
                 self.domain_tester.update_font_size(queue, self.font_size);
                 self.domain_tester.update_aabb_size(queue, self.aabb_size);
             }
+            println!("aabb_size == {:?}", self.aabb_size);
+            println!("font_size == {:?}", self.font_size);
         }
 
         if self.keyboard_manager.test_key(&Key::NumpadAdd, input) {
@@ -302,8 +400,9 @@ use jaankaup_core::input::*;
               self.aabb_size = self.aabb_size + 0.01;
               self.domain_tester.update_font_size(queue, self.font_size);
               self.domain_tester.update_aabb_size(queue, self.aabb_size);
+              println!("aabb_size == {:?}", self.aabb_size);
+              println!("font_size == {:?}", self.font_size);
         }
-
 
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
@@ -312,20 +411,14 @@ use jaankaup_core::input::*;
                                FMM_INNER_Y *
                                FMM_INNER_Z;
 
-        let mut encoder = device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor {
-                label: Some("Domain tester encoder"),
-        });
+        // let mut encoder = device.create_command_encoder(
+        //     &wgpu::CommandEncoderDescriptor {
+        //         label: Some("Domain tester encoder"),
+        // });
 
-        self.domain_tester.dispatch(&mut encoder);
+        // self.domain_tester.dispatch(&mut encoder);
 
-        queue.submit(Some(encoder.finish())); 
-
-
-        //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
-
-        //++ queue.submit(Some(encoder_command.finish()));
-
+        // queue.submit(Some(encoder.finish())); 
     }
 }
 
@@ -365,6 +458,21 @@ fn create_gpu_debugger(device: &wgpu::Device,
                 MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
                 64,
         )
+}
+
+fn load_pc_data(device: &wgpu::Device,
+                src_file: &String) -> (u32, wgpu::Buffer) {
+
+    //let result = read_pc_data(&"../../cloud_data.asc".to_string());
+    let result = read_pc_data(src_file);
+
+    (result.len() as u32,
+     buffer_from_data::<VVVC>(
+        &device,
+        &result,
+        wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        Some("Cloud data buffer")
+    ))
 }
 
 /// Load a wavefront mesh and store it to hash_map. Drop texture coordinates.

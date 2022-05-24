@@ -608,11 +608,6 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   return vec3<u32>(x, y, z);
 }
 
-fn get_cell_mem_loc(v: vec3<u32>) -> u32 {
-
-    let block_count = mc_uniform.noise_global_dimension.x * mc_uniform.noise_global_dimension.y * mc_uniform.noise_global_dimension.z;
-}
-
 fn get_cell_index(global_index: u32) -> vec3<u32> {
 
     let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
@@ -624,29 +619,9 @@ fn get_cell_index(global_index: u32) -> vec3<u32> {
 
     let local_position = decode3Dmorton32(local_index);
 
-    // let cell_position = noise_params.local_dim * block_position + local_position;
     let cell_position = block_position + local_position;
 
     return cell_position; 
-
-    // let block_count = mc_uniform.noise_global_dimension.x * mc_uniform.noise_global_dimension.y * mc_uniform.noise_global_dimension.z;
-
-    // let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
-
-    // let block_index = global_index / stride;
-
-    // let block_position = index_to_uvec3(block_index, mc_uniform.noise_global_dimension.x, mc_uniform.noise_global_dimension.y);
-
-    // // Calculate local position.
-    // let local_index = global_index - block_index * stride;
-
-    // let local_position = decode3Dmorton32(local_index);
-
-    // // let cell_position = mc_uniform.noise_local_dimension * block_position + local_position;
-
-    // let cell_position = block_position + local_position;
-
-    // return cell_position; 
 }
 
 @compute
