@@ -32,10 +32,10 @@ use jaankaup_core::input::*;
     use jaankaup_core::fmm_things::{DomainTester, Permutation};
 
     /// Max number of arrows for gpu debugger.
-    const MAX_NUMBER_OF_ARROWS:     usize = 40960;
+    const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
     /// Max number of aabbs for gpu debugger.
-    const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
+    const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES + 10000;
 
     /// Max number of box frames for gpu debugger.
     const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
@@ -155,7 +155,7 @@ use jaankaup_core::input::*;
             // Scale_factor for triangle meshes.
             let render_params = RenderParamBuffer::create(
                         &configuration.device,
-                        1.0
+                        4.0
             );
 
             // RenderObject for basic triangle mesh rendering.
@@ -181,24 +181,27 @@ use jaankaup_core::input::*;
             // 2 	3 	5 	7 	11 	13 	17 	19 	23 	29 	31 	37 	41 	43 	47 	53 	59 	61 	67 	71 
             // 73 	79 	83 	89 	97 	101 	103 	107 	109 	113 	127 	131 	137 	139 	149 	151 	157 	163 	167 	173
 
-            let primes = vec![2, 3,	5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+            // Primes - 3
+            let primes = vec![2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+            //let primes = vec![2, 3,	5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
 
-            let perms = (0..5).permutations(3).collect_vec();
-            //++ let mut blah: Vec<[i32; 3]> = Vec::new();
-            //++ for mut elem in perms.clone() {
-            //++     elem.sort();
-            //++     //blah.append([elem[0] as i32, elem[1] as i32, elem[2] as i32]);
-            //++     blah.append([1,2,3]);
-            //++     // blah.append(elem);
-            //++ }
-            // println!("{:?}", perms);
+            let perms = (0..19).permutations(3).collect_vec();
 
-            permutations.push(Permutation { modulo: 3, x_factor: 2,  y_factor: 13,  z_factor: 17, });
-            permutations.push(Permutation { modulo: 3, x_factor: 5,  y_factor: 13,  z_factor: 17, });
+            let mut blah: Vec<[u32; 3]> = Vec::new();
+            for mut elem in perms.clone() {
+                //println!("elem == {:?}", elem);
+                elem.sort();
+                //println!("sorted elem == {:?}", elem);
+                //blah.append([elem[0] as i32, elem[1] as i32, elem[2] as i32]);
+                blah.push([elem[0], elem[1], elem[2]]);
+                // blah.append(elem);
+            }
+            blah.sort();
+            let jebulis: Vec<[u32; 3]> = blah.into_iter().unique().collect();
 
-            // let permutation_number = (2u * position_u32_temp.x +  13u * position_u32_temp.y + 17u * position_u32_temp.z) % 4u; 
-            // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
-            // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
+            for j in jebulis {
+                permutations.push(Permutation { modulo: 3, x_factor: primes[j[0] as usize], y_factor: primes[j[1] as usize], z_factor: primes[j[2] as usize], }); 
+            }
             
             // The DomainTester.
             let domain_tester = DomainTester::init(
@@ -227,7 +230,6 @@ use jaankaup_core::input::*;
             triangle_meshes.insert(
                 FIRE_TOWER_MESH.to_string(),
                 fire_tower_mesh);
-
 
             let point_count = 0;
             //++ let (point_count, buf) = load_pc_data(&configuration.device, &"../../cloud_data.asc".to_string());
@@ -316,19 +318,20 @@ use jaankaup_core::input::*;
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
+        let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
 
         let mut clear = true;
 
-        // draw(&mut encoder,
-        //      &view,
-        //      self.screen.depth_texture.as_ref().unwrap(),
-        //      &self.triangle_mesh_bindgroups,
-        //      &self.triangle_mesh_renderer.get_render_object().pipeline,
-        //      &fire_tower.get_buffer(),
-        //      0..fire_tower.get_triangle_count() * 3, 
-        //      clear
-        // );
+        draw(&mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.triangle_mesh_bindgroups,
+             &self.triangle_mesh_renderer.get_render_object().pipeline,
+             &fire_tower.get_buffer(),
+             0..3, 
+             //0..fire_tower.get_triangle_count() * 3, 
+             clear
+        );
 
         // println!("{}", self.point_count);
 
@@ -441,7 +444,7 @@ fn create_gpu_debugger(device: &wgpu::Device,
                        sc_desc: &wgpu::SurfaceConfiguration,
                        camera: &mut Camera) -> GpuDebugger {
 
-        GpuDebugger::Init(
+        GpuDebugger::init(
                 &device,
                 &sc_desc,
                 &camera.get_camera_uniform(&device),
@@ -451,6 +454,7 @@ fn create_gpu_debugger(device: &wgpu::Device,
                 MAX_NUMBER_OF_AABBS.try_into().unwrap(),
                 MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
                 64,
+                1.0,
         )
 }
 

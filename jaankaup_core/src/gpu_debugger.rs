@@ -144,7 +144,7 @@ impl GpuDebugger {
         self.buffers.get(&"output_aabb_wires".to_string()).unwrap()
     }
 
-    pub fn Init(device: &wgpu::Device,
+    pub fn init(device: &wgpu::Device,
                 sc_desc: &wgpu::SurfaceConfiguration,
                 camera_buffer: &wgpu::Buffer,
                 max_number_of_vertices: u32,
@@ -152,7 +152,8 @@ impl GpuDebugger {
                 max_number_of_arrows: u32,
                 max_number_of_aabbs: u32,
                 max_number_of_aabb_wires: u32,
-                thread_count: u32
+                thread_count: u32,
+                scale_factor: f32,
                 ) -> Self {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
@@ -290,7 +291,7 @@ impl GpuDebugger {
         ////////////////////////////////////////////////////
 
         let other_render_params = OtherRenderParams {
-            scale_factor: 1.0,
+            scale_factor: scale_factor,
         };
 
         buffers.insert(

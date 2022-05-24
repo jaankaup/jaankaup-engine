@@ -1,4 +1,5 @@
 // TODO: add padding to Rust struct.
+
 struct ComputationalDomain {
     global_dimension: vec3<u32>,
     aabb_size: f32,
@@ -195,14 +196,17 @@ fn number_of_chars_data(data: vec4<f32>, vec_dim_count: u32, number_of_decimals:
 }
 
 /// A function that checks if a given coordinate is within the global computational domain. 
-fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
-    return ((*coord).x >= 0 && (*coord).x < i32(computational_domain.local_dimension.x * computational_domain.global_dimension.x)) &&
-           ((*coord).y >= 0 && (*coord).y < i32(computational_domain.local_dimension.y * computational_domain.global_dimension.y)) &&
-           ((*coord).z >= 0 && (*coord).z < i32(computational_domain.local_dimension.z * computational_domain.global_dimension.z)); 
+//fn isInside(coord: ptr<function, vec3<i32>>) -> bool {
+fn isInside(coord: vec3<i32>) -> bool {
+    return (coord.x >= 0 && coord.x < i32(computational_domain.local_dimension.x * computational_domain.global_dimension.x)) &&
+           (coord.y >= 0 && coord.y < i32(computational_domain.local_dimension.y * computational_domain.global_dimension.y)) &&
+           (coord.z >= 0 && coord.z < i32(computational_domain.local_dimension.z * computational_domain.global_dimension.z)); 
 }
 
 fn get_block_coordinate(block_index: u32) -> vec3<u32> {
-    return index_to_uvec3(block_index, computational_domain.global_dimension.x, computational_domain.global_dimension.y);
+    return index_to_uvec3(block_index,
+                          computational_domain.global_dimension.x * computational_domain.local_dimension.x,
+                          computational_domain.global_dimension.y * computational_domain.local_dimension.y);
 }
 
 fn get_group_coordinate(global_index: u32) -> vec3<u32> {
@@ -267,7 +271,7 @@ fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
 
-fn visualize_cell(position: vec3<f32>, color: u32, global_id: u32, draw_number: bool) {
+fn visualize_cell(position: vec3<f32>, color: u32, value: vec4<f32>, dimension: u32, draw_number: bool) {
     output_aabb[atomicAdd(&counter[2], 1u)] =
           AABB (
               vec4<f32>(position - vec3<f32>(computational_domain.aabb_size), bitcast<f32>(color)),
@@ -277,14 +281,14 @@ fn visualize_cell(position: vec3<f32>, color: u32, global_id: u32, draw_number: 
     if (draw_number) {
         let color_text = rgba_u32(255u, 255u, 255u, 255u);
 
-        let value = vec4<f32>(f32(global_id), 0.0, 0.0, 0.0);
+        // let value = vec4<f32>(f32(global_id), 0.0, 0.0, 0.0);
         let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
         let element_position = position - vec3<f32>(f32(total_number_of_chars) * computational_domain.font_size * 0.5, 0.0, (-1.0) * computational_domain.aabb_size - 0.001);
         let renderable_element = Char (
                         element_position,
                         computational_domain.font_size,
                         value,
-                        1u,
+                        dimension,
                         color_text,
                         1u,
                         0u
@@ -293,38 +297,103 @@ fn visualize_cell(position: vec3<f32>, color: u32, global_id: u32, draw_number: 
     }
 }
 
-fn load_neighbors(coord: vec3<u32>) {
+fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
 
-    var neighbor_0_coord = vec3<i32>(coord) + vec3<i32>(1, 0, 0);
-    var neighbor_1_coord = vec3<i32>(coord) - vec3<i32>(1, 0, 0);
-    var neighbor_2_coord = vec3<i32>(coord) + vec3<i32>(0, 1, 0);
-    var neighbor_3_coord = vec3<i32>(coord) - vec3<i32>(0, 1, 0);
-    var neighbor_4_coord = vec3<i32>(coord) + vec3<i32>(0, 0, 1);
-    var neighbor_5_coord = vec3<i32>(coord) - vec3<i32>(0, 0, 1);
+    var neighbors: array<vec3<i32>, 18> = array<vec3<i32>, 18>(
+        vec3<i32>(coord) + vec3<i32>(-1, 0, 0),
+        vec3<i32>(coord) + vec3<i32>(-1, 1, 0),
+        vec3<i32>(coord) + vec3<i32>(-1,-1, 0),
+        vec3<i32>(coord) + vec3<i32>(1,  0, 0),
+        vec3<i32>(coord) + vec3<i32>(1,  1, 0),
+        vec3<i32>(coord) + vec3<i32>(1, -1, 0),
+        vec3<i32>(coord) + vec3<i32>(0,  1, 0),
+        vec3<i32>(coord) + vec3<i32>(0, -1, 0),
+        vec3<i32>(coord) + vec3<i32>(0,  0, -1),
+        vec3<i32>(coord) + vec3<i32>(1,  0, -1),
+        vec3<i32>(coord) + vec3<i32>(-1, 0, -1),
+        vec3<i32>(coord) + vec3<i32>(0,  1, -1),
+        vec3<i32>(coord) + vec3<i32>(0, -1, -1),
+        vec3<i32>(coord) + vec3<i32>(0,  0, 1),
+        vec3<i32>(coord) + vec3<i32>(1,  0, 1),
+        vec3<i32>(coord) + vec3<i32>(-1, 0, 1),
+        vec3<i32>(coord) + vec3<i32>(0,  1, 1),
+        vec3<i32>(coord) + vec3<i32>(0, -1, 1)
+    );
 
-    var neighbor_0_coord_u32 = coord + vec3<u32>(1u, 0u, 0u);
-    var neighbor_1_coord_u32 = coord - vec3<u32>(1u, 0u, 0u);
-    var neighbor_2_coord_u32 = coord + vec3<u32>(0u, 1u, 0u);
-    var neighbor_3_coord_u32 = coord - vec3<u32>(0u, 1u, 0u);
-    var neighbor_4_coord_u32 = coord + vec3<u32>(0u, 0u, 1u);
-    var neighbor_5_coord_u32 = coord - vec3<u32>(0u, 0u, 1u);
+    //++ // var memory_locations: array<u32, 18> = array<u32, 18>(
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[0])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[1])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[2])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[3])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[4])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[5])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[6])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[7])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[8])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[9])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[10])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[11])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[12])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[13])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[14])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[15])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[16])),
+    //++ //     get_cell_mem_location(vec3<u32>(neighbors[17]))
+    //++ // );
 
-    var cell_index0 = encode3Dmorton32(neighbor_0_coord_u32.x, neighbor_0_coord_u32.y, neighbor_0_coord_u32.z);
-    var cell_index1 = encode3Dmorton32(neighbor_1_coord_u32.x, neighbor_1_coord_u32.y, neighbor_1_coord_u32.z);
-    var cell_index2 = encode3Dmorton32(neighbor_2_coord_u32.x, neighbor_2_coord_u32.y, neighbor_2_coord_u32.z);
-    var cell_index3 = encode3Dmorton32(neighbor_3_coord_u32.x, neighbor_3_coord_u32.y, neighbor_3_coord_u32.z);
-    var cell_index4 = encode3Dmorton32(neighbor_4_coord_u32.x, neighbor_4_coord_u32.y, neighbor_4_coord_u32.z);
-    var cell_index5 = encode3Dmorton32(neighbor_5_coord_u32.x, neighbor_5_coord_u32.y, neighbor_5_coord_u32.z);
+    var ohno = false;
+    //var ohno = true;
 
-    var inside0 = isInside(&neighbor_0_coord);
-    var inside1 = isInside(&neighbor_1_coord);
-    var inside2 = isInside(&neighbor_2_coord);
-    var inside3 = isInside(&neighbor_3_coord);
-    var inside4 = isInside(&neighbor_4_coord);
-    var inside5 = isInside(&neighbor_5_coord);
+    var this_permutation_number = 
+        (permutations[1].x_factor * coord.x +
+         permutations[1].y_factor * coord.y +
+         permutations[1].z_factor * coord.z) % permutations[1].modulo;
 
-    // In which global index?  
+    // var permutation_numbers: array<u32, 18> = array<u32, 18>();
 
+    let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
+    let permutation_color1 = rgba_u32(0u, 255u, 0u, 255u);
+    let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
+    let permutation_color3 = rgba_u32(0u, 155u, 155u, 255u);
+    let permutation_color100 = rgba_u32(255u, 255u, 255u, 255u);
+
+    var col = select(select(select(select(0u, permutation_color3, this_permutation_number == 3u), permutation_color2, this_permutation_number == 2u), permutation_color1, this_permutation_number == 1u), permutation_color0, this_permutation_number == 0u);
+
+    for (var i: i32 = 0 ; i < 18 ; i = i + 1) {
+        //permutation_numbers[i] = 
+
+        let neighbor_perm = (permutations[1].x_factor * u32(neighbors[i].x) +
+                             permutations[1].y_factor * u32(neighbors[i].y) +
+                             permutations[1].z_factor * u32(neighbors[i].z)) % permutations[1].modulo;
+        let neighbor_permutation = select(100u,
+               neighbor_perm,
+               isInside(neighbors[i])
+        );
+
+        if (neighbor_permutation == 100u) {
+
+            visualize_cell(4.0 * vec3<f32>(neighbors[i]), permutation_color100, vec4<f32>(vec3<f32>(neighbors[i]), 0.0), 3u, true);
+            //visualize_cell(4.0 * vec3<f32>(coord), col, global_index, true);
+            ohno = true;
+            output_arrow[atomicAdd(&counter[1], 1u)] =  
+                  Arrow (
+                      4.0 * vec4<f32>(vec3<f32>(coord), 0.0),
+                      4.0 * vec4<f32>(vec3<f32>(neighbors[i]), 0.0),
+                      rgba_u32(255u, 0u, 0u, 255u),
+                      0.1
+            );
+            
+            // ohno = true;
+        }
+        //if (neighbor_permutation == this_permutation_number) { ohno = true; }
+    }
+
+
+
+    if (ohno) {
+        // visualize_cell(4.0 * vec3<f32>(neighbors[i]), permutation_color100, vec4<f32>(vec3<f32>(coord), 0.0), 3u, false);
+        // visualize_cell(4.0 * vec3<f32>(coord), col, global_index, true);
+    }
 }
 
 @compute
@@ -337,38 +406,31 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                             computational_domain.global_dimension.y *
                             computational_domain.global_dimension.z;
 
-    //++ let total_count = computational_domain.local_dimension.x *
-    //++                   computational_domain.local_dimension.y *
-    //++                   computational_domain.local_dimension.z *
-    //++                   computational_domain.global_dimension.x *
-    //++                   computational_domain.global_dimension.y *
-    //++                   computational_domain.global_dimension.z;
+    let total_count = computational_domain.local_dimension.x *
+                      computational_domain.local_dimension.y *
+                      computational_domain.local_dimension.z *
+                      computational_domain.global_dimension.x *
+                      computational_domain.global_dimension.y *
+                      computational_domain.global_dimension.z;
 
-    //++ if (global_id.x >= total_count) { return; }
-    if (global_id.x >= total_block_count) { return; }
+    if (global_id.x >= total_count) { return; }
+    //++ if (global_id.x >= total_block_count) { return; }
 
-    let group_coord = get_block_coordinate(global_id.x);
-    //++ let index = get_cell_index(global_id.x);
+    //let group_coord = get_block_coordinate(global_id.x);
+    let index = get_cell_index(global_id.x);
+    load_neighbors_18(index, global_id.x);
     
     //++ let group_coord = get_group_coordinate(global_id.x);
 
-    let permutation_number = (2u * group_coord.x +  13u * group_coord.y + 17u * group_coord.z) % 4u; 
-    // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
-    // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
+    // let permutation_number = (2u * index.x +  13u * index.y + 17u * index.z) % 4u; 
 
-    let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
-    let permutation_color1 = rgba_u32(0u, 255u, 0u, 255u);
-    let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
-    let permutation_color3 = rgba_u32(0u, 155u, 155u, 255u);
-
-    // var col = 0u;
-    // if (permutation_number == 0u) { col =  permutation_color0; }
-    // else if (permutation_number == 1u) { col = permutation_color1; }
-    // else if (permutation_number == 2u) { col = permutation_color2; }
-    // else if (permutation_number == 3u) { col = permutation_color3; }
-
-    var col = select(select(select(select(0u, permutation_color3, permutation_number == 3u), permutation_color2, permutation_number == 2u), permutation_color1, permutation_number == 1u), permutation_color0, permutation_number == 0u);
-
+    //++    let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
+    //++    let permutation_color1 = rgba_u32(0u, 255u, 0u, 255u);
+    //++    let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
+    //++    let permutation_color3 = rgba_u32(0u, 155u, 155u, 255u);
+    //++
+    //++    var col = select(select(select(select(0u, permutation_color3, permutation_number == 3u), permutation_color2, permutation_number == 2u), permutation_color1, permutation_number == 1u), permutation_color0, permutation_number == 0u);
+    //++
     // col = select(0u, permutation_color1, permutation_number == 1u);
     // col = select(0u, permutation_color2, permutation_number == 2u);
     // col = select(0u, permutation_color3, permutation_number == 3u);
@@ -377,7 +439,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // col = select(0u, permutation_color1, permutation_number == 1u);
     // col = select(0u, permutation_color2, permutation_number == 2u);
     // col = select(0u, permutation_color3, permutation_number == 3u);
-    visualize_cell(vec3<f32>(group_coord), col, global_id.x, false);
+    //++ visualize_cell(vec3<f32>(index), col, global_id.x, false);
 
     //if (permutation_number == 0u) {
     //    visualize_cell(vec3<f32>(index), col, global_id.x);
