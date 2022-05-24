@@ -52,6 +52,8 @@ pub struct ComputationalDomain {
     aabb_size: f32,
     local_dimension:  [u32; 3],
     font_size: f32,
+    permutation_index: u32,
+    padding: [u32; 3],
 }
 
 impl_convert!{FMMCell}
@@ -70,7 +72,8 @@ impl ComputationalDomainBuffer {
                   global_dimension: [u32; 3],
                   local_dimension: [u32; 3],
                   aabb_size: f32,
-                  font_size: f32) -> Self {
+                  font_size: f32,
+                  permutation_index: u32) -> Self {
 
         // TODO: asserts
 
@@ -79,6 +82,8 @@ impl ComputationalDomainBuffer {
             aabb_size: aabb_size,
             local_dimension: local_dimension,
             font_size: font_size,
+            permutation_index: permutation_index,
+            padding: [0, 0, 0],
         };
 
         let buf = buffer_from_data::<ComputationalDomain>(
@@ -109,6 +114,12 @@ impl ComputationalDomainBuffer {
         self.computational_domain.global_dimension = global_dimension;
     }
 
+    pub fn update_permutation_index(&mut self, queue: &wgpu::Queue, permutation_index: u32) {
+        // TODO: asserts
+        self.computational_domain.permutation_index = permutation_index;
+        self.update(queue);
+    }
+
     pub fn get_buffer(&self) -> &wgpu::Buffer {
         &self.buffer
     }
@@ -122,6 +133,7 @@ pub struct DomainTester {
     computational_domain_buffer: ComputationalDomainBuffer,
     compute_object: ComputeObject,
     bind_groups: Vec<wgpu::BindGroup>,
+    permutations: Vec<Permutation>,
     permutations_buffer: wgpu::Buffer,
 }
 
@@ -134,6 +146,7 @@ impl DomainTester {
                 aabb_size: f32,
                 font_size: f32,
                 permutations: &Vec<Permutation>,
+                permutation_index: u32,
                 ) -> Self {
 
         let shader = &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -149,6 +162,8 @@ impl DomainTester {
                   local_dimension,
                   aabb_size,
                   font_size,
+                  //permutations: permutations,
+                  permutation_index
         );
 
         let permutations_buffer = buffer_from_data::<Permutation>(
@@ -212,6 +227,7 @@ impl DomainTester {
             compute_object: compute_object, 
             bind_groups: bind_groups,
             permutations_buffer: permutations_buffer,
+            permutations: permutations.to_vec(),
         }
     }
 
@@ -222,6 +238,11 @@ impl DomainTester {
 
     pub fn update_aabb_size(&mut self, queue: &wgpu::Queue, aabb_size: f32) {
         self.computational_domain_buffer.computational_domain.aabb_size = aabb_size; 
+        self.computational_domain_buffer.update(queue);
+    }
+
+    pub fn update_permutation_index(&mut self, queue: &wgpu::Queue, permutation_index: u32) {
+        self.computational_domain_buffer.computational_domain.permutation_index = permutation_index; 
         self.computational_domain_buffer.update(queue);
     }
 

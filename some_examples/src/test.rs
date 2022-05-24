@@ -112,11 +112,15 @@ use jaankaup_core::input::*;
         render_object_vvvc: RenderObject,
         render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
         point_count: u32,
+        permutation_index: u32,
+        permutation_count: u32,
     }
 
     impl Application for TestProject {
 
         fn init(configuration: &WGPUConfiguration) -> Self {
+
+            let permutation_index = 0;
 
             let aabb_size: f32 = 0.15;
             let font_size: f32 = 0.016;
@@ -182,7 +186,8 @@ use jaankaup_core::input::*;
             // 73 	79 	83 	89 	97 	101 	103 	107 	109 	113 	127 	131 	137 	139 	149 	151 	157 	163 	167 	173
 
             // Primes - 3
-            let primes = vec![2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+            //let primes = vec![2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+            let primes = vec![2, 3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
             //let primes = vec![2, 3,	5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
 
             let perms = (0..19).permutations(3).collect_vec();
@@ -200,7 +205,7 @@ use jaankaup_core::input::*;
             let jebulis: Vec<[u32; 3]> = blah.into_iter().unique().collect();
 
             for j in jebulis {
-                permutations.push(Permutation { modulo: 3, x_factor: primes[j[0] as usize], y_factor: primes[j[1] as usize], z_factor: primes[j[2] as usize], }); 
+                permutations.push(Permutation { modulo: 5, x_factor: primes[j[0] as usize], y_factor: primes[j[1] as usize], z_factor: primes[j[2] as usize], }); 
             }
             
             // The DomainTester.
@@ -211,8 +216,12 @@ use jaankaup_core::input::*;
                 [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
                 0.15,
                 0.016,
-                &permutations
+                &permutations,
+                permutation_index,
                 );
+
+            let permutation_count = permutations.len();
+            println!("permutation count == {}", permutation_count);
 
             // Container for triangle meshes.
             let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
@@ -288,6 +297,8 @@ use jaankaup_core::input::*;
                 render_object_vvvc: render_object_vvvc,
                 render_bind_groups_vvvc: render_bind_groups_vvvc,
                 point_count: point_count,
+                permutation_index: permutation_index,
+                permutation_count: permutation_count as u32,
             }
     }
 
@@ -399,6 +410,15 @@ use jaankaup_core::input::*;
               self.domain_tester.update_aabb_size(queue, self.aabb_size);
               println!("aabb_size == {:?}", self.aabb_size);
               println!("font_size == {:?}", self.font_size);
+        }
+
+        if self.keyboard_manager.test_key(&Key::P, input) {
+              println!("heko");
+              if self.permutation_index + 1 < self.permutation_count {
+                  self.permutation_index = self.permutation_index + 1; 
+                  self.domain_tester.update_permutation_index(queue, self.permutation_index);
+                  println!("updating permutation index {}", self.permutation_index);
+              }
         }
 
         let total_grid_count = FMM_GLOBAL_X *
@@ -515,6 +535,8 @@ fn create_keyboard_manager() -> KeyboardManager {
 
         keys.register_key(Key::NumpadSubtract, 50.0);
         keys.register_key(Key::NumpadAdd, 50.0);
+        keys.register_key(Key::O, 100.0);
+        keys.register_key(Key::P, 100.0);
         
         keys
 }
