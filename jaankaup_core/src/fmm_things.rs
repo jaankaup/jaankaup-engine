@@ -27,15 +27,15 @@ const KNOWN: u32    = 3;
 /// Tag value for a cell outside the computational domain.
 const OUTSIDE: u32  = 4;
 
-/// parameters for permutations.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-pub struct Permutation {
-    pub modulo: u32,
-    pub x_factor: u32,  
-    pub y_factor: u32,  
-    pub z_factor: u32,  
-}
+// /// parameters for permutations.
+// #[repr(C)]
+// #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+// pub struct Permutation {
+//     pub modulo: u32,
+//     pub x_factor: u32,  
+//     pub y_factor: u32,  
+//     pub z_factor: u32,  
+// }
 
 /// Basic data for the fast marching method.
 #[repr(C)]
@@ -53,8 +53,9 @@ pub struct ComputationalDomain {
     aabb_size: f32,
     local_dimension:  [u32; 3],
     font_size: f32,
-    permutation_index: u32,
-    padding: [u32; 3],
+    domain_iterator: [u32; 3],
+    padding: u32,
+    // permutation_index: u32,
 }
 
 impl_convert!{FMMCell}
@@ -74,7 +75,7 @@ impl ComputationalDomainBuffer {
                   local_dimension: [u32; 3],
                   aabb_size: f32,
                   font_size: f32,
-                  permutation_index: u32) -> Self {
+                  domain_iterator: [u32; 3])  -> Self {
 
         // TODO: asserts
 
@@ -83,8 +84,9 @@ impl ComputationalDomainBuffer {
             aabb_size: aabb_size,
             local_dimension: local_dimension,
             font_size: font_size,
-            permutation_index: permutation_index,
-            padding: [0, 0, 0],
+            // permutation_index: permutation_index,
+            domain_iterator: domain_iterator,
+            padding: 0,
         };
 
         let buf = buffer_from_data::<ComputationalDomain>(
@@ -115,11 +117,17 @@ impl ComputationalDomainBuffer {
         self.computational_domain.global_dimension = global_dimension;
     }
 
-    pub fn update_permutation_index(&mut self, queue: &wgpu::Queue, permutation_index: u32) {
+    pub fn update_domain_iterator(&mut self, queue: &wgpu::Queue, domain_iterator: [u32; 3]) {
         // TODO: asserts
-        self.computational_domain.permutation_index = permutation_index;
+        self.computational_domain.domain_iterator = domain_iterator;
         self.update(queue);
     }
+
+    // pub fn update_permutation_index(&mut self, queue: &wgpu::Queue, permutation_index: u32) {
+    //     // TODO: asserts
+    //     self.computational_domain.permutation_index = permutation_index;
+    //     self.update(queue);
+    // }
 
     pub fn get_buffer(&self) -> &wgpu::Buffer {
         &self.buffer
@@ -134,8 +142,9 @@ pub struct DomainTester {
     computational_domain_buffer: ComputationalDomainBuffer,
     compute_object: ComputeObject,
     bind_groups: Vec<wgpu::BindGroup>,
-    permutations: Vec<Permutation>,
-    permutations_buffer: wgpu::Buffer,
+    domain_iterator: [u32; 3],
+    // permutations: Vec<Permutation>,
+    // permutations_buffer: wgpu::Buffer,
 }
 
 impl DomainTester {
@@ -146,8 +155,9 @@ impl DomainTester {
                 local_dimension: [u32; 3],
                 aabb_size: f32,
                 font_size: f32,
-                permutations: &Vec<Permutation>,
-                permutation_index: u32,
+                domain_iterator: [u32 ; 3]
+                //permutations: &Vec<Permutation>,
+                //permutation_index: u32,
                 ) -> Self {
 
         let shader = &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -163,16 +173,17 @@ impl DomainTester {
                   local_dimension,
                   aabb_size,
                   font_size,
+                  domain_iterator,
                   //permutations: permutations,
-                  permutation_index
+                  //permutation_index
         );
 
-        let permutations_buffer = buffer_from_data::<Permutation>(
-                  &device,
-                  permutations,
-                  wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-                  Some("Permutations wgpu::buffer.")
-        );
+        // let permutations_buffer = buffer_from_data::<Permutation>(
+        //           &device,
+        //           permutations,
+        //           wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+        //           Some("Permutations wgpu::buffer.")
+        // );
 
         let compute_object =
                 ComputeObject::init(
@@ -184,23 +195,23 @@ impl DomainTester {
                             // @group(0) @binding(0) var<uniform> computational_domain: ComputationalDomain;
                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-                            // @group(0) @binding(1) var<storage,read_write> permutations: array<Permutation>;
-                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+                            // // @group(0) @binding(1) var<storage,read_write> permutations: array<Permutation>;
+                            // create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(2) var<storage,read_write> counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
-                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string()
@@ -213,7 +224,7 @@ impl DomainTester {
                 &vec![
                     vec![
                     &computational_domain_buffer.get_buffer().as_entire_binding(),
-                    &permutations_buffer.as_entire_binding(),
+                    // &permutations_buffer.as_entire_binding(),
                     &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                     &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
                     &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
@@ -227,8 +238,9 @@ impl DomainTester {
             computational_domain_buffer,
             compute_object: compute_object, 
             bind_groups: bind_groups,
-            permutations_buffer: permutations_buffer,
-            permutations: permutations.to_vec(),
+            domain_iterator: domain_iterator,
+            // permutations_buffer: permutations_buffer,
+            // permutations: permutations.to_vec(),
         }
     }
 
@@ -242,8 +254,8 @@ impl DomainTester {
         self.computational_domain_buffer.update(queue);
     }
 
-    pub fn update_permutation_index(&mut self, queue: &wgpu::Queue, permutation_index: u32) {
-        self.computational_domain_buffer.computational_domain.permutation_index = permutation_index; 
+    pub fn update_domain_iterator(&mut self, queue: &wgpu::Queue, domain_iterator: [u32; 3]) {
+        self.computational_domain_buffer.computational_domain.domain_iterator = domain_iterator; 
         self.computational_domain_buffer.update(queue);
     }
 

@@ -29,7 +29,7 @@ use jaankaup_core::input::*;
     use jaankaup_core::texture::Texture;
     use jaankaup_core::aabb::Triangle_vvvvnnnn;
     use jaankaup_core::common_functions::encode_rgba_u32;
-    use jaankaup_core::fmm_things::{DomainTester, Permutation, PointCloud};
+    use jaankaup_core::fmm_things::{DomainTester, PointCloud};
 
     /// Max number of arrows for gpu debugger.
     const MAX_NUMBER_OF_ARROWS:     usize = 262144;
@@ -140,7 +140,7 @@ use jaankaup_core::input::*;
             // Camera.
             let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
             camera.set_rotation_sensitivity(0.4);
-            camera.set_movement_sensitivity(0.02);
+            camera.set_movement_sensitivity(0.1);
 
             // Gpu debugger.
             let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
@@ -180,9 +180,6 @@ use jaankaup_core::input::*;
             // Buffer hash_map.
             let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-            // Permutations.
-            let mut permutations: Vec<Permutation> = Vec::new();
-
             // Generate the point cloud.
             let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
@@ -194,28 +191,28 @@ use jaankaup_core::input::*;
             // 2 	3 	5 	7 	11 	13 	17 	19 	23 	29 	31 	37 	41 	43 	47 	53 	59 	61 	67 	71 
             // 73 	79 	83 	89 	97 	101 	103 	107 	109 	113 	127 	131 	137 	139 	149 	151 	157 	163 	167 	173
 
-            // Primes - 3
-            //let primes = vec![2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
-            let primes = vec![2, 3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
-            //let primes = vec![2, 3,	5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+            // // Primes - 3
+            // //let primes = vec![2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+            // let primes = vec![2, 3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
+            // //let primes = vec![2, 3,	5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
 
-            let perms = (0..19).permutations(3).collect_vec();
+            // let perms = (0..19).permutations(3).collect_vec();
 
-            let mut blah: Vec<[u32; 3]> = Vec::new();
-            for mut elem in perms.clone() {
-                //println!("elem == {:?}", elem);
-                elem.sort();
-                //println!("sorted elem == {:?}", elem);
-                //blah.append([elem[0] as i32, elem[1] as i32, elem[2] as i32]);
-                blah.push([elem[0], elem[1], elem[2]]);
-                // blah.append(elem);
-            }
-            blah.sort();
-            let jebulis: Vec<[u32; 3]> = blah.into_iter().unique().collect();
+            // let mut blah: Vec<[u32; 3]> = Vec::new();
+            // for mut elem in perms.clone() {
+            //     //println!("elem == {:?}", elem);
+            //     elem.sort();
+            //     //println!("sorted elem == {:?}", elem);
+            //     //blah.append([elem[0] as i32, elem[1] as i32, elem[2] as i32]);
+            //     blah.push([elem[0], elem[1], elem[2]]);
+            //     // blah.append(elem);
+            // }
+            // blah.sort();
+            // let jebulis: Vec<[u32; 3]> = blah.into_iter().unique().collect();
 
-            for j in jebulis {
-                permutations.push(Permutation { modulo: 5, x_factor: primes[j[0] as usize], y_factor: primes[j[1] as usize], z_factor: primes[j[2] as usize], }); 
-            }
+            // for j in jebulis {
+            //     permutations.push(Permutation { modulo: 5, x_factor: primes[j[0] as usize], y_factor: primes[j[1] as usize], z_factor: primes[j[2] as usize], }); 
+            // }
             
             // The DomainTester.
             let domain_tester = DomainTester::init(
@@ -225,12 +222,13 @@ use jaankaup_core::input::*;
                 [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
                 0.15,
                 0.016,
-                &permutations,
-                permutation_index,
+                //&permutations,
+                [cell_iterator[0] as u32, cell_iterator[1] as u32, cell_iterator[2] as u32],
+                // permutation_index,
                 );
 
-            let permutation_count = permutations.len();
-            println!("permutation count == {}", permutation_count);
+            // let permutation_count = permutations.len();
+            // println!("permutation count == {}", permutation_count);
 
             // Container for triangle meshes.
             let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
@@ -418,9 +416,8 @@ use jaankaup_core::input::*;
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
-        if self.keyboard_manager.test_key(&Key::Key1, input) {
-            println!("1 pressed");
-        }
+        self.domain_tester.update_domain_iterator(queue, [self.cell_iterator[0] as u32, self.cell_iterator[1] as u32, self.cell_iterator[2] as u32] );
+
         if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) { 
             if self.font_size - 0.0005 > 0.0 && self.aabb_size - 0.01 > 0.0 {
                 self.font_size = self.font_size - 0.0005;
