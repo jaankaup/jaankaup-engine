@@ -328,6 +328,52 @@ fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
         get_cell_mem_location(vec3<u32>(neighbors[5]))
     );
 
+    let this_group_number = get_group_number(global_index);
+
+    var col = select(
+              select(
+              select(
+              select(0u, GROUP_COLORS[3], this_group_number == 3u),
+                     GROUP_COLORS[2], this_group_number == 2u),
+                     GROUP_COLORS[1], this_group_number == 1u),
+                     GROUP_COLORS[0], this_group_number == 0u);
+
+    if (coord.x == computational_domain.current_cell.x &&
+        coord.y == computational_domain.current_cell.y &&
+        coord.z == computational_domain.current_cell.z) {
+
+            visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
+
+            // Draw arrows.
+            for (var i: i32 = 0 ; i < 6; i = i + 1) {
+
+                let n_group_number = get_group_number(memory_locations[i]);
+
+		var col_arrow = select(
+                                select(
+                                select(
+                                select(0u, GROUP_COLORS[3], n_group_number == 3u),
+                                       GROUP_COLORS[2], n_group_number == 2u),
+                                       GROUP_COLORS[1], n_group_number == 1u),
+                                       GROUP_COLORS[0], n_group_number == 0u); 
+
+                // Draw an arrow if the neighbor is inside computational domain.
+                if (isInside(neighbors[i])) {
+                    output_arrow[atomicAdd(&counter[1], 1u)] =  
+                          Arrow (
+                              4.0 * vec4<f32>(vec3<f32>(coord), 0.0),
+                              4.0 * vec4<f32>(vec3<f32>(neighbors[i]), 0.0),
+                              col_arrow,
+                              0.1
+                    );
+                }
+            }
+        
+    }
+    else {
+        visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
+    }
+
 }
 
 // Load 16 neighbors with debug.
@@ -374,19 +420,6 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
         get_cell_mem_location(vec3<u32>(neighbors[16])),
         get_cell_mem_location(vec3<u32>(neighbors[17]))
     );
-
-    let this_group_number = get_group_number(global_index);
-
-    // var magic_numbers: array<u32, 8> = array<u32, 8>(0u, 1u, 2u, 3u, 3u, 2u, 1u, 0u);
-
-    // var this_permutation_number = magic_numbers[global_index & 7u];
-
-    let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
-    let permutation_color1 = rgba_u32(255u, 255u, 0u, 255u);
-    let permutation_color2 = rgba_u32(0u, 155u, 255u, 255u);
-    let permutation_color3 = rgba_u32(0u, 0u, 255u, 255u);
-    let permutation_color100 = rgba_u32(255u, 255u, 255u, 255u);
-    let permutation_color_selected = rgba_u32(100u, 255u, 255u, 255u);
 
     let this_group_number = get_group_number(global_index);
 
@@ -455,5 +488,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if (global_id.x >= total_count) { return; }
 
     let index = get_cell_index(global_id.x);
-    load_neighbors_18(index, global_id.x);
+    // load_neighbors_18(index, global_id.x);
+    load_neighbors_6(index, global_id.x);
 }
