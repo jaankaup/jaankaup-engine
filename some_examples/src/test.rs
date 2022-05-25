@@ -114,12 +114,17 @@ use jaankaup_core::input::*;
         point_count: u32,
         permutation_index: u32,
         point_cloud: PointCloud,
+        cell_iterator: [u32; 3],
+        camera_mode: bool,
         //permutation_count: u32,
     }
 
     impl Application for TestProject {
 
         fn init(configuration: &WGPUConfiguration) -> Self {
+
+            let cell_iterator: [u32; 3] = [0, 0, 0];
+            let camera_mode = true;
 
             let permutation_index = 0;
 
@@ -304,6 +309,8 @@ use jaankaup_core::input::*;
                 point_count: point_count,
                 permutation_index: permutation_index,
                 point_cloud: point_cloud,
+                cell_iterator: cell_iterator,
+                camera_mode: camera_mode,
             }
     }
 
@@ -344,7 +351,7 @@ use jaankaup_core::input::*;
              &self.triangle_mesh_bindgroups,
              &self.triangle_mesh_renderer.get_render_object().pipeline,
              &fire_tower.get_buffer(),
-             0..3, 
+             0..3,
              //0..fire_tower.get_triangle_count() * 3, 
              clear
         );
@@ -381,7 +388,7 @@ use jaankaup_core::input::*;
 
     #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input: &InputCache) {
-        self.camera.update_from_input(&queue, &input);
+        if self.camera_mode { self.camera.update_from_input(&queue, &input); } 
     }
 
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {
@@ -417,14 +424,17 @@ use jaankaup_core::input::*;
               println!("font_size == {:?}", self.font_size);
         }
 
-        // if self.keyboard_manager.test_key(&Key::P, input) {
-        //       println!("heko");
-        //       if self.permutation_index + 1 < self.permutation_count {
-        //           self.permutation_index = self.permutation_index + 1; 
-        //           self.domain_tester.update_permutation_index(queue, self.permutation_index);
-        //           println!("updating permutation index {}", self.permutation_index);
-        //       }
-        // }
+        if self.keyboard_manager.test_key(&Key::P, input) {
+              self.camera_mode = true;
+              println!("camera mode == {:?}", self.camera_mode);
+              // log::info!("camera mode == {:?}", self.camera_mode);
+        }
+
+        if self.keyboard_manager.test_key(&Key::O, input) {
+              self.camera_mode = false;
+              println!("camera mode == {:?}", self.camera_mode);
+              //log::info!("camera mode == {:?}", self.camera_mode);
+        }
 
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
@@ -540,8 +550,8 @@ fn create_keyboard_manager() -> KeyboardManager {
 
         keys.register_key(Key::NumpadSubtract, 50.0);
         keys.register_key(Key::NumpadAdd, 50.0);
-        keys.register_key(Key::O, 100.0);
-        keys.register_key(Key::P, 100.0);
+        keys.register_key(Key::O, 50.0);
+        keys.register_key(Key::P, 50.0);
         
         keys
 }
