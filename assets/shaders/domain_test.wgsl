@@ -59,6 +59,7 @@ let AABB_SIZE = 0.26;
 @group(0) @binding(5) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 var<private> MAGIC_NUMBERS: array<u32, 8> = array<u32, 8>(0u, 1u, 2u, 3u, 3u, 2u, 1u, 0u);
+var<private> GROUP_COLORS: array<u32, 4> = array<u32, 4>(4278190335u, 4294902015u, 10223615u, 65535u);
 
 /// DEBUG FUNCTION. 
 struct ModF {
@@ -307,9 +308,27 @@ fn visualize_cell(position: vec3<f32>, color: u32, value: vec4<f32>, dimension: 
     }
 }
 
-// fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
-// 
-// }
+fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
+
+    var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
+        vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
+        vec3<i32>(coord) + vec3<i32>(1,   0,  0),
+        vec3<i32>(coord) + vec3<i32>(0,   1,  0),
+        vec3<i32>(coord) + vec3<i32>(0,  -1,  0),
+        vec3<i32>(coord) + vec3<i32>(0,   0,  1),
+        vec3<i32>(coord) + vec3<i32>(0,   0, -1)
+    );
+
+    var memory_locations: array<u32, 6> = array<u32, 6>(
+        get_cell_mem_location(vec3<u32>(neighbors[0])),
+        get_cell_mem_location(vec3<u32>(neighbors[1])),
+        get_cell_mem_location(vec3<u32>(neighbors[2])),
+        get_cell_mem_location(vec3<u32>(neighbors[3])),
+        get_cell_mem_location(vec3<u32>(neighbors[4])),
+        get_cell_mem_location(vec3<u32>(neighbors[5]))
+    );
+
+}
 
 // Load 16 neighbors with debug.
 fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
@@ -356,9 +375,9 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
         get_cell_mem_location(vec3<u32>(neighbors[17]))
     );
 
-    var ohno = false;
+    let this_group_number = get_group_number(global_index);
 
-    var magic_numbers: array<u32, 8> = array<u32, 8>(0u, 1u, 2u, 3u, 3u, 2u, 1u, 0u);
+    // var magic_numbers: array<u32, 8> = array<u32, 8>(0u, 1u, 2u, 3u, 3u, 2u, 1u, 0u);
 
     // var this_permutation_number = magic_numbers[global_index & 7u];
 
@@ -371,20 +390,34 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
 
     let this_group_number = get_group_number(global_index);
 
-    //var col = select(select(select(select(0u, permutation_color3, this_permutation_number == 3u), permutation_color2, this_permutation_number == 2u), permutation_color1, this_permutation_number == 1u), permutation_color0, this_permutation_number == 0u);
-
-    var col = select(select(select(select(0u, permutation_color3, this_group_number == 3u), permutation_color2, this_group_number == 2u), permutation_color1, this_group_number == 1u), permutation_color0, this_group_number == 0u);
+    var col = select(
+              select(
+              select(
+              select(0u, GROUP_COLORS[3], this_group_number == 3u),
+                     GROUP_COLORS[2], this_group_number == 2u),
+                     GROUP_COLORS[1], this_group_number == 1u),
+                     GROUP_COLORS[0], this_group_number == 0u);
 
     if (coord.x == computational_domain.current_cell.x &&
         coord.y == computational_domain.current_cell.y &&
         coord.z == computational_domain.current_cell.z) {
+
             visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
+
+            // Draw arrows.
             for (var i: i32 = 0 ; i < 18; i = i + 1) {
 
-                // let neigh_color = magic_numbers[memory_locations[i] & 7u];
                 let n_group_number = get_group_number(memory_locations[i]);
-		var col_arrow = select(select(select(select(0u, permutation_color3, n_group_number == 3u), permutation_color2, n_group_number == 2u), permutation_color1, n_group_number == 1u), permutation_color0, n_group_number == 0u); 
 
+		var col_arrow = select(
+                                select(
+                                select(
+                                select(0u, GROUP_COLORS[3], n_group_number == 3u),
+                                       GROUP_COLORS[2], n_group_number == 2u),
+                                       GROUP_COLORS[1], n_group_number == 1u),
+                                       GROUP_COLORS[0], n_group_number == 0u); 
+
+                // Draw an arrow if the neighbor is inside computational domain.
                 if (isInside(neighbors[i])) {
                     output_arrow[atomicAdd(&counter[1], 1u)] =  
                           Arrow (
