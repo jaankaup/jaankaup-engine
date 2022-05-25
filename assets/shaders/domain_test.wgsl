@@ -298,6 +298,10 @@ fn visualize_cell(position: vec3<f32>, color: u32, value: vec4<f32>, dimension: 
     }
 }
 
+// fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
+// 
+// }
+
 fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
 
     var neighbors: array<vec3<i32>, 18> = array<vec3<i32>, 18>(
@@ -349,9 +353,6 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
     var magic_numbers: array<u32, 8> = array<u32, 8>(0u, 1u, 2u, 3u, 3u, 2u, 1u, 0u);
 
     var this_permutation_number = magic_numbers[global_index & 7u];  
-    //     (permutations[computational_domain.permutation_index].x_factor * coord.x +
-    //      permutations[computational_domain.permutation_index].y_factor * coord.y +
-    //      permutations[computational_domain.permutation_index].z_factor * coord.z) % permutations[computational_domain.permutation_index].modulo;
 
     // var permutation_numbers: array<u32, 18> = array<u32, 18>();
 
@@ -363,38 +364,7 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
 
     var col = select(select(select(select(0u, permutation_color3, this_permutation_number == 3u), permutation_color2, this_permutation_number == 2u), permutation_color1, this_permutation_number == 1u), permutation_color0, this_permutation_number == 0u);
 
-    for (var i: i32 = 0 ; i < 18 ; i = i + 1) {
-
-        let neighbor_perm = magic_numbers[memory_locations[i] & 7u];
-
-// (permutations[computational_domain.permutation_index].x_factor * u32(neighbors[i].x) +
-//                             permutations[computational_domain.permutation_index].y_factor * u32(neighbors[i].y) +
-//                             permutations[computational_domain.permutation_index].z_factor * u32(neighbors[i].z)) % permutations[computational_domain.permutation_index].modulo;
-
-        let neighbor_permutation = select(100u,
-               neighbor_perm,
-               isInside(neighbors[i])
-        );
-
-        if (neighbor_permutation == this_permutation_number) { ohno = true; }
-
-        //    visualize_cell(4.0 * vec3<f32>(neighbors[i]), permutation_color100, vec4<f32>(vec3<f32>(neighbors[i]), 0.0), 3u, true);
-        //    //visualize_cell(4.0 * vec3<f32>(coord), col, global_index, true);
-        //    ohno = true;
-        //    output_arrow[atomicAdd(&counter[1], 1u)] =  
-        //          Arrow (
-        //              4.0 * vec4<f32>(vec3<f32>(coord), 0.0),
-        //              4.0 * vec4<f32>(vec3<f32>(neighbors[i]), 0.0),
-        //              rgba_u32(255u, 0u, 0u, 255u),
-        //              0.1
-        //    );
-            
-            // ohno = true;
-        }
-
-    if (ohno) {
-        visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
-    }
+    visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
 }
 
 @compute
@@ -415,7 +385,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                       computational_domain.global_dimension.z;
 
     if (global_id.x >= total_count) { return; }
-    //++ if (global_id.x >= total_block_count) { return; }
 
     //let group_coord = get_block_coordinate(global_id.x);
     let index = get_cell_index(global_id.x);

@@ -21,7 +21,8 @@ pub struct VVVC64 {
     color: u32,
 }
 
-pub fn read_pc_data(file: &String) -> Vec<VVVC> {
+/// Read space separated pppccc data from file. Returns (aabb_min, aabb_max, VVVC data)
+pub fn read_pc_data(file: &String) -> ([f32; 3], [f32; 3], Vec<VVVC>) {
 
     let mut result: Vec<VVVC64> = Vec::with_capacity(7000000);
     let mut result2: Vec<VVVC> = Vec::with_capacity(7000000);
@@ -64,8 +65,12 @@ pub fn read_pc_data(file: &String) -> Vec<VVVC> {
         });
     }
     println!("{:?}", aabb);
+    aabb.max = aabb.max - aabb.min;  
+    aabb.min.x = 0.0;
+    aabb.min.y = 0.0;
+    aabb.min.z = 0.0;
 
-    result2
+    ([aabb.min.x as f32, aabb.min.y as f32, aabb.min.z as f32], [aabb.max.x as f32, aabb.max.y as f32, aabb.max.z as f32], result2)
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>

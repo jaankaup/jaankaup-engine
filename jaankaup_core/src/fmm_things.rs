@@ -1,3 +1,4 @@
+use crate::pc_parser::{read_pc_data, VVVC};
 use crate::render_object::create_bind_groups;
 use crate::common_functions::{
     udiv_up_safe32,
@@ -266,3 +267,46 @@ impl DomainTester {
         );
     }
 }
+
+fn load_pc_data(device: &wgpu::Device, src_file: &String) -> (u32, [f32; 3], [f32; 3], wgpu::Buffer) {
+
+    let (aabb_min, aabb_max, pc_data) = read_pc_data(src_file);
+
+    (pc_data.len() as u32,
+     aabb_min,
+     aabb_max,
+     buffer_from_data::<VVVC>(
+         &device,
+         &pc_data,
+         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
+         Some("Cloud data buffer")
+         )
+    )
+}
+
+pub struct PointCloud {
+    point_cloud_buffer: wgpu::Buffer,
+    point_count: u32,
+    min_coord: [f32; 3],
+    max_coord: [f32; 3],
+    // compute_object: ComputeObject,
+    // bind_groups: Vec<wgpu::BindGroup>,
+}
+
+impl PointCloud {
+
+    pub fn init(device: &wgpu::Device, file_location: &String) -> Self {
+
+        let (point_count, aabb_min, aabb_max, buffer) = load_pc_data(device, file_location);
+
+        // let result = read_pc_data(src_file);
+
+        Self {
+            point_cloud_buffer: buffer,
+            point_count: point_count,
+            min_coord: aabb_min,
+            max_coord: aabb_max,
+        }
+    }
+}
+

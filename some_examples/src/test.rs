@@ -29,7 +29,7 @@ use jaankaup_core::input::*;
     use jaankaup_core::texture::Texture;
     use jaankaup_core::aabb::Triangle_vvvvnnnn;
     use jaankaup_core::common_functions::encode_rgba_u32;
-    use jaankaup_core::fmm_things::{DomainTester, Permutation};
+    use jaankaup_core::fmm_things::{DomainTester, Permutation, PointCloud};
 
     /// Max number of arrows for gpu debugger.
     const MAX_NUMBER_OF_ARROWS:     usize = 262144;
@@ -113,7 +113,8 @@ use jaankaup_core::input::*;
         render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
         point_count: u32,
         permutation_index: u32,
-        permutation_count: u32,
+        point_cloud: PointCloud,
+        //permutation_count: u32,
     }
 
     impl Application for TestProject {
@@ -176,6 +177,9 @@ use jaankaup_core::input::*;
 
             // Permutations.
             let mut permutations: Vec<Permutation> = Vec::new();
+
+            // Generate the point cloud.
+            let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
             // Create different permutations such that (a*x + b*y + c*) % d where
             //
@@ -296,9 +300,10 @@ use jaankaup_core::input::*;
                 font_size: font_size,
                 render_object_vvvc: render_object_vvvc,
                 render_bind_groups_vvvc: render_bind_groups_vvvc,
+                //permutation_count: permutation_count as u32,
                 point_count: point_count,
                 permutation_index: permutation_index,
-                permutation_count: permutation_count as u32,
+                point_cloud: point_cloud,
             }
     }
 
@@ -412,14 +417,14 @@ use jaankaup_core::input::*;
               println!("font_size == {:?}", self.font_size);
         }
 
-        if self.keyboard_manager.test_key(&Key::P, input) {
-              println!("heko");
-              if self.permutation_index + 1 < self.permutation_count {
-                  self.permutation_index = self.permutation_index + 1; 
-                  self.domain_tester.update_permutation_index(queue, self.permutation_index);
-                  println!("updating permutation index {}", self.permutation_index);
-              }
-        }
+        // if self.keyboard_manager.test_key(&Key::P, input) {
+        //       println!("heko");
+        //       if self.permutation_index + 1 < self.permutation_count {
+        //           self.permutation_index = self.permutation_index + 1; 
+        //           self.domain_tester.update_permutation_index(queue, self.permutation_index);
+        //           println!("updating permutation index {}", self.permutation_index);
+        //       }
+        // }
 
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
@@ -478,20 +483,20 @@ fn create_gpu_debugger(device: &wgpu::Device,
         )
 }
 
-fn load_pc_data(device: &wgpu::Device,
-                src_file: &String) -> (u32, wgpu::Buffer) {
-
-    //let result = read_pc_data(&"../../cloud_data.asc".to_string());
-    let result = read_pc_data(src_file);
-
-    (result.len() as u32,
-     buffer_from_data::<VVVC>(
-        &device,
-        &result,
-        wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        Some("Cloud data buffer")
-    ))
-}
+// fn load_pc_data(device: &wgpu::Device,
+//                 src_file: &String) -> (u32, wgpu::Buffer) {
+// 
+//     //let result = read_pc_data(&"../../cloud_data.asc".to_string());
+//     let result = read_pc_data(src_file);
+// 
+//     (result.len() as u32,
+//      buffer_from_data::<VVVC>(
+//         &device,
+//         &result,
+//         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
+//         Some("Cloud data buffer")
+//     ))
+// }
 
 /// Load a wavefront mesh and store it to hash_map. Drop texture coordinates.
 fn load_vvvnnn_mesh(device: &wgpu::Device,

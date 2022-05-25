@@ -59,6 +59,7 @@ struct Char {
     z_offset: f32,
 };
 
+// TODO: remove
 struct ModF {
     fract: f32,
     whole: f32,
