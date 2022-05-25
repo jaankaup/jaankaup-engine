@@ -114,7 +114,7 @@ use jaankaup_core::input::*;
         point_count: u32,
         permutation_index: u32,
         point_cloud: PointCloud,
-        cell_iterator: [u32; 3],
+        cell_iterator: [i32; 3],
         camera_mode: bool,
         //permutation_count: u32,
     }
@@ -123,7 +123,7 @@ use jaankaup_core::input::*;
 
         fn init(configuration: &WGPUConfiguration) -> Self {
 
-            let cell_iterator: [u32; 3] = [0, 0, 0];
+            let cell_iterator: [i32; 3] = [0, 0, 0];
             let camera_mode = true;
 
             let permutation_index = 0;
@@ -389,6 +389,23 @@ use jaankaup_core::input::*;
     #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input: &InputCache) {
         if self.camera_mode { self.camera.update_from_input(&queue, &input); } 
+        else {
+            let mut temp_coordinate = self.cell_iterator; 
+            if self.keyboard_manager.test_key(&Key::A, input) { temp_coordinate[0] = temp_coordinate[0] - 1; }
+            if self.keyboard_manager.test_key(&Key::D, input) { temp_coordinate[0] = temp_coordinate[0] + 1; }
+            if self.keyboard_manager.test_key(&Key::W, input) { temp_coordinate[2] = temp_coordinate[2] - 1; }
+            if self.keyboard_manager.test_key(&Key::S, input) { temp_coordinate[2] = temp_coordinate[2] + 1; }
+            if self.keyboard_manager.test_key(&Key::E, input) { temp_coordinate[1] = temp_coordinate[1] + 1; }
+            if self.keyboard_manager.test_key(&Key::C, input) { temp_coordinate[1] = temp_coordinate[1] - 1; }
+            let dimension = [FMM_GLOBAL_X as i32 * FMM_INNER_X as i32, 
+                             FMM_GLOBAL_Y as i32 * FMM_INNER_Y as i32, 
+                             FMM_GLOBAL_Z as i32 * FMM_INNER_Z as i32]; 
+            if temp_coordinate[0] >= 0 && temp_coordinate[1] >= 0 && temp_coordinate[2] >= 0 &&
+               temp_coordinate[0] < dimension[0] && temp_coordinate[1] < dimension[1] && temp_coordinate[2] < dimension[2] {
+                   if self.cell_iterator != temp_coordinate { println!("cell_iterator == {:?}", temp_coordinate); }
+                   self.cell_iterator = temp_coordinate; 
+               }
+        }
     }
 
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {
@@ -552,6 +569,12 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::NumpadAdd, 50.0);
         keys.register_key(Key::O, 50.0);
         keys.register_key(Key::P, 50.0);
+        keys.register_key(Key::A, 50.0);
+        keys.register_key(Key::S, 50.0);
+        keys.register_key(Key::D, 50.0);
+        keys.register_key(Key::W, 50.0);
+        keys.register_key(Key::C, 50.0);
+        keys.register_key(Key::E, 50.0);
         
         keys
 }
