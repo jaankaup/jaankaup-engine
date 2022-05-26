@@ -40,6 +40,7 @@ struct Arrow {
 
 let FONT_SIZE = 0.015;
 let AABB_SIZE = 0.26;
+let SCALE_FACTOR = 4.0;
 
 @group(0) @binding(0) var<uniform> computational_domain: ComputationalDomain;
 @group(0) @binding(1) var<storage,read_write> counter: array<atomic<u32>>;
@@ -298,7 +299,7 @@ fn visualize_cell(position: vec3<f32>, color: u32, value: vec4<f32>, dimension: 
     }
 }
 
-fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
+fn load_neighbors_6(coord: vec3<u32>, global_index: u32, visualize_font: bool) {
 
     var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
         vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
@@ -332,7 +333,7 @@ fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
         coord.y == computational_domain.current_cell.y &&
         coord.z == computational_domain.current_cell.z) {
 
-            visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
+            visualize_cell(SCALE_FACTOR * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, visualize_font);
 
             // Draw arrows.
             for (var i: i32 = 0 ; i < 6; i = i + 1) {
@@ -351,8 +352,8 @@ fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
                 if (isInside(neighbors[i])) {
                     output_arrow[atomicAdd(&counter[1], 1u)] =  
                           Arrow (
-                              4.0 * vec4<f32>(vec3<f32>(coord), 0.0),
-                              4.0 * vec4<f32>(vec3<f32>(neighbors[i]), 0.0),
+                              SCALE_FACTOR * vec4<f32>(vec3<f32>(coord), 0.0),
+                              SCALE_FACTOR * vec4<f32>(vec3<f32>(neighbors[i]), 0.0),
                               col_arrow,
                               0.1
                     );
@@ -361,13 +362,13 @@ fn load_neighbors_6(coord: vec3<u32>, global_index: u32) {
         
     }
     else {
-        visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
+        visualize_cell(SCALE_FACTOR * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, visualize_font);
     }
 
 }
 
 // Load 16 neighbors with debug.
-fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
+fn load_neighbors_18(coord: vec3<u32>, global_index: u32, visualize_font: bool) {
 
     var neighbors: array<vec3<i32>, 18> = array<vec3<i32>, 18>(
         vec3<i32>(coord) + vec3<i32>(-1, 0, 0),
@@ -425,7 +426,7 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
         coord.y == computational_domain.current_cell.y &&
         coord.z == computational_domain.current_cell.z) {
 
-            visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
+            visualize_cell(SCALE_FACTOR * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, visualize_font);
 
             // Draw arrows.
             for (var i: i32 = 0 ; i < 18; i = i + 1) {
@@ -444,8 +445,8 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
                 if (isInside(neighbors[i])) {
                     output_arrow[atomicAdd(&counter[1], 1u)] =  
                           Arrow (
-                              4.0 * vec4<f32>(vec3<f32>(coord), 0.0),
-                              4.0 * vec4<f32>(vec3<f32>(neighbors[i]), 0.0),
+                              SCALE_FACTOR * vec4<f32>(vec3<f32>(coord), 0.0),
+                              SCALE_FACTOR * vec4<f32>(vec3<f32>(neighbors[i]), 0.0),
                               col_arrow,
                               0.1
                     );
@@ -454,7 +455,7 @@ fn load_neighbors_18(coord: vec3<u32>, global_index: u32) {
         
     }
     else {
-        visualize_cell(4.0 * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, true);
+        visualize_cell(SCALE_FACTOR * vec3<f32>(coord), col, vec4<f32>(f32(global_index), 0.0, 0.0, 0.0), 1u, visualize_font);
     }
 }
 
@@ -479,5 +480,5 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let index = get_cell_index(global_id.x);
     // load_neighbors_18(index, global_id.x);
-    load_neighbors_6(index, global_id.x);
+    load_neighbors_6(index, global_id.x, false);
 }

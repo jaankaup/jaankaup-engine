@@ -359,6 +359,7 @@ fn create_arrow(arr: Arrow, offset: u32, local_index: u32, start_index: u32) {
     direction = normalize(direction);
 
     let head_size = min(0.5 * array_length, 2.0 * arr.size);
+    // let head_size = min(0.1 * array_length, 0.5 * arr.size);
 
     //          array_length
     //    +----------------------+

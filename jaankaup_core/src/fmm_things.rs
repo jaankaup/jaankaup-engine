@@ -187,8 +187,6 @@ impl DomainTester {
                 aabb_size: f32,
                 font_size: f32,
                 domain_iterator: [u32 ; 3]
-                //permutations: &Vec<Permutation>,
-                //permutation_index: u32,
                 ) -> Self {
 
         let shader = &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -330,7 +328,7 @@ pub struct PointCloudParams {
     min_point: [f32; 3],
     point_count: u32,
     max_point: [f32; 3],
-    padding: u32,
+    scale_factor: f32,
 }
 
 /// A Struct for PointCloudParams.
@@ -340,13 +338,13 @@ pub struct PointCloudParamsBuffer {
 }
 
 impl PointCloudParamsBuffer {
-    pub fn create(device: &wgpu::Device, point_count: u32, aabb_min: [f32; 3], aabb_max: [f32; 3]) -> Self {
+    pub fn create(device: &wgpu::Device, point_count: u32, aabb_min: [f32; 3], aabb_max: [f32; 3], scale_factor: f32) -> Self {
 
         let params = PointCloudParams {
             min_point: aabb_min,
             point_count: point_count,
             max_point: aabb_max,
-            padding: 0,
+            scale_factor: scale_factor,
         };
 
         let buf = buffer_from_data::<PointCloudParams>(
@@ -428,13 +426,14 @@ impl PointCloudHandler {
                  point_count: u32,
                  aabb_min: [f32 ; 3],
                  aabb_max: [f32 ; 3],
+                 scale_factor: f32,
                  fmm_data: &wgpu::Buffer,
                  point_data: &wgpu::Buffer,
                  gpu_debugger: &GpuDebugger) -> Self {
 
          // From parameter.
          let fmm_params_buffer = FmmParamsBuffer::create(&device, global_dimension, local_dimension);
-         let point_cloud_params_buffer = PointCloudParamsBuffer::create(&device, point_count, aabb_min, aabb_max);
+         let point_cloud_params_buffer = PointCloudParamsBuffer::create(&device, point_count, aabb_min, aabb_max, scale_factor);
          
          let compute_object =
                  ComputeObject::init(

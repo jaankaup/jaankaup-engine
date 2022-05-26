@@ -35,13 +35,13 @@ use jaankaup_core::input::*;
     const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
     /// Max number of aabbs for gpu debugger.
-    const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES + 10000;
+    const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
     /// Max number of box frames for gpu debugger.
     const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 
     /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-    const MAX_NUMBER_OF_CHARS:      usize = 262144;
+    const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 
     /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
     const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
@@ -52,9 +52,9 @@ use jaankaup_core::input::*;
     const CLOUD_DATA: &'static str = "CLOUD_DATA";
 
     /// Global dimensions. 
-    const FMM_GLOBAL_X: usize = 16; 
-    const FMM_GLOBAL_Y: usize = 16; 
-    const FMM_GLOBAL_Z: usize = 16; 
+    const FMM_GLOBAL_X: usize = 32; 
+    const FMM_GLOBAL_Y: usize = 8; 
+    const FMM_GLOBAL_Z: usize = 32; 
 
     /// Inner dimensions.
     const FMM_INNER_X: usize = 4; 
@@ -117,6 +117,7 @@ use jaankaup_core::input::*;
         cell_iterator: [i32; 3],
         camera_mode: bool,
         point_cloud_handler: PointCloudHandler,
+        render_params_point_cloud: RenderParamBuffer,
     }
 
     impl Application for TestProject {
@@ -199,13 +200,41 @@ use jaankaup_core::input::*;
                     None)
                 );
 
+            let pc_min_coord = point_cloud.get_min_coord();
+            let pc_max_coord = point_cloud.get_max_coord();
+
+            println!("pc_min_coord == {:?}", pc_min_coord);
+            println!("pc_max_coord == {:?}", pc_max_coord);
+
+            let point_cloud_scale_factor_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32 / pc_max_coord[0];
+            let point_cloud_scale_factor_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32 / pc_max_coord[1];
+            let point_cloud_scale_factor_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32 / pc_max_coord[2];
+
+            println!("FMM_GLOBAL_X * FMM_INNER_X == {:?}", (FMM_GLOBAL_X * FMM_INNER_X) as f32);
+            println!("FMM_GLOBAL_Y * FMM_INNER_X == {:?}", (FMM_GLOBAL_Y * FMM_INNER_Z) as f32);
+            println!("FMM_GLOBAL_Z * FMM_INNER_X == {:?}", (FMM_GLOBAL_Y * FMM_INNER_Z) as f32);
+            
+            println!("point_cloud_scale_factor_x == {}", point_cloud_scale_factor_x);
+            println!("point_cloud_scale_factor_y == {}", point_cloud_scale_factor_y);
+            println!("point_cloud_scale_factor_z == {}", point_cloud_scale_factor_z);
+
+            let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
+
+            println!("pc_scale_factor == {}", pc_scale_factor);
+
+            let render_params_point_cloud = RenderParamBuffer::create(
+                        &configuration.device,
+                        pc_scale_factor
+            );
+
             let point_cloud_handler = PointCloudHandler::init(
                     &configuration.device,
                     [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
                     [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
                     point_cloud.get_point_count(),
-                    point_cloud.get_min_coord(),
-                    point_cloud.get_max_coord(),
+                    pc_min_coord,
+                    pc_max_coord,
+                    pc_scale_factor, // scale_factor
                     &buffers.get("pc_sample_data").unwrap(),
                     point_cloud.get_buffer(),
                     &gpu_debugger
@@ -240,11 +269,6 @@ use jaankaup_core::input::*;
                 fire_tower_mesh);
 
             let point_count = 0;
-            //++ let (point_count, buf) = load_pc_data(&configuration.device, &"../../cloud_data.asc".to_string());
-
-            //++ println!("point_count == {}", point_count);
-
-            //++ buffers.insert("pc_data".to_string(), buf);
 
             // vvvc
             let render_object_vvvc =
@@ -252,18 +276,19 @@ use jaankaup_core::input::*;
                         &configuration.device,
                         &configuration.sc_desc,
                         &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                            label: Some("renderer_v3c1.wgsl"),
+                            label: Some("renderer_v3c1_x4.wgsl"),
                             source: wgpu::ShaderSource::Wgsl(
-                                Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
+                                Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1_x4.wgsl"))),
 
                         }),
                         &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
                         &vec![
                             vec![
                                 create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
+                                create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX),
                             ],
                         ],
-                        Some("Debug visualizator vvvc renderer with camera."),
+                        Some("Debug visualizator vvvc x4 renderer with camera."),
                         true,
                         wgpu::PrimitiveTopology::PointList
             );
@@ -274,6 +299,7 @@ use jaankaup_core::input::*;
                                          &vec![
                                               vec![
                                                   &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                                  &render_params_point_cloud.get_buffer().as_entire_binding(),
                                              ]
                                          ]
             );
@@ -302,6 +328,7 @@ use jaankaup_core::input::*;
                 cell_iterator: cell_iterator,
                 camera_mode: camera_mode,
                 point_cloud_handler: point_cloud_handler,
+                render_params_point_cloud: render_params_point_cloud,
             }
     }
 
@@ -336,18 +363,18 @@ use jaankaup_core::input::*;
 
         let mut clear = true;
 
-        draw(&mut encoder,
-             &view,
-             self.screen.depth_texture.as_ref().unwrap(),
-             &self.triangle_mesh_bindgroups,
-             &self.triangle_mesh_renderer.get_render_object().pipeline,
-             &fire_tower.get_buffer(),
-             0..3,
-             //0..fire_tower.get_triangle_count() * 3, 
-             clear
-        );
+        //++ draw(&mut encoder,
+        //++      &view,
+        //++      self.screen.depth_texture.as_ref().unwrap(),
+        //++      &self.triangle_mesh_bindgroups,
+        //++      &self.triangle_mesh_renderer.get_render_object().pipeline,
+        //++      &fire_tower.get_buffer(),
+        //++      0..3,
+        //++      //0..fire_tower.get_triangle_count() * 3, 
+        //++      clear
+        //++ );
 
-        clear = false;
+        //++ clear = false;
         // println!("{}", self.point_count);
 
         draw(&mut encoder,
@@ -361,6 +388,8 @@ use jaankaup_core::input::*;
         );
 
         queue.submit(Some(encoder.finish())); 
+
+        clear = false;
 
         self.gpu_debugger.render(
                   &device,
@@ -454,8 +483,8 @@ use jaankaup_core::input::*;
                 label: Some("Domain tester encoder"),
         });
 
-        //self.domain_tester.dispatch(&mut encoder);
-        self.point_cloud_handler.point_data_to_interface(&mut encoder);
+        self.domain_tester.dispatch(&mut encoder);
+        //self.point_cloud_handler.point_data_to_interface(&mut encoder);
 
         queue.submit(Some(encoder.finish())); 
     }
@@ -555,8 +584,8 @@ fn create_keyboard_manager() -> KeyboardManager {
 
         let mut keys = KeyboardManager::init();
 
-        keys.register_key(Key::NumpadSubtract, 50.0);
-        keys.register_key(Key::NumpadAdd, 50.0);
+        keys.register_key(Key::NumpadSubtract, 10.0);
+        keys.register_key(Key::NumpadAdd, 10.0);
         keys.register_key(Key::O, 50.0);
         keys.register_key(Key::P, 50.0);
         keys.register_key(Key::A, 50.0);

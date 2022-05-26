@@ -14,7 +14,7 @@ struct PointCloudParams {
     min_point: vec3<f32>,
     point_count: u32,
     max_point: vec3<f32>,
-    padding: u32,
+    pc_scale_factor: f32,
 };
 
 struct FmmCellPc {
@@ -97,7 +97,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     if (global_id.x >= point_cloud_params.point_count) { return; }
 
-    let p = point_data[global_id.x];
+    var p = point_data[global_id.x];
+    // p.position = p.position * pc_scale_factor;
     let nearest_cell = vec3<u32>(u32(round(f32(p.position.x))),
                                  u32(round(f32(p.position.y))),
                                  u32(round(f32(p.position.z))));
