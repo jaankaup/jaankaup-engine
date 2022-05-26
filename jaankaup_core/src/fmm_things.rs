@@ -95,6 +95,9 @@ impl FmmParamsBuffer {
     pub fn get_buffer(&self) -> &wgpu::Buffer {
         &self.params_buffer
     }
+
+    pub fn get_global_dimension(&self) -> [u32; 3] { self.params.global_dimension }
+    pub fn get_local_dimension(&self) -> [u32; 3] { self.params.local_dimension }
 }
 
 /// A struct for Computational domain data, operations and buffer.
@@ -324,7 +327,10 @@ pub struct FmmCellPc {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct PointCloudParams {
+    min_point: [f32; 3],
     point_count: u32,
+    max_point: [f32; 3],
+    padding: u32,
 }
 
 /// A Struct for PointCloudParams.
@@ -334,10 +340,13 @@ pub struct PointCloudParamsBuffer {
 }
 
 impl PointCloudParamsBuffer {
-    pub fn create(device: &wgpu::Device, point_count: u32) -> Self {
+    pub fn create(device: &wgpu::Device, point_count: u32, aabb_min: [f32; 3], aabb_max: [f32; 3]) -> Self {
 
         let params = PointCloudParams {
+            min_point: aabb_min,
             point_count: point_count,
+            max_point: aabb_max,
+            padding: 0,
         };
 
         let buf = buffer_from_data::<PointCloudParams>(
@@ -407,7 +416,7 @@ pub struct GridDataPc {
 /// A struct that offers some functionality for PointCloud data manipulation.
 pub struct PointCloudHandler {
     compute_object_point_to_interface: ComputeObject,
-    bind_groups: Vec<wgpu::BindGroup>,
+    point_to_interface_bind_groups: Vec<wgpu::BindGroup>,
     fmm_params_buffer: FmmParamsBuffer, // TODO: from parameter, remove this 
     point_cloud_params_buffer: PointCloudParamsBuffer,
 }
@@ -417,13 +426,15 @@ impl PointCloudHandler {
                  global_dimension: [u32; 3],
                  local_dimension: [u32; 3],
                  point_count: u32,
+                 aabb_min: [f32 ; 3],
+                 aabb_max: [f32 ; 3],
                  fmm_data: &wgpu::Buffer,
                  point_data: &wgpu::Buffer,
                  gpu_debugger: &GpuDebugger) -> Self {
 
          // From parameter.
          let fmm_params_buffer = FmmParamsBuffer::create(&device, global_dimension, local_dimension);
-         let point_cloud_params_buffer = PointCloudParamsBuffer::create(&device, point_count);
+         let point_cloud_params_buffer = PointCloudParamsBuffer::create(&device, point_count, aabb_min, aabb_max);
          
          let compute_object =
                  ComputeObject::init(
@@ -468,7 +479,7 @@ impl PointCloudHandler {
                      &"main".to_string()
          );
  
-         let bind_groups = create_bind_groups(
+         let point_to_interface_bind_groups = create_bind_groups(
                  &device,
                  &compute_object.bind_group_layout_entries,
                  &compute_object.bind_group_layouts,
@@ -489,10 +500,31 @@ impl PointCloudHandler {
  
          Self {
               compute_object_point_to_interface: compute_object,
-              bind_groups: bind_groups,
+              point_to_interface_bind_groups: point_to_interface_bind_groups,
               fmm_params_buffer: fmm_params_buffer,
               point_cloud_params_buffer: point_cloud_params_buffer,
          }
+     }
+
+     pub fn point_data_to_interface(&self, encoder: &mut wgpu::CommandEncoder) {
+
+         let global_dimension = self.fmm_params_buffer.get_global_dimension();
+         let local_dimension = self.fmm_params_buffer.get_local_dimension();
+
+         let total_grid_count =
+                         global_dimension[0] *
+                         global_dimension[1] *
+                         global_dimension[2] *
+                         local_dimension[0] *
+                         local_dimension[1] *
+                         local_dimension[2];
+
+         self.compute_object_point_to_interface.dispatch(
+             &self.point_to_interface_bind_groups,
+             encoder,
+             1, 1, 1, Some("Point data to interface dispatch")
+             //udiv_up_safe32(total_grid_count, 1024), 1, 1, Some("Point data to interface dispatch")
+         );
      }
 }
 

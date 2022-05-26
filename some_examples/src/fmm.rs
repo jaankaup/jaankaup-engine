@@ -252,7 +252,7 @@ impl Application for Fmm {
         camera.set_movement_sensitivity(0.02);
 
         // gpu debugger.
-        let gpu_debugger = GpuDebugger::Init(
+        let gpu_debugger = GpuDebugger::init(
                 &configuration.device,
                 &configuration.sc_desc,
                 &camera.get_camera_uniform(&configuration.device),
@@ -262,6 +262,7 @@ impl Application for Fmm {
                 MAX_NUMBER_OF_AABBS.try_into().unwrap(),
                 MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
                 64,
+                1.0
         );
 
         let mut keys = KeyboardManager::init();

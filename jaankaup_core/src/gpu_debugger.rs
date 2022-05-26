@@ -641,9 +641,6 @@ impl GpuDebugger {
 
                 let draw_count = number_of_elements * vertices_per_elem;
 
-                // println!("local_dispatch == {}", local_dispatch);
-                // println!("draw_count == {}", draw_count);
-
                 let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
 
                 draw(&mut encoder_arrow_rendering,

@@ -555,6 +555,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
     else if (arrow_aabb_params.element_type == 2u) {
         let aabb = aabb_wires[actual_index];
-        create_aabb_wire(aabb, aabb.max.w, u32(aabb.min.w), u32(delta), local_index, THREAD_COUNT * work_group_id.x * 144u);
+        create_aabb_wire(aabb, aabb.max.w, bitcast<u32>(aabb.min.w), u32(delta), local_index, THREAD_COUNT * work_group_id.x * 144u);
     }
 }

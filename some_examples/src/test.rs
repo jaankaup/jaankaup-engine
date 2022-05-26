@@ -181,8 +181,8 @@ use jaankaup_core::input::*;
             let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
             // Generate the point cloud.
-            println!("Generation point cloud.");
             let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
+            println!("Point cloud generated.");
 
             println!("Generate fmm sample data.");
             let pc_sample_data = 
@@ -204,42 +204,13 @@ use jaankaup_core::input::*;
                     [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
                     [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
                     point_cloud.get_point_count(),
+                    point_cloud.get_min_coord(),
+                    point_cloud.get_max_coord(),
                     &buffers.get("pc_sample_data").unwrap(),
-                    point_cloud.get_buffer(), //point_data,
+                    point_cloud.get_buffer(),
                     &gpu_debugger
             );
 
-            // Create different permutations such that (a*x + b*y + c*) % d where
-            //
-            // a, b and c are prime numbers, a != b != c, and a % d != , b % d != 0, c % d != 0.
-            //
-
-            // 2 	3 	5 	7 	11 	13 	17 	19 	23 	29 	31 	37 	41 	43 	47 	53 	59 	61 	67 	71 
-            // 73 	79 	83 	89 	97 	101 	103 	107 	109 	113 	127 	131 	137 	139 	149 	151 	157 	163 	167 	173
-
-            // // Primes - 3
-            // //let primes = vec![2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
-            // let primes = vec![2, 3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
-            // //let primes = vec![2, 3,	5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71]; 
-
-            // let perms = (0..19).permutations(3).collect_vec();
-
-            // let mut blah: Vec<[u32; 3]> = Vec::new();
-            // for mut elem in perms.clone() {
-            //     //println!("elem == {:?}", elem);
-            //     elem.sort();
-            //     //println!("sorted elem == {:?}", elem);
-            //     //blah.append([elem[0] as i32, elem[1] as i32, elem[2] as i32]);
-            //     blah.push([elem[0], elem[1], elem[2]]);
-            //     // blah.append(elem);
-            // }
-            // blah.sort();
-            // let jebulis: Vec<[u32; 3]> = blah.into_iter().unique().collect();
-
-            // for j in jebulis {
-            //     permutations.push(Permutation { modulo: 5, x_factor: primes[j[0] as usize], y_factor: primes[j[1] as usize], z_factor: primes[j[2] as usize], }); 
-            // }
-            
             // The DomainTester.
             let domain_tester = DomainTester::init(
                 &configuration.device,
@@ -250,9 +221,6 @@ use jaankaup_core::input::*;
                 0.016,
                 [cell_iterator[0] as u32, cell_iterator[1] as u32, cell_iterator[2] as u32],
                 );
-
-            // let permutation_count = permutations.len();
-            // println!("permutation count == {}", permutation_count);
 
             // Container for triangle meshes.
             let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
@@ -379,19 +347,18 @@ use jaankaup_core::input::*;
              clear
         );
 
+        clear = false;
         // println!("{}", self.point_count);
 
-        //++ draw(&mut encoder,
-        //++      &view,
-        //++      &self.screen.depth_texture.as_ref().unwrap(),
-        //++      &self.render_bind_groups_vvvc,
-        //++      &self.render_object_vvvc.pipeline,
-        //++      &self.buffers.get("pc_data").unwrap(),
-        //++      0..self.point_count,
-        //++      clear
-        //++ );
-        
-        //++ clear = false;
+        draw(&mut encoder,
+             &view,
+             &self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_bind_groups_vvvc,
+             &self.render_object_vvvc.pipeline,
+             &self.point_cloud.get_buffer(),
+             0..self.point_cloud.get_point_count(),
+             clear
+        );
 
         queue.submit(Some(encoder.finish())); 
 
@@ -487,7 +454,8 @@ use jaankaup_core::input::*;
                 label: Some("Domain tester encoder"),
         });
 
-        self.domain_tester.dispatch(&mut encoder);
+        //self.domain_tester.dispatch(&mut encoder);
+        self.point_cloud_handler.point_data_to_interface(&mut encoder);
 
         queue.submit(Some(encoder.finish())); 
     }
