@@ -15,6 +15,8 @@ struct PointCloudParams {
     point_count: u32,
     max_point: vec3<f32>,
     pc_scale_factor: f32,
+    thread_group_number: u32,
+    show_numbers: u32,
 };
 
 struct FmmCellPc {
@@ -85,20 +87,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if (global_id.x == 0u) {
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
               AABB (
-                  vec4<f32>(0.0, 0.0, 0.0, scene_aabb_color),
-                  vec4<f32>(vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension), 0.1)
+                  4.0 * vec4<f32>(0.0, 0.0, 0.0, scene_aabb_color),
+                  4.0 * vec4<f32>(vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension), 0.1)
               );
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
               AABB (
-                  vec4<f32>(point_cloud_params.min_point, scene_aabb_color),
-                  vec4<f32>(point_cloud_params.max_point, 0.1)
+                  4.0 * vec4<f32>(point_cloud_params.min_point, scene_aabb_color),
+                  4.0 * vec4<f32>(point_cloud_params.max_point * point_cloud_params.pc_scale_factor, 0.1)
               );
     }
+    let actual_index = point_cloud_params.thread_group_number * 1024u + global_id.x;
 
-    if (global_id.x >= point_cloud_params.point_count) { return; }
+    if (actual_index >= point_cloud_params.point_count) { return; }
 
-    var p = point_data[global_id.x];
-    // p.position = p.position * pc_scale_factor;
+    var p = point_data[actual_index];
+    p.position = p.position * point_cloud_params.pc_scale_factor;
     let nearest_cell = vec3<u32>(u32(round(f32(p.position.x))),
                                  u32(round(f32(p.position.y))),
                                  u32(round(f32(p.position.z))));

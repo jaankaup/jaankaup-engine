@@ -54,7 +54,7 @@ pub struct ComputationalDomain {
     local_dimension:  [u32; 3],
     font_size: f32,
     domain_iterator: [u32; 3],
-    padding: u32,
+    show_numbers: u32,
     // permutation_index: u32,
 }
 
@@ -114,6 +114,7 @@ impl ComputationalDomainBuffer {
                   local_dimension: [u32; 3],
                   aabb_size: f32,
                   font_size: f32,
+                  show_numbers: bool,
                   domain_iterator: [u32; 3])  -> Self {
 
         // TODO: asserts
@@ -125,7 +126,7 @@ impl ComputationalDomainBuffer {
             font_size: font_size,
             // permutation_index: permutation_index,
             domain_iterator: domain_iterator,
-            padding: 0,
+            show_numbers: if show_numbers { 1 } else { 0 },
         };
 
         let buf = buffer_from_data::<ComputationalDomain>(
@@ -186,6 +187,7 @@ impl DomainTester {
                 local_dimension: [u32; 3],
                 aabb_size: f32,
                 font_size: f32,
+                show_numbers: bool,
                 domain_iterator: [u32 ; 3]
                 ) -> Self {
 
@@ -202,7 +204,8 @@ impl DomainTester {
                   local_dimension,
                   aabb_size,
                   font_size,
-                  domain_iterator,
+                  show_numbers,
+                  domain_iterator
         );
 
         let compute_object =
@@ -276,6 +279,11 @@ impl DomainTester {
         self.computational_domain_buffer.update(queue);
     }
 
+    pub fn update_show_numbers(&mut self, queue: &wgpu::Queue, show_numbers: bool) {
+        self.computational_domain_buffer.computational_domain.show_numbers = if show_numbers { 1 } else { 0 }; 
+        self.computational_domain_buffer.update(queue);
+    }
+
     pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
 
         let global_dimension = self.computational_domain_buffer.get_computational_domain().global_dimension;
@@ -329,6 +337,9 @@ pub struct PointCloudParams {
     point_count: u32,
     max_point: [f32; 3],
     scale_factor: f32,
+    thread_group_number: u32,
+    show_numbers: u32,
+    padding: [u32; 2],
 }
 
 /// A Struct for PointCloudParams.
@@ -338,13 +349,16 @@ pub struct PointCloudParamsBuffer {
 }
 
 impl PointCloudParamsBuffer {
-    pub fn create(device: &wgpu::Device, point_count: u32, aabb_min: [f32; 3], aabb_max: [f32; 3], scale_factor: f32) -> Self {
+    pub fn create(device: &wgpu::Device, point_count: u32, aabb_min: [f32; 3], aabb_max: [f32; 3], scale_factor: f32, thread_group_number: u32, show_numbers: bool) -> Self {
 
         let params = PointCloudParams {
             min_point: aabb_min,
             point_count: point_count,
             max_point: aabb_max,
             scale_factor: scale_factor,
+            thread_group_number: thread_group_number,
+            show_numbers: if show_numbers { 1 } else { 0 }, 
+            padding: [0, 0],
         };
 
         let buf = buffer_from_data::<PointCloudParams>(
@@ -420,90 +434,109 @@ pub struct PointCloudHandler {
 }
 
 impl PointCloudHandler {
-     pub fn init(device: &wgpu::Device,
-                 global_dimension: [u32; 3],
-                 local_dimension: [u32; 3],
-                 point_count: u32,
-                 aabb_min: [f32 ; 3],
-                 aabb_max: [f32 ; 3],
-                 scale_factor: f32,
-                 fmm_data: &wgpu::Buffer,
-                 point_data: &wgpu::Buffer,
-                 gpu_debugger: &GpuDebugger) -> Self {
 
-         // From parameter.
-         let fmm_params_buffer = FmmParamsBuffer::create(&device, global_dimension, local_dimension);
-         let point_cloud_params_buffer = PointCloudParamsBuffer::create(&device, point_count, aabb_min, aabb_max, scale_factor);
-         
-         let compute_object =
-                 ComputeObject::init(
-                     &device,
-                     &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                         label: Some("point_cloud_to_interface.wgsl"),
-                         source: wgpu::ShaderSource::Wgsl(
-                             Cow::Borrowed(include_str!("../../assets/shaders/point_cloud_to_interface.wgsl"))),
+    pub fn init(device: &wgpu::Device,
+                global_dimension: [u32; 3],
+                local_dimension: [u32; 3],
+                point_count: u32,
+                aabb_min: [f32 ; 3],
+                aabb_max: [f32 ; 3],
+                scale_factor: f32,
+                thread_group_number: u32,
+                show_numbers: bool,
+                fmm_data: &wgpu::Buffer,
+                point_data: &wgpu::Buffer,
+                gpu_debugger: &GpuDebugger) -> Self {
 
-                     }),
-                     Some("Cloud data to fmm Compute object"),
-                     &vec![
-                         vec![
-                             // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
-                             create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+        // From parameter.
+        let fmm_params_buffer = FmmParamsBuffer::create(&device, global_dimension, local_dimension);
+        let point_cloud_params_buffer = PointCloudParamsBuffer::create(&device, point_count, aabb_min, aabb_max, scale_factor, thread_group_number, show_numbers);
+        
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("point_cloud_to_interface.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/point_cloud_to_interface.wgsl"))),
+
+                    }),
+                    Some("Cloud data to fmm Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
  
-                             // @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
-                             create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+                            // @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
  
-                             // @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
-                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
  
-                             // @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
-                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
  
-                             // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
-                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
  
-                             // @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
-                             create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
  
-                             // @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
-                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
  
-                             // @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
-                             create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
  
-                             // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
-                             create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
-                         ],
-                     ],
-                     &"main".to_string()
-         );
+                            // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string()
+        );
  
-         let point_to_interface_bind_groups = create_bind_groups(
-                 &device,
-                 &compute_object.bind_group_layout_entries,
-                 &compute_object.bind_group_layouts,
-                 &vec![
-                     vec![
-                     &fmm_params_buffer.get_buffer().as_entire_binding(),
-                     &point_cloud_params_buffer.get_buffer().as_entire_binding(),
-                     &fmm_data.as_entire_binding(),
-                     &point_data.as_entire_binding(),
-                     &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
-                     &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
-                     &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
-                     &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
-                     &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
-                     ],
-                 ]
-         );
+        let point_to_interface_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                    &fmm_params_buffer.get_buffer().as_entire_binding(),
+                    &point_cloud_params_buffer.get_buffer().as_entire_binding(),
+                    &fmm_data.as_entire_binding(),
+                    &point_data.as_entire_binding(),
+                    &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                    &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
+        );
  
-         Self {
-              compute_object_point_to_interface: compute_object,
-              point_to_interface_bind_groups: point_to_interface_bind_groups,
-              fmm_params_buffer: fmm_params_buffer,
-              point_cloud_params_buffer: point_cloud_params_buffer,
-         }
-     }
+        Self {
+             compute_object_point_to_interface: compute_object,
+             point_to_interface_bind_groups: point_to_interface_bind_groups,
+             fmm_params_buffer: fmm_params_buffer,
+             point_cloud_params_buffer: point_cloud_params_buffer,
+        }
+    }
+
+    pub fn update_thread_group_number(&mut self, queue: &wgpu::Queue, work_group_number: u32) {
+   
+        self.point_cloud_params_buffer.pc_params.thread_group_number = work_group_number;
+        self.update(queue);
+    }
+
+    /// Update buffer.
+    fn update(&self, queue: &wgpu::Queue) {
+        
+        queue.write_buffer(
+            &self.point_cloud_params_buffer.get_buffer(),
+            0,
+            bytemuck::cast_slice(&[self.point_cloud_params_buffer.pc_params])
+        );
+    }
 
      pub fn point_data_to_interface(&self, encoder: &mut wgpu::CommandEncoder) {
 

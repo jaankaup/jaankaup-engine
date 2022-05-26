@@ -118,12 +118,20 @@ use jaankaup_core::input::*;
         camera_mode: bool,
         point_cloud_handler: PointCloudHandler,
         render_params_point_cloud: RenderParamBuffer,
+        draw_point_cloud: bool,
+        point_cloud_draw_iterator: u32,
+        show_domain_tester: bool,
+        show_numbers: bool,
     }
 
     impl Application for TestProject {
 
         fn init(configuration: &WGPUConfiguration) -> Self {
 
+            let show_numbers = false;
+            let show_domain_tester = false;
+            let point_cloud_draw_iterator = 0;
+            let draw_point_cloud = true;
             let cell_iterator: [i32; 3] = [0, 0, 0];
             let camera_mode = true;
 
@@ -235,6 +243,8 @@ use jaankaup_core::input::*;
                     pc_min_coord,
                     pc_max_coord,
                     pc_scale_factor, // scale_factor
+                    point_cloud_draw_iterator,
+                    show_numbers,
                     &buffers.get("pc_sample_data").unwrap(),
                     point_cloud.get_buffer(),
                     &gpu_debugger
@@ -248,6 +258,7 @@ use jaankaup_core::input::*;
                 [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
                 0.15,
                 0.016,
+                show_numbers,
                 [cell_iterator[0] as u32, cell_iterator[1] as u32, cell_iterator[2] as u32],
                 );
 
@@ -329,6 +340,10 @@ use jaankaup_core::input::*;
                 camera_mode: camera_mode,
                 point_cloud_handler: point_cloud_handler,
                 render_params_point_cloud: render_params_point_cloud,
+                draw_point_cloud: draw_point_cloud,
+                point_cloud_draw_iterator: point_cloud_draw_iterator,
+                show_domain_tester: show_domain_tester,
+                show_numbers: show_numbers,
             }
     }
 
@@ -377,19 +392,23 @@ use jaankaup_core::input::*;
         //++ clear = false;
         // println!("{}", self.point_count);
 
-        draw(&mut encoder,
-             &view,
-             &self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_bind_groups_vvvc,
-             &self.render_object_vvvc.pipeline,
-             &self.point_cloud.get_buffer(),
-             0..self.point_cloud.get_point_count(),
-             clear
-        );
+        if self.draw_point_cloud {
+
+            draw(&mut encoder,
+                 &view,
+                 &self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups_vvvc,
+                 &self.render_object_vvvc.pipeline,
+                 &self.point_cloud.get_buffer(),
+                 0..self.point_cloud.get_point_count(),
+                 clear
+            );
+
+            clear = false;
+        }
 
         queue.submit(Some(encoder.finish())); 
 
-        clear = false;
 
         self.gpu_debugger.render(
                   &device,
@@ -424,6 +443,29 @@ use jaankaup_core::input::*;
                    if self.cell_iterator != temp_coordinate { println!("cell_iterator == {:?}", temp_coordinate); }
                    self.cell_iterator = temp_coordinate; 
                }
+        }
+
+        if self.keyboard_manager.test_key(&Key::Key0, input) {
+            if self.point_cloud_draw_iterator * 1024 + 1024 < self.point_cloud.get_point_count() {
+                self.point_cloud_draw_iterator = self.point_cloud_draw_iterator + 1;
+                self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
+            }
+        }
+
+        if self.keyboard_manager.test_key(&Key::Key9, input) {
+                if self.point_cloud_draw_iterator != 0 {
+                    self.point_cloud_draw_iterator = self.point_cloud_draw_iterator - 1;
+                    self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
+                }
+        }
+
+        if self.keyboard_manager.test_key(&Key::Return, input) {
+            self.show_domain_tester = !self.show_domain_tester;
+        }
+
+        if self.keyboard_manager.test_key(&Key::N, input) {
+            self.show_numbers = !self.show_numbers;
+            self.domain_tester.update_show_numbers(queue, self.show_numbers);
         }
     }
 
@@ -471,6 +513,11 @@ use jaankaup_core::input::*;
               //log::info!("camera mode == {:?}", self.camera_mode);
         }
 
+        if self.keyboard_manager.test_key(&Key::Space, input) {
+              self.draw_point_cloud = !self.draw_point_cloud;
+              println!("draw point cloud == {:?}", self.draw_point_cloud);
+        }
+
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
                                FMM_GLOBAL_Z *
@@ -483,8 +530,11 @@ use jaankaup_core::input::*;
                 label: Some("Domain tester encoder"),
         });
 
-        self.domain_tester.dispatch(&mut encoder);
-        //self.point_cloud_handler.point_data_to_interface(&mut encoder);
+        if self.show_domain_tester {
+            self.domain_tester.dispatch(&mut encoder);
+        }
+
+        self.point_cloud_handler.point_data_to_interface(&mut encoder);
 
         queue.submit(Some(encoder.finish())); 
     }
@@ -594,6 +644,11 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::W, 50.0);
         keys.register_key(Key::C, 50.0);
         keys.register_key(Key::E, 50.0);
+        keys.register_key(Key::Space, 100.0);
+        keys.register_key(Key::Key9, 50.0);
+        keys.register_key(Key::Key0, 50.0);
+        keys.register_key(Key::Return, 50.0);
+        keys.register_key(Key::N, 50.0);
         
         keys
 }

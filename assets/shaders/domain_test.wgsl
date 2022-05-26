@@ -6,6 +6,7 @@ struct ComputationalDomain {
     local_dimension:  vec3<u32>,
     font_size: f32,
     current_cell: vec3<u32>,
+    show_number: u32,
 };
 
 /// Struct which contains the data of a single thread.
@@ -480,5 +481,5 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let index = get_cell_index(global_id.x);
     // load_neighbors_18(index, global_id.x);
-    load_neighbors_6(index, global_id.x, false);
+    load_neighbors_6(index, global_id.x, bool(computational_domain.show_number));
 }
