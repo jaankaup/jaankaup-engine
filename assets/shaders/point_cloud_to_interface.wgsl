@@ -1,7 +1,7 @@
 /// Create an initial fmm interface from point data. 
 
 struct VVVC {
-    position: [f32; 3],
+    position: vec3<u32>,
     color: u32,
 };
 
@@ -19,6 +19,31 @@ struct FmmCellPc {
     value: f32,
     color: u32,
 }
+
+// Debugging.
+struct AABB {
+    min: vec4<f32>, 
+    max: vec4<f32>, 
+};
+
+// Debugging.
+struct Char {
+    start_pos: vec3<f32>,
+    font_size: f32,
+    value: vec4<f32>,
+    vec_dim_count: u32,
+    color: u32,
+    decimal_count: u32,
+    auxiliary_data: u32,
+};
+
+// Debugging.
+struct Arrow {
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
+};
 
 @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
 @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
@@ -42,7 +67,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     if (global_id.x >= point_cloud_params.point_count) { return; }
 
-    let point = point_cloud_params[global_id.x];
-    let nearest_cell = vec3<u32>(round(point.x), round(point.y), round(point.z));
-    let distance = distance(point, nearest_cell);
+    let p = point_data[global_id.x];
+    let nearest_cell = vec3<u32>(u32(round(f32(p.position.x))),
+                                 u32(round(f32(p.position.y))),
+                                 u32(round(f32(p.position.z))));
+    let dist = distance(vec3<f32>(p.position), vec3<f32>(nearest_cell));
 }

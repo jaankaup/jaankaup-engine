@@ -29,7 +29,7 @@ use jaankaup_core::input::*;
     use jaankaup_core::texture::Texture;
     use jaankaup_core::aabb::Triangle_vvvvnnnn;
     use jaankaup_core::common_functions::encode_rgba_u32;
-    use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc};
+    use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler};
 
     /// Max number of arrows for gpu debugger.
     const MAX_NUMBER_OF_ARROWS:     usize = 262144;
@@ -116,7 +116,7 @@ use jaankaup_core::input::*;
         point_cloud: PointCloud,
         cell_iterator: [i32; 3],
         camera_mode: bool,
-        //permutation_count: u32,
+        point_cloud_handler: PointCloudHandler,
     }
 
     impl Application for TestProject {
@@ -184,6 +184,7 @@ use jaankaup_core::input::*;
             println!("Generation point cloud.");
             let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
+            println!("Generate fmm sample data.");
             let pc_sample_data = 
                 buffers.insert(
                     "pc_sample_data".to_string(),
@@ -193,10 +194,20 @@ use jaankaup_core::input::*;
                         tag: 0,
                         value: 1000000.0,
                         color: 0,
-                    }],
+                    } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     None)
                 );
+
+            let point_cloud_handler = PointCloudHandler::init(
+                    &configuration.device,
+                    [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
+                    [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+                    point_cloud.get_point_count(),
+                    &buffers.get("pc_sample_data").unwrap(),
+                    point_cloud.get_buffer(), //point_data,
+                    &gpu_debugger
+            );
 
             // Create different permutations such that (a*x + b*y + c*) % d where
             //
@@ -322,6 +333,7 @@ use jaankaup_core::input::*;
                 point_cloud: point_cloud,
                 cell_iterator: cell_iterator,
                 camera_mode: camera_mode,
+                point_cloud_handler: point_cloud_handler,
             }
     }
 
