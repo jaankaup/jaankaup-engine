@@ -296,6 +296,15 @@ fn load_pc_data(device: &wgpu::Device, src_file: &String) -> (u32, [f32; 3], [f3
     )
 }
 
+/// Sample point for point cloud data.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct FmmCellPc {
+    pub tag: u32,
+    pub value: f32,
+    pub color: u32,
+}
+
 /// Struct that generates and own point data buffer.
 pub struct PointCloud {
     point_cloud_buffer: wgpu::Buffer,
@@ -308,11 +317,11 @@ pub struct PointCloud {
 
 impl PointCloud {
 
+    /// Creates PointCloud structure from given v v v c c c data.
+    /// TODO: Check if file_location exists.
     pub fn init(device: &wgpu::Device, file_location: &String) -> Self {
 
         let (point_count, aabb_min, aabb_max, buffer) = load_pc_data(device, file_location);
-
-        // let result = read_pc_data(src_file);
 
         Self {
             point_cloud_buffer: buffer,
@@ -322,10 +331,34 @@ impl PointCloud {
         }
     }
 
+    /// Get the minimum coordinate from point cloud data.
     pub fn get_min_coord(&self) -> [f32; 3] { self.min_coord }
 
+    /// Get the maximum coordinate from point cloud data.
     pub fn get_max_coord(&self) -> [f32; 3] { self.max_coord }
 
+    /// Get the data buffer.
     pub fn get_buffer(&self) -> &wgpu::Buffer { &self.point_cloud_buffer }
 }
+
+/// A single cell for point cloud data. Store the euclidin distance, color and fmm tag. 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct GridDataPc {
+    distance: f32,
+    color: u32,
+    tag: u32,
+}
+
+/// A struct that offers some functionality for PointCloud data manipulation.
+struct PointCloudHandler {
+    point_data_to_grid_data: ComputeObject,
+    bind_groups: Vec<wgpu::BindGroup>,
+}
+
+// impl PointCloudHandler {
+//     pub fn init(device: &wgpu::Device, global_dimension: [u32; 3], local_dimension: [u32; 3]) -> Self { 
+//         
+//     }
+// }
 

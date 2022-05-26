@@ -29,7 +29,7 @@ use jaankaup_core::input::*;
     use jaankaup_core::texture::Texture;
     use jaankaup_core::aabb::Triangle_vvvvnnnn;
     use jaankaup_core::common_functions::encode_rgba_u32;
-    use jaankaup_core::fmm_things::{DomainTester, PointCloud};
+    use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc};
 
     /// Max number of arrows for gpu debugger.
     const MAX_NUMBER_OF_ARROWS:     usize = 262144;
@@ -184,6 +184,20 @@ use jaankaup_core::input::*;
             println!("Generation point cloud.");
             let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
+            let pc_sample_data = 
+                buffers.insert(
+                    "pc_sample_data".to_string(),
+                    buffer_from_data::<FmmCellPc>(
+                    &configuration.device,
+                    &vec![FmmCellPc {
+                        tag: 0,
+                        value: 1000000.0,
+                        color: 0,
+                    }],
+                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    None)
+                );
+
             // Create different permutations such that (a*x + b*y + c*) % d where
             //
             // a, b and c are prime numbers, a != b != c, and a % d != , b % d != 0, c % d != 0.
@@ -223,9 +237,7 @@ use jaankaup_core::input::*;
                 [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
                 0.15,
                 0.016,
-                //&permutations,
                 [cell_iterator[0] as u32, cell_iterator[1] as u32, cell_iterator[2] as u32],
-                // permutation_index,
                 );
 
             // let permutation_count = permutations.len();

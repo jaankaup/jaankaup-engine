@@ -415,7 +415,6 @@ impl KeyboardManager {
     }
 
     pub fn register_key(&mut self, key: Key, threshold: f64) {
-        println!("registering....");
         self.keys.insert(key, (0.0, threshold)); 
     }
 
@@ -445,7 +444,6 @@ impl KeyboardManager {
                 _ => { }
             }
         }
-
         return result;
     }
 }
