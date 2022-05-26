@@ -296,6 +296,7 @@ fn load_pc_data(device: &wgpu::Device, src_file: &String) -> (u32, [f32; 3], [f3
     )
 }
 
+/// Struct that generates and own point data buffer.
 pub struct PointCloud {
     point_cloud_buffer: wgpu::Buffer,
     point_count: u32,
@@ -320,5 +321,11 @@ impl PointCloud {
             max_coord: aabb_max,
         }
     }
+
+    pub fn get_min_coord(&self) -> [f32; 3] { self.min_coord }
+
+    pub fn get_max_coord(&self) -> [f32; 3] { self.max_coord }
+
+    pub fn get_buffer(&self) -> &wgpu::Buffer { &self.point_cloud_buffer }
 }
 

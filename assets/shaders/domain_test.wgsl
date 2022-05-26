@@ -6,15 +6,6 @@ struct ComputationalDomain {
     local_dimension:  vec3<u32>,
     font_size: f32,
     current_cell: vec3<u32>,
-    //permutation_index: u32,
-};
-
-/// parameters for permutations.
-struct Permutation {
-    modulo: u32,
-    x_factor: u32,  
-    y_factor: u32,  
-    z_factor: u32,  
 };
 
 /// Struct which contains the data of a single thread.
@@ -51,7 +42,6 @@ let FONT_SIZE = 0.015;
 let AABB_SIZE = 0.26;
 
 @group(0) @binding(0) var<uniform> computational_domain: ComputationalDomain;
-// @group(0) @binding(1) var<storage,read_write> permutations: array<Permutation>;
 @group(0) @binding(1) var<storage,read_write> counter: array<atomic<u32>>;
 @group(0) @binding(2) var<storage,read_write> output_char: array<Char>;
 @group(0) @binding(3) var<storage,read_write> output_arrow: array<Arrow>;

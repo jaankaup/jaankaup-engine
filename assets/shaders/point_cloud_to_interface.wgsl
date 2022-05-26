@@ -1,6 +1,5 @@
 /// Create an initial fmm interface from point data. 
 
-
 struct VVVC {
     position: [f32; 3],
     color: u32,
@@ -23,7 +22,7 @@ struct FmmCellPc {
 
 @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
 @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
-@group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCell>;
+@group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
 
 // Debug.

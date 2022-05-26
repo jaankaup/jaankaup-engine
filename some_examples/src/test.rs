@@ -181,6 +181,7 @@ use jaankaup_core::input::*;
             let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
             // Generate the point cloud.
+            println!("Generation point cloud.");
             let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
             // Create different permutations such that (a*x + b*y + c*) % d where
