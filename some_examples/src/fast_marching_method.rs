@@ -46,7 +46,7 @@ const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
 /// Mc global dimensions. 
 const FMM_GLOBAL_X: usize = 32; 
-const FMM_GLOBAL_Y: usize = 32; 
+const FMM_GLOBAL_Y: usize = 8; 
 const FMM_GLOBAL_Z: usize = 32; 
 
 /// Mc inner dimensions.
@@ -54,13 +54,13 @@ const FMM_INNER_X: usize = 4;
 const FMM_INNER_Y: usize = 4; 
 const FMM_INNER_Z: usize = 4; 
 
-const MC_OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
-                                    FMM_GLOBAL_Y *
-                                    FMM_GLOBAL_Z *
-                                    FMM_INNER_X *
-                                    FMM_INNER_Y *
-                                    FMM_INNER_Z *
-                                    size_of::<f32>()) as u32 * 16;
+// const MC_OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
+//                                     FMM_GLOBAL_Y *
+//                                     FMM_GLOBAL_Z *
+//                                     FMM_INNER_X *
+//                                     FMM_INNER_Y *
+//                                     FMM_INNER_Z *
+//                                     size_of::<f32>()) as u32 * 16;
 
 /// Features and limits for FastMarchingMethod application.
 struct FastMarchingMethodFeatures {}

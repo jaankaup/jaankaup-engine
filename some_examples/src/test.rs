@@ -201,7 +201,7 @@ use jaankaup_core::input::*;
                     &configuration.device,
                     &vec![FmmCellPc {
                         tag: 0,
-                        value: 1000000.0,
+                        value: 1000000,
                         color: 0,
                     } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
                     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,

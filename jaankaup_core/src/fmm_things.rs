@@ -326,7 +326,7 @@ fn load_pc_data(device: &wgpu::Device, src_file: &String) -> (u32, [f32; 3], [f3
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct FmmCellPc {
     pub tag: u32,
-    pub value: f32,
+    pub value: u32,
     pub color: u32,
 }
 
