@@ -1,350 +1,449 @@
+use jaankaup_core::common_functions::{create_buffer_bindgroup_layout, create_uniform_bindgroup_layout};
 use jaankaup_core::pc_parser::VVVC;
 use jaankaup_core::pc_parser::read_pc_data;
-use jaankaup_core::common_functions::create_uniform_bindgroup_layout;
 use itertools::Itertools;
 use std::mem::size_of;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use jaankaup_core::input::*;
-    use jaankaup_algorithms::mc::{McParams, MarchingCubes};
-    use jaankaup_core::template::{
-            WGPUFeatures,
-            WGPUConfiguration,
-            Application,
-            BasicLoop,
-            Spawner,
-    };
-    use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObject, create_bind_groups};
-    use jaankaup_core::{wgpu, log};
-    use jaankaup_core::winit;
-    use jaankaup_core::buffer::{buffer_from_data};
-    use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
-    use jaankaup_core::camera::Camera;
-    use jaankaup_core::gpu_debugger::GpuDebugger;
-    use jaankaup_core::gpu_timer::GpuTimer;
-    use jaankaup_core::screen::ScreenTexture;
-    use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
-    use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
-    use jaankaup_core::texture::Texture;
-    use jaankaup_core::aabb::Triangle_vvvvnnnn;
-    use jaankaup_core::common_functions::encode_rgba_u32;
-    use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler};
+use jaankaup_algorithms::mc::{McParams, MarchingCubes};
+use jaankaup_core::template::{
+        WGPUFeatures,
+        WGPUConfiguration,
+        Application,
+        BasicLoop,
+        Spawner,
+};
+use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObject, create_bind_groups};
+use jaankaup_core::{wgpu, log};
+use jaankaup_core::winit;
+use jaankaup_core::buffer::{buffer_from_data};
+use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
+use jaankaup_core::camera::Camera;
+use jaankaup_core::gpu_debugger::GpuDebugger;
+use jaankaup_core::gpu_timer::GpuTimer;
+use jaankaup_core::screen::ScreenTexture;
+use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
+use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
+use jaankaup_core::texture::Texture;
+use jaankaup_core::aabb::Triangle_vvvvnnnn;
+use jaankaup_core::common_functions::encode_rgba_u32;
+use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler};
+use bytemuck::{Pod, Zeroable};
 
-    /// Max number of arrows for gpu debugger.
-    const MAX_NUMBER_OF_ARROWS:     usize = 262144;
+/// Max number of arrows for gpu debugger.
+const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
-    /// Max number of aabbs for gpu debugger.
-    const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
+/// Max number of aabbs for gpu debugger.
+const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
-    /// Max number of box frames for gpu debugger.
-    const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+/// Max number of box frames for gpu debugger.
+const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 
-    /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-    const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
+/// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
+const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 
-    /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
-    const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
+/// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
+const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
-    /// Name for the fire tower mesh (assets/models/wood.obj).
-    const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
+/// Name for the fire tower mesh (assets/models/wood.obj).
+const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-    const CLOUD_DATA: &'static str = "CLOUD_DATA";
+const CLOUD_DATA: &'static str = "CLOUD_DATA";
 
-    /// Global dimensions. 
-    const FMM_GLOBAL_X: usize = 32; 
-    const FMM_GLOBAL_Y: usize = 8; 
-    const FMM_GLOBAL_Z: usize = 32; 
+/// Global dimensions. 
+const FMM_GLOBAL_X: usize = 32; 
+const FMM_GLOBAL_Y: usize = 8; 
+const FMM_GLOBAL_Z: usize = 32; 
 
-    /// Inner dimensions.
-    const FMM_INNER_X: usize = 4; 
-    const FMM_INNER_Y: usize = 4; 
-    const FMM_INNER_Z: usize = 4; 
+/// Inner dimensions.
+const FMM_INNER_X: usize = 4; 
+const FMM_INNER_Y: usize = 4; 
+const FMM_INNER_Z: usize = 4; 
 
-    const TOTAL_INDICES: usize = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
+const TOTAL_INDICES: usize = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 
-    const OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
-                                     FMM_GLOBAL_Y *
-                                     FMM_GLOBAL_Z *
-                                     FMM_INNER_X *
-                                     FMM_INNER_Y *
-                                     FMM_INNER_Z *
-                                     size_of::<f32>()) as u32 * 16;
+const OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
+                                 FMM_GLOBAL_Y *
+                                 FMM_GLOBAL_Z *
+                                 FMM_INNER_X *
+                                 FMM_INNER_Y *
+                                 FMM_INNER_Z *
+                                 size_of::<f32>()) as u32 * 16;
 
-    /// Features and limits for TestProject application.
-    struct TestProjectFeatures {}
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmVisualizationParams {
+    fmm_global_dimension: [u32; 3],
+    visualization_method: u32, // ???.
+    fmm_inner_dimension: [u32; 3],
+    future_usage: u32,
+}
 
-    impl WGPUFeatures for TestProjectFeatures {
+/// Features and limits for TestProject application.
+struct TestProjectFeatures {}
 
-        fn optional_features() -> wgpu::Features {
-            wgpu::Features::TIMESTAMP_QUERY
-        }
+impl WGPUFeatures for TestProjectFeatures {
 
-        fn required_features() -> wgpu::Features {
-            wgpu::Features::empty()
-        }
-
-        fn required_limits() -> wgpu::Limits {
-            let mut limits = wgpu::Limits::default();
-            limits.max_compute_invocations_per_workgroup = 1024;
-            limits.max_compute_workgroup_size_x = 1024;
-            limits.max_storage_buffers_per_shader_stage = 10;
-            limits
-        }
+    fn optional_features() -> wgpu::Features {
+        wgpu::Features::TIMESTAMP_QUERY
     }
 
-    /// The purpose of this application is to test modules and functions.
-    struct TestProject {
-        camera: Camera,
-        gpu_debugger: GpuDebugger,
-        gpu_timer: Option<GpuTimer>,
-        keyboard_manager: KeyboardManager,
-        screen: ScreenTexture, 
-        light: LightBuffer,
-        render_params: RenderParamBuffer,
-        triangle_mesh_renderer: Render_VVVVNNNN_camera,
-        triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
-        buffers: HashMap<String, wgpu::Buffer>,
-        triangle_meshes: HashMap<String, TriangleMesh>,
-        domain_tester: DomainTester,
-        aabb_size: f32,
-        font_size: f32,
-        render_object_vvvc: RenderObject,
-        render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
-        point_count: u32,
-        permutation_index: u32,
-        point_cloud: PointCloud,
-        cell_iterator: [i32; 3],
-        camera_mode: bool,
-        point_cloud_handler: PointCloudHandler,
-        render_params_point_cloud: RenderParamBuffer,
-        draw_point_cloud: bool,
-        point_cloud_draw_iterator: u32,
-        show_domain_tester: bool,
-        show_numbers: bool,
+    fn required_features() -> wgpu::Features {
+        wgpu::Features::empty()
     }
 
-    impl Application for TestProject {
+    fn required_limits() -> wgpu::Limits {
+        let mut limits = wgpu::Limits::default();
+        limits.max_compute_invocations_per_workgroup = 1024;
+        limits.max_compute_workgroup_size_x = 1024;
+        limits.max_storage_buffers_per_shader_stage = 10;
+        limits
+    }
+}
 
-        fn init(configuration: &WGPUConfiguration) -> Self {
+/// The purpose of this application is to test modules and functions.
+struct TestProject {
+    camera: Camera,
+    gpu_debugger: GpuDebugger,
+    gpu_timer: Option<GpuTimer>,
+    keyboard_manager: KeyboardManager,
+    screen: ScreenTexture, 
+    light: LightBuffer,
+    render_params: RenderParamBuffer,
+    triangle_mesh_renderer: Render_VVVVNNNN_camera,
+    triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+    buffers: HashMap<String, wgpu::Buffer>,
+    triangle_meshes: HashMap<String, TriangleMesh>,
+    domain_tester: DomainTester,
+    aabb_size: f32,
+    font_size: f32,
+    render_object_vvvc: RenderObject,
+    render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
+    point_count: u32,
+    permutation_index: u32,
+    point_cloud: PointCloud,
+    cell_iterator: [i32; 3],
+    camera_mode: bool,
+    point_cloud_handler: PointCloudHandler,
+    render_params_point_cloud: RenderParamBuffer,
+    draw_point_cloud: bool,
+    point_cloud_draw_iterator: u32,
+    show_domain_tester: bool,
+    show_numbers: bool,
+    compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
+    compute_object_fmm_visualizer: ComputeObject,
+}
 
-            let show_numbers = false;
-            let show_domain_tester = false;
-            let point_cloud_draw_iterator = 0;
-            let draw_point_cloud = true;
-            let cell_iterator: [i32; 3] = [0, 0, 0];
-            let camera_mode = true;
+impl Application for TestProject {
 
-            let permutation_index = 0;
+    fn init(configuration: &WGPUConfiguration) -> Self {
 
-            let aabb_size: f32 = 0.15;
-            let font_size: f32 = 0.016;
+        let show_numbers = false;
+        let show_domain_tester = false;
+        let point_cloud_draw_iterator = 0;
+        let draw_point_cloud = true;
+        let cell_iterator: [i32; 3] = [0, 0, 0];
+        let camera_mode = true;
 
-            let start_index = 0;
-            let step_size = 1024;
+        let permutation_index = 0;
 
-            // Log adapter info.
-            log_adapter_info(&configuration.adapter);
+        let aabb_size: f32 = 0.15;
+        let font_size: f32 = 0.016;
 
-            // Camera.
-            let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
-            camera.set_rotation_sensitivity(0.4);
-            camera.set_movement_sensitivity(0.1);
+        let start_index = 0;
+        let step_size = 1024;
 
-            // Gpu debugger.
-            let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
+        // Log adapter info.
+        log_adapter_info(&configuration.adapter);
 
-            // Gpu timer.
-            let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
+        // Camera.
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
+        camera.set_rotation_sensitivity(0.4);
+        camera.set_movement_sensitivity(0.1);
 
-            // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
-            let mut keyboard_manager = create_keyboard_manager();
+        // Gpu debugger.
+        let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
 
-            // Light source for triangle meshes.
-            let light = LightBuffer::create(
-                          &configuration.device,
-                          [25.0, 55.0, 25.0], // pos
-                          [25, 25, 130],  // spec
-                          [255,200,255], // light 
-                          55.0,
-                          0.35,
-                          0.000013
-            );
+        // Gpu timer.
+        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
 
-            // Scale_factor for triangle meshes.
-            let render_params = RenderParamBuffer::create(
-                        &configuration.device,
-                        4.0
-            );
+        // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
+        let mut keyboard_manager = create_keyboard_manager();
 
-            // RenderObject for basic triangle mesh rendering.
-            let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        // Light source for triangle meshes.
+        let light = LightBuffer::create(
+                      &configuration.device,
+                      [25.0, 55.0, 25.0], // pos
+                      [25, 25, 130],  // spec
+                      [255,200,255], // light 
+                      55.0,
+                      0.35,
+                      0.000013
+        );
 
-            // Create bindgroups for triangle_mesh_renderer.
-            let triangle_mesh_bindgroups = 
-                    triangle_mesh_renderer.create_bingroups(
-                        &configuration.device, &mut camera, &light, &render_params
-                    );
-
-            // Buffer hash_map.
-            let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
-
-            // Generate the point cloud.
-            let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
-            println!("Point cloud generated.");
-
-            println!("Generate fmm sample data.");
-            let pc_sample_data = 
-                buffers.insert(
-                    "pc_sample_data".to_string(),
-                    buffer_from_data::<FmmCellPc>(
+        // Scale_factor for triangle meshes.
+        let render_params = RenderParamBuffer::create(
                     &configuration.device,
-                    &vec![FmmCellPc {
-                        tag: 0,
-                        value: 1000000,
-                        color: 0,
-                    } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
-                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                    None)
+                    4.0
+        );
+
+        // RenderObject for basic triangle mesh rendering.
+        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+
+        // Create bindgroups for triangle_mesh_renderer.
+        let triangle_mesh_bindgroups = 
+                triangle_mesh_renderer.create_bingroups(
+                    &configuration.device, &mut camera, &light, &render_params
                 );
 
-            let pc_min_coord = point_cloud.get_min_coord();
-            let pc_max_coord = point_cloud.get_max_coord();
+        // Buffer hash_map.
+        let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-            println!("pc_min_coord == {:?}", pc_min_coord);
-            println!("pc_max_coord == {:?}", pc_max_coord);
+        // Generate the point cloud.
+        let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
+        println!("Point cloud generated.");
 
-            let point_cloud_scale_factor_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32 / pc_max_coord[0];
-            let point_cloud_scale_factor_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32 / pc_max_coord[1];
-            let point_cloud_scale_factor_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32 / pc_max_coord[2];
-
-            println!("FMM_GLOBAL_X * FMM_INNER_X == {:?}", (FMM_GLOBAL_X * FMM_INNER_X) as f32);
-            println!("FMM_GLOBAL_Y * FMM_INNER_X == {:?}", (FMM_GLOBAL_Y * FMM_INNER_Z) as f32);
-            println!("FMM_GLOBAL_Z * FMM_INNER_X == {:?}", (FMM_GLOBAL_Y * FMM_INNER_Z) as f32);
-            
-            println!("point_cloud_scale_factor_x == {}", point_cloud_scale_factor_x);
-            println!("point_cloud_scale_factor_y == {}", point_cloud_scale_factor_y);
-            println!("point_cloud_scale_factor_z == {}", point_cloud_scale_factor_z);
-
-            let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
-
-            println!("pc_scale_factor == {}", pc_scale_factor);
-
-            let render_params_point_cloud = RenderParamBuffer::create(
-                        &configuration.device,
-                        pc_scale_factor
-            );
-
-            let point_cloud_handler = PointCloudHandler::init(
-                    &configuration.device,
-                    [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
-                    [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
-                    point_cloud.get_point_count(),
-                    pc_min_coord,
-                    pc_max_coord,
-                    pc_scale_factor, // scale_factor
-                    point_cloud_draw_iterator,
-                    show_numbers,
-                    &buffers.get("pc_sample_data").unwrap(),
-                    point_cloud.get_buffer(),
-                    &gpu_debugger
-            );
-
-            // The DomainTester.
-            let domain_tester = DomainTester::init(
+        println!("Generate fmm sample data.");
+        let pc_sample_data = 
+            buffers.insert(
+                "pc_sample_data".to_string(),
+                buffer_from_data::<FmmCellPc>(
                 &configuration.device,
-                &gpu_debugger,
+                &vec![FmmCellPc {
+                    tag: 0,
+                    value: 10000000,
+                    color: 0,
+                    // padding: 0,
+                } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                None)
+            );
+
+        let pc_min_coord = point_cloud.get_min_coord();
+        let pc_max_coord = point_cloud.get_max_coord();
+
+        println!("pc_min_coord == {:?}", pc_min_coord);
+        println!("pc_max_coord == {:?}", pc_max_coord);
+
+        let point_cloud_scale_factor_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32 / pc_max_coord[0];
+        let point_cloud_scale_factor_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32 / pc_max_coord[1];
+        let point_cloud_scale_factor_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32 / pc_max_coord[2];
+
+        println!("FMM_GLOBAL_X * FMM_INNER_X == {:?}", (FMM_GLOBAL_X * FMM_INNER_X) as f32);
+        println!("FMM_GLOBAL_Y * FMM_INNER_X == {:?}", (FMM_GLOBAL_Y * FMM_INNER_Z) as f32);
+        println!("FMM_GLOBAL_Z * FMM_INNER_X == {:?}", (FMM_GLOBAL_Y * FMM_INNER_Z) as f32);
+        
+        println!("point_cloud_scale_factor_x == {}", point_cloud_scale_factor_x);
+        println!("point_cloud_scale_factor_y == {}", point_cloud_scale_factor_y);
+        println!("point_cloud_scale_factor_z == {}", point_cloud_scale_factor_z);
+
+        let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
+
+        println!("pc_scale_factor == {}", pc_scale_factor);
+
+        let render_params_point_cloud = RenderParamBuffer::create(
+                    &configuration.device,
+                    pc_scale_factor
+        );
+
+        let point_cloud_handler = PointCloudHandler::init(
+                &configuration.device,
                 [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
                 [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
-                0.15,
-                0.016,
+                point_cloud.get_point_count(),
+                pc_min_coord,
+                pc_max_coord,
+                pc_scale_factor, // scale_factor
+                point_cloud_draw_iterator,
                 show_numbers,
-                [cell_iterator[0] as u32, cell_iterator[1] as u32, cell_iterator[2] as u32],
-                );
+                &buffers.get("pc_sample_data").unwrap(),
+                point_cloud.get_buffer(),
+                &gpu_debugger
+        );
 
-            // Container for triangle meshes.
-            let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
-
-            // Load fire tower mesh.
-            let fire_tower_mesh = load_vvvnnn_mesh(
-                             &configuration.device,
-                             include_str!("../../assets/models/wood.obj")[..].to_string(),
-                             FIRE_TOWER_MESH,
-                             2.0,
-                             [50.0, 25.0, 50.0],
-                             [11, 0, 155]
+        // The DomainTester.
+        let domain_tester = DomainTester::init(
+            &configuration.device,
+            &gpu_debugger,
+            [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
+            [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+            0.15,
+            0.016,
+            show_numbers,
+            [cell_iterator[0] as u32, cell_iterator[1] as u32, cell_iterator[2] as u32],
             );
 
-            triangle_meshes.insert(
-                FIRE_TOWER_MESH.to_string(),
-                fire_tower_mesh);
+        // Fmm scene visualizer parasm
+        let fmm_visualization_params = 
+                 FmmVisualizationParams {
+                     fmm_global_dimension: [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
+                     visualization_method: 4, // ???.
+                     //visualization_method: 1 | 2 | 4, // ???.
+                     fmm_inner_dimension: [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+                     future_usage: 0,
+        };
 
-            let point_count = 0;
+        buffers.insert(
+            "fmm_visualization_params".to_string(),
+            buffer_from_data::<FmmVisualizationParams>(
+            &configuration.device,
+            &vec![fmm_visualization_params],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
+        );
 
-            // vvvc
-            let render_object_vvvc =
-                    RenderObject::init(
-                        &configuration.device,
-                        &configuration.sc_desc,
-                        &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                            label: Some("renderer_v3c1_x4.wgsl"),
-                            source: wgpu::ShaderSource::Wgsl(
-                                Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1_x4.wgsl"))),
+        // The fmm scene visualizer.
+        let compute_object_fmm_visualizer =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("fmm_data_visualizer.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_data_visualizer.wgsl"))),
+                    
+                    }),
+                    Some("Fmm data visualizer compute object"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmVisualizationParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-                        }),
-                        &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
-                        &vec![
-                            vec![
-                                create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
-                                create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX),
-                            ],
+                            // @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            // create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // // @group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
+                            // create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
                         ],
-                        Some("Debug visualizator vvvc x4 renderer with camera."),
-                        true,
-                        wgpu::PrimitiveTopology::PointList
-            );
-            let render_bind_groups_vvvc = create_bind_groups(
-                                         &configuration.device,
-                                         &render_object_vvvc.bind_group_layout_entries,
-                                         &render_object_vvvc.bind_group_layouts,
-                                         &vec![
-                                              vec![
-                                                  &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
-                                                  &render_params_point_cloud.get_buffer().as_entire_binding(),
-                                             ]
-                                         ]
-            );
+                    ],
+                    &"main".to_string()
+        );
 
-            Self {
-                camera: camera,
-                gpu_debugger: gpu_debugger,
-                gpu_timer: gpu_timer,
-                keyboard_manager: keyboard_manager,
-                screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-                light: light,
-                render_params: render_params,
-                triangle_mesh_renderer: triangle_mesh_renderer,
-                triangle_mesh_bindgroups: triangle_mesh_bindgroups,
-                buffers: buffers,
-                triangle_meshes: triangle_meshes,
-                domain_tester: domain_tester,
-                aabb_size: aabb_size,
-                font_size: font_size,
-                render_object_vvvc: render_object_vvvc,
-                render_bind_groups_vvvc: render_bind_groups_vvvc,
-                //permutation_count: permutation_count as u32,
-                point_count: point_count,
-                permutation_index: permutation_index,
-                point_cloud: point_cloud,
-                cell_iterator: cell_iterator,
-                camera_mode: camera_mode,
-                point_cloud_handler: point_cloud_handler,
-                render_params_point_cloud: render_params_point_cloud,
-                draw_point_cloud: draw_point_cloud,
-                point_cloud_draw_iterator: point_cloud_draw_iterator,
-                show_domain_tester: show_domain_tester,
-                show_numbers: show_numbers,
-            }
+        let compute_bind_groups_fmm_visualizer =
+            create_bind_groups(
+                &configuration.device,
+                &compute_object_fmm_visualizer.bind_group_layout_entries,
+                &compute_object_fmm_visualizer.bind_group_layouts,
+                &vec![
+                    vec![
+                         &buffers.get(&"fmm_visualization_params".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"pc_sample_data".to_string()).unwrap().as_entire_binding(),
+                         // &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
+                         // &buffers.get(&"isotropic_data".to_string()).unwrap().as_entire_binding(),
+                         &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ]
+                ]
+        );
+
+        // Container for triangle meshes.
+        let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
+
+        // Load fire tower mesh.
+        let fire_tower_mesh = load_vvvnnn_mesh(
+                         &configuration.device,
+                         include_str!("../../assets/models/wood.obj")[..].to_string(),
+                         FIRE_TOWER_MESH,
+                         2.0,
+                         [50.0, 25.0, 50.0],
+                         [11, 0, 155]
+        );
+
+        triangle_meshes.insert(
+            FIRE_TOWER_MESH.to_string(),
+            fire_tower_mesh);
+
+        let point_count = 0;
+
+        // vvvc
+        let render_object_vvvc =
+                RenderObject::init(
+                    &configuration.device,
+                    &configuration.sc_desc,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("renderer_v3c1_x4.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1_x4.wgsl"))),
+
+                    }),
+                    &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
+                    &vec![
+                        vec![
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX),
+                        ],
+                    ],
+                    Some("Debug visualizator vvvc x4 renderer with camera."),
+                    true,
+                    wgpu::PrimitiveTopology::PointList
+        );
+        let render_bind_groups_vvvc = create_bind_groups(
+                                     &configuration.device,
+                                     &render_object_vvvc.bind_group_layout_entries,
+                                     &render_object_vvvc.bind_group_layouts,
+                                     &vec![
+                                          vec![
+                                              &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                              &render_params_point_cloud.get_buffer().as_entire_binding(),
+                                         ]
+                                     ]
+        );
+
+        Self {
+            camera: camera,
+            gpu_debugger: gpu_debugger,
+            gpu_timer: gpu_timer,
+            keyboard_manager: keyboard_manager,
+            screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
+            light: light,
+            render_params: render_params,
+            triangle_mesh_renderer: triangle_mesh_renderer,
+            triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+            buffers: buffers,
+            triangle_meshes: triangle_meshes,
+            domain_tester: domain_tester,
+            aabb_size: aabb_size,
+            font_size: font_size,
+            render_object_vvvc: render_object_vvvc,
+            render_bind_groups_vvvc: render_bind_groups_vvvc,
+            //permutation_count: permutation_count as u32,
+            point_count: point_count,
+            permutation_index: permutation_index,
+            point_cloud: point_cloud,
+            cell_iterator: cell_iterator,
+            camera_mode: camera_mode,
+            point_cloud_handler: point_cloud_handler,
+            render_params_point_cloud: render_params_point_cloud,
+            draw_point_cloud: draw_point_cloud,
+            point_cloud_draw_iterator: point_cloud_draw_iterator,
+            show_domain_tester: show_domain_tester,
+            show_numbers: show_numbers,
+            compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
+            compute_object_fmm_visualizer: compute_object_fmm_visualizer,
+        }
     }
 
     fn render(&mut self,
@@ -353,31 +452,31 @@ use jaankaup_core::input::*;
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
               spawner: &Spawner) {
-
+    
         self.screen.acquire_screen_texture(
             &device,
             &sc_desc,
             &surface
         );
-
+    
         // let buf = buffer_from_data::<f32>(
         //           &device,
         //           &vec![1.0,2.0,3.0,2.0,4.0],
         //           wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
         //           Some("Computational domain wgpu::buffer.")
         // );
-
+    
         let mut encoder = device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
         });
-
+    
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
-
+    
         let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
-
+    
         let mut clear = true;
-
+    
         //++ draw(&mut encoder,
         //++      &view,
         //++      self.screen.depth_texture.as_ref().unwrap(),
@@ -388,12 +487,12 @@ use jaankaup_core::input::*;
         //++      //0..fire_tower.get_triangle_count() * 3, 
         //++      clear
         //++ );
-
+    
         //++ clear = false;
         // println!("{}", self.point_count);
-
+    
         if self.draw_point_cloud {
-
+    
             draw(&mut encoder,
                  &view,
                  &self.screen.depth_texture.as_ref().unwrap(),
@@ -403,13 +502,13 @@ use jaankaup_core::input::*;
                  0..self.point_cloud.get_point_count(),
                  clear
             );
-
+    
             clear = false;
         }
-
+    
         queue.submit(Some(encoder.finish())); 
-
-
+    
+    
         self.gpu_debugger.render(
                   &device,
                   &queue,
@@ -418,12 +517,12 @@ use jaankaup_core::input::*;
                   &mut clear,
                   spawner
         );
-
+    
         self.gpu_debugger.reset_element_counters(&queue);
-
+    
         self.screen.prepare_for_rendering();
     }
-
+    
     #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input: &InputCache) {
         if self.camera_mode { self.camera.update_from_input(&queue, &input); } 
@@ -444,43 +543,43 @@ use jaankaup_core::input::*;
                    self.cell_iterator = temp_coordinate; 
                }
         }
-
+    
         if self.keyboard_manager.test_key(&Key::Key0, input) {
             if self.point_cloud_draw_iterator * 1024 + 1024 < self.point_cloud.get_point_count() {
                 self.point_cloud_draw_iterator = self.point_cloud_draw_iterator + 1;
                 self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
             }
         }
-
+    
         if self.keyboard_manager.test_key(&Key::Key9, input) {
                 if self.point_cloud_draw_iterator != 0 {
                     self.point_cloud_draw_iterator = self.point_cloud_draw_iterator - 1;
                     self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
                 }
         }
-
+    
         if self.keyboard_manager.test_key(&Key::Return, input) {
             self.show_domain_tester = !self.show_domain_tester;
         }
-
+    
         if self.keyboard_manager.test_key(&Key::N, input) {
             self.show_numbers = !self.show_numbers;
             self.domain_tester.update_show_numbers(queue, self.show_numbers);
         }
     }
-
+    
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {
-
+    
         // TODO: add this functionality to the Screen.
         self.screen.depth_texture = Some(Texture::create_depth_texture(&device, &sc_desc, Some("depth-texture")));
         self.camera.resize(sc_desc.width as f32, sc_desc.height as f32);
     }
-
+    
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
-
+    
         self.domain_tester.update_domain_iterator(queue, [self.cell_iterator[0] as u32, self.cell_iterator[1] as u32, self.cell_iterator[2] as u32] );
-
+    
         if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) { 
             if self.font_size - 0.0005 > 0.0 && self.aabb_size - 0.01 > 0.0 {
                 self.font_size = self.font_size - 0.0005;
@@ -491,7 +590,7 @@ use jaankaup_core::input::*;
             println!("aabb_size == {:?}", self.aabb_size);
             println!("font_size == {:?}", self.font_size);
         }
-
+    
         if self.keyboard_manager.test_key(&Key::NumpadAdd, input) {
               self.font_size = self.font_size + 0.0005;
               self.aabb_size = self.aabb_size + 0.01;
@@ -500,42 +599,49 @@ use jaankaup_core::input::*;
               println!("aabb_size == {:?}", self.aabb_size);
               println!("font_size == {:?}", self.font_size);
         }
-
+    
         if self.keyboard_manager.test_key(&Key::P, input) {
               self.camera_mode = true;
               println!("camera mode == {:?}", self.camera_mode);
               // log::info!("camera mode == {:?}", self.camera_mode);
         }
-
+    
         if self.keyboard_manager.test_key(&Key::O, input) {
               self.camera_mode = false;
               println!("camera mode == {:?}", self.camera_mode);
               //log::info!("camera mode == {:?}", self.camera_mode);
         }
-
+    
         if self.keyboard_manager.test_key(&Key::Space, input) {
               self.draw_point_cloud = !self.draw_point_cloud;
               println!("draw point cloud == {:?}", self.draw_point_cloud);
         }
-
+    
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
                                FMM_GLOBAL_Z *
                                FMM_INNER_X *
                                FMM_INNER_Y *
                                FMM_INNER_Z;
-
+    
         let mut encoder = device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
                 label: Some("Domain tester encoder"),
         });
-
+    
         if self.show_domain_tester {
             self.domain_tester.dispatch(&mut encoder);
         }
-
+    
         self.point_cloud_handler.point_data_to_interface(&mut encoder);
 
+        self.compute_object_fmm_visualizer.dispatch(
+            &self.compute_bind_groups_fmm_visualizer,
+            &mut encoder,
+            (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+            Some("fmm visualizer dispatch")
+        );
+    
         queue.submit(Some(encoder.finish())); 
     }
 }
@@ -645,8 +751,8 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::C, 50.0);
         keys.register_key(Key::E, 50.0);
         keys.register_key(Key::Space, 100.0);
-        keys.register_key(Key::Key9, 50.0);
-        keys.register_key(Key::Key0, 50.0);
+        keys.register_key(Key::Key9, 5.0);
+        keys.register_key(Key::Key0, 5.0);
         keys.register_key(Key::Return, 50.0);
         keys.register_key(Key::N, 50.0);
         

@@ -328,6 +328,7 @@ pub struct FmmCellPc {
     pub tag: u32,
     pub value: u32,
     pub color: u32,
+    // pub padding: u32,
 }
 
 #[repr(C)]

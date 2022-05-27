@@ -23,7 +23,7 @@ struct Char {
 };
 
 let FONT_SIZE = 0.015;
-let AABB_SIZE = 0.26;
+let AABB_SIZE = 0.026;
 
 // FMM tags
 // 0 :: Far
@@ -38,10 +38,10 @@ let BAND     = 2u;
 let KNOWN    = 3u;
 let OUTSIDE  = 4u;
 
-struct FmmCell {
+struct FmmCellPc {
     tag: u32,
     value: f32,
-    queue_value: u32,
+    color: u32,
 };
 
 struct FmmBlock {
@@ -57,14 +57,14 @@ struct FmmVisualizationParams {
 };
 
 @group(0) @binding(0) var<uniform> fmm_visualization_params: FmmVisualizationParams;
-@group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCell>;
-@group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
-@group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
-@group(0) @binding(4) var<storage, read_write> counter: array<atomic<u32>>;
-@group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
-@group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
-@group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
-@group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+@group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCellPc>;
+// @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+// @group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
+@group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+@group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
+@group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
+@group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
+@group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 let THREAD_COUNT = 64u;
 
@@ -241,11 +241,60 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
    );
 }
 
+/// xy-plane indexing. (x,y,z) => index
+fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
+  var x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh; // check
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  return vec3<u32>(x, y, z);
+}
+
+/// Get memory index from given cell coordinate.
+fn get_cell_mem_location(v: vec3<u32>) -> u32 {
+
+    let stride = fmm_visualization_params.fmm_inner_dimension.x * fmm_visualization_params.fmm_inner_dimension.y * fmm_visualization_params.fmm_inner_dimension.z;
+
+    let xOffset = 1u;
+    let yOffset = fmm_visualization_params.fmm_global_dimension.x;
+    let zOffset = yOffset * fmm_visualization_params.fmm_global_dimension.y;
+
+    let global_coordinate = vec3<u32>(v) / fmm_visualization_params.fmm_inner_dimension;
+
+    let global_index = (global_coordinate.x * xOffset +
+                        global_coordinate.y * yOffset +
+                        global_coordinate.z * zOffset) * stride;
+
+    let local_coordinate = vec3<u32>(v) - global_coordinate * fmm_visualization_params.fmm_inner_dimension;
+
+    let local_index = encode3Dmorton32(local_coordinate.x, local_coordinate.y, local_coordinate.z);
+
+    return global_index + local_index; 
+}
+
+fn get_cell_index(global_index: u32) -> vec3<u32> { 
+
+    let stride = fmm_visualization_params.fmm_inner_dimension.x * fmm_visualization_params.fmm_inner_dimension.y * fmm_visualization_params.fmm_inner_dimension.z;
+    let block_index = global_index / stride;
+    let block_position = index_to_uvec3(block_index, fmm_visualization_params.fmm_global_dimension.x, fmm_visualization_params.fmm_global_dimension.y) * fmm_visualization_params.fmm_inner_dimension;
+
+    // calculate local position.
+    let local_index = global_index - block_index * stride;
+
+    let local_position = decode3Dmorton32(local_index);
+
+    let cell_position = block_position + local_position;
+
+    return cell_position; 
+}
+
 fn visualize_cell(position: vec3<f32>, color: u32) {
     output_aabb[atomicAdd(&counter[2], 1u)] =
           AABB (
-              vec4<f32>(position - vec3<f32>(AABB_SIZE), bitcast<f32>(color)),
-              vec4<f32>(position + vec3<f32>(AABB_SIZE), 0.0),
+              4.0 * vec4<f32>(position - vec3<f32>(AABB_SIZE), 0.0) + vec4<f32>(0.0, 0.0, 0.0, bitcast<f32>(color)),
+              4.0 * vec4<f32>(position + vec3<f32>(AABB_SIZE), 0.0),
           );
 }
 
@@ -258,18 +307,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let color = bitcast<f32>(rgba_u32(222u, 0u, 150u, 255u));
 
     // Visualize the global fmm domain aabb.
-    if (global_id.x == 0u) {
-        output_aabb_wire[global_id.x] =  
-              AABB (
-                  vec4<f32>(0.0, 0.0, 0.0, color),
-                  vec4<f32>(vec3<f32>(fmm_visualization_params.fmm_global_dimension), 0.1)
-              );
-        atomicAdd(&counter[3], 1u);
-    }
+    // if (global_id.x == 0u) {
+    //     output_aabb_wire[global_id.x] =  
+    //           AABB (
+    //               vec4<f32>(0.0, 0.0, 0.0, color),
+    //               vec4<f32>(vec3<f32>(fmm_visualization_params.fmm_global_dimension), 0.1)
+    //           );
+    //     atomicAdd(&counter[3], 1u);
+    // }
 
-    let cell = fmm_data[global_id.x];
-    let speed = isotropic_data[global_id.x];
-    var position = vec3<f32>(decode3Dmorton32(global_id.x)); // * 0.25;
+    // let cell = fmm_data[global_id.x];
+
+    //++ let speed = isotropic_data[global_id.x];
+    //++ var position = vec3<f32>(decode3Dmorton32(global_id.x)); // * 0.25;
+    var position = vec3<f32>(get_cell_index(global_id.x)); // * 0.25;
+    let cell = fmm_data[get_cell_mem_location(get_cell_index(global_id.x))];
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
@@ -294,27 +346,13 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     0u
     );
 
-    var position_u32_temp = decode3Dmorton32(global_id.x); // * 0.25;
-    let permutation_number = (2u * position_u32_temp.x +  13u * position_u32_temp.y + 17u * position_u32_temp.z) % 4u; 
-    // let permutation_number = (2u * position_u32_temp.x +  3u * position_u32_temp.y + 5u * position_u32_temp.z) & 3u; 
-    // let permutation_number = (3u * position_u32_temp.x +  5u * position_u32_temp.y + 7u * position_u32_temp.z) & 2u; 
-    let permutation_color0 = rgba_u32(255u, 0u, 0u, 255u);
-    let permutation_color1 = rgba_u32(0u, 255u, 0u, 255u);
-    let permutation_color2 = rgba_u32(0u, 0u, 255u, 255u);
-    let permutation_color3 = rgba_u32(0u, 155u, 155u, 255u);
-
     if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
 
-        if (permutation_number == 0u) { visualize_cell(position, permutation_color0);} 
-        if (permutation_number == 1u) { visualize_cell(position, permutation_color1);} 
-        if (permutation_number == 2u) { visualize_cell(position, permutation_color2);} 
-        if (permutation_number == 3u) { visualize_cell(position, permutation_color3);} 
+        visualize_cell(position, col);
+        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 
-        // visualize_cell(position, col);
-        // if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
-
-        //     output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
-        //  }
+            output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+         }
     }
     if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
         visualize_cell(position, col);
@@ -325,32 +363,33 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
 
     if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
-        visualize_cell(position, col);
-        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+        //col = cell.color;
+        visualize_cell(position, cell.color);
+        // if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 
-            output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
-        }
+        //     output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+        // }
     }
 
-    let ranged_color = mapRange(0.0, 100.0, 0.0, 255.0, speed);
-    let ranged_color_rgba = rgba_u32(u32(ranged_color), 10u, 0u, 255u);
+    //++ let ranged_color = mapRange(0.0, 100.0, 0.0, 255.0, speed);
+    //++ let ranged_color_rgba = rgba_u32(u32(ranged_color), 10u, 0u, 255u);
 
-    // Visualize isotropic speed data.
-    if ((fmm_visualization_params.visualization_method & 8u) != 0u) {
-        visualize_cell(position, ranged_color_rgba);
-        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+    //++ // Visualize isotropic speed data.
+    //++ if ((fmm_visualization_params.visualization_method & 8u) != 0u) {
+    //++     visualize_cell(position, ranged_color_rgba);
+    //++     if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 
-            output_char[atomicAdd(&counter[0], 1u)] =  
-                
-                Char (
-                    element_position,
-                    FONT_SIZE,
-                    vec4<f32>(speed, 0.0, 0.0, 0.0),
-                    1u,
-                    color_text,
-                    2u,
-                    0u
-                );
-         }
-    }
+    //++         output_char[atomicAdd(&counter[0], 1u)] =  
+    //++             
+    //++             Char (
+    //++                 element_position,
+    //++                 FONT_SIZE,
+    //++                 vec4<f32>(speed, 0.0, 0.0, 0.0),
+    //++                 1u,
+    //++                 color_text,
+    //++                 2u,
+    //++                 0u
+    //++             );
+    //++      }
+    //++ }
 }

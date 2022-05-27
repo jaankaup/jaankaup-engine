@@ -19,12 +19,20 @@ var<uniform> camerauniform: Camera;
 var<uniform> render_params: RenderParams;
 
 fn decode_color(c: u32) -> vec4<f32> {
-  let a: f32 = f32(c & 256u) / 255.0;
-  let b: f32 = f32((c & 65280u) >> 8u) / 255.0;
-  let g: f32 = f32((c & 16711680u) >> 16u) / 255.0;
-  let r: f32 = f32((c & 4278190080u) >> 24u) / 255.0;
+  let a: f32 = f32(c & 0xffu) / 255.0;
+  let b: f32 = f32((c & 0xff00u) >> 8u) / 255.0;
+  let g: f32 = f32((c & 0xff0000u) >> 16u) / 255.0;
+  let r: f32 = f32((c & 0xff000000u) >> 24u) / 255.0;
   return vec4<f32>(r,g,b,a);
 }
+
+// fn decode_color(c: u32) -> vec4<f32> {
+//   let a: f32 = f32(c & 256u) / 255.0;
+//   let b: f32 = f32((c & 65280u) >> 8u) / 255.0;
+//   let g: f32 = f32((c & 16711680u) >> 16u) / 255.0;
+//   let r: f32 = f32((c & 4278190080u) >> 24u) / 255.0;
+//   return vec4<f32>(r,g,b,a);
+// }
 
 @vertex
 fn vs_main(@location(0) pos: vec3<f32>, @location(1) col: u32) -> VertexOutput {

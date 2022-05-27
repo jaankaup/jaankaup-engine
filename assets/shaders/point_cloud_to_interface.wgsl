@@ -1,5 +1,11 @@
 /// Create an initial fmm interface from point data. 
 
+let FAR      = 0u;
+let BAND_NEW = 1u;
+let BAND     = 2u;
+let KNOWN    = 3u;
+let OUTSIDE  = 4u;
+
 struct VVVC {
     position: vec3<f32>,
     color: u32,
@@ -22,7 +28,7 @@ struct PointCloudParams {
 struct FmmCellPc {
     tag: u32,
     value: atomic<u32>,
-    color: u32,
+    color: atomic<u32>,
 }
 
 // Debugging.
@@ -169,32 +175,39 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let inside = isInside(nearest_cell);
 
     // Calculate the distance between point and nearest cell.
-    let dist = distance(vec3<f32>(p.position), vec3<f32>(nearest_cell));
+    let dist = distance(p.position, vec3<f32>(nearest_cell));
 
     // 0.045 => 45000
     let dist_to_u32 = u32(dist * 1000000.0);
 
-    // If inside update distance if necessery.
-    if (inside || dist < 0.25) {
+    // If inside update distance.
+    if (inside && dist < 0.25) {
         let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
         atomicMin(&fmm_data[memory_index].value, dist_to_u32);
     }
 
-    workgroupBarrier(); 
+    // workgroupBarrier(); 
+    storageBarrier(); 
 
-    let final_value = fmm_data[memory_index].value;
+    if (inside && dist < 0.25) {
 
-    // Update the color.
-    if (final_value == dist_to_u32) {
+        let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
+        let final_value = fmm_data[memory_index].value;
 
-        fmm_data[memory_index].color = p.color;
+        // Update the color and tag.
+        if (final_value == dist_to_u32) {
 
-        // output_arrow[atomicAdd(&counter[1], 1u)] =  
-        //       Arrow (
-        //           4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
-        //           4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
-        //           p.color,
-        //           0.05
-        // );
+            atomicExchange(&fmm_data[memory_index].color, p.color);
+            fmm_data[memory_index].tag = KNOWN;
+
+            output_arrow[atomicAdd(&counter[1], 1u)] =  
+                  Arrow (
+                      4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
+                      4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
+                      //fmm_data[memory_index].color,
+                      p.color,
+                      0.05
+            );
+        }
     }
 }

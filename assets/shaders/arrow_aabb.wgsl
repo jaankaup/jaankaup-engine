@@ -236,7 +236,7 @@ fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: f32, start_inde
     // Encode color information to the fourth component.
 
     // let c = f32(color);
-    let c = bitcast<f32>(color);
+    let c = color; // bitcast<f32>(color);
 
     let delta = aabb.max - aabb.min;
 

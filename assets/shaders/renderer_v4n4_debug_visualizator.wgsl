@@ -36,10 +36,10 @@ var<uniform> light: Light;
 var<uniform> other_params: RenderParams;
 
 fn decode_color(c: u32) -> vec4<f32> {
-  let a: f32 = f32(c & 256u) / 255.0;
-  let b: f32 = f32((c & 65280u) >> 8u) / 255.0;
-  let g: f32 = f32((c & 16711680u) >> 16u) / 255.0;
-  let r: f32 = f32((c & 4278190080u) >> 24u) / 255.0;
+  let a: f32 = f32(c & 0xffu) / 255.0;
+  let b: f32 = f32((c & 0xff00u) >> 8u) / 255.0;
+  let g: f32 = f32((c & 0xff0000u) >> 16u) / 255.0;
+  let r: f32 = f32((c & 0xff000000u) >> 24u) / 255.0;
   return vec4<f32>(r,g,b,a);
 }
 
@@ -94,37 +94,4 @@ fn fs_main(in_data: VertexOutput) -> @location(0) vec4<f32> {
     var final_color: vec4<f32> = vec4<f32>(ambient_component + attentuation * (diffuse_component + specular_component) , 1.0);
 
     return final_color;
-
-//++    var light_dir: vec3<f32> = normalize(light.light_pos - in.pos.xyz);
-//++    var normal: vec3<f32> = normalize(in.nor).xyz;
-//++    var diff_coeffient: f32 = max(0.0, dot(normal, light_dir));
-//++    var reflection_vector: vec3<f32> = reflect(-light_dir, normal);
-//++    var camera_dir: vec3<f32> = normalize(camerauniform.camera_pos.xyz - in.pos.xyz);
-//++
-//++    var cosAngle: f32 = max(0.0, dot(camera_dir, reflection_vector));
-//++
-//++    //++ var cosAngle: f32 = max(0.0, dot(in.camera_dir, in.reflection_vector));
-//++
-//++    var specular_coeffient: f32 = 0.0;
-//++
-//++    if (diff_coeffient > 0.0) {
-//++        specular_coeffient = pow(cosAngle, light.material_shininess);
-//++    }
-//++
-//++    var surface_color: vec3<f32> = in.col; 
-//++
-//++    var specular_component: vec3<f32> = specular_coeffient * light.material_spec_color * light.light_color;
-//++    var ambient_component:  vec3<f32> = light.ambient_coeffience * light.light_color * surface_color.xyz;
-//++    var diffuse_component:  vec3<f32> = diff_coeffient * light.light_color * surface_color.xyz;
-//++
-//++    //++ var specular_component: vec3<f32> = specular_coeffient * light.material_spec_color * light.light_color;
-//++    //++ var ambient_component:  vec3<f32> = light.ambient_coeffience * light.light_color * surface_color.xyz;
-//++    //++ var diffuse_component:  vec3<f32> = in.diff_coeffient * light.light_color * surface_color.xyz;
-//++    
-//++    var distance_to_light: f32 = distance(in.pos.xyz, light.light_pos); 
-//++    var attentuation: f32 = 1.0 / (1.0 + light.attentuation_factor * pow(distance_to_light,2.0));
-//++    
-//++    var final_color: vec4<f32> = vec4<f32>(ambient_component + attentuation * (diffuse_component + specular_component) , 1.0);
-//++
-//++    return final_color;
 }
