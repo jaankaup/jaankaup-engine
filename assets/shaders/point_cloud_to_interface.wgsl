@@ -184,7 +184,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let dist = distance(p.position, vec3<f32>(nearest_cell));
 
     // 0.045 => 45000
-    let dist_to_u32 = u32(dist * 1000000.0);
+    let dist_to_u32 = u32(dist * 100000.0);
 
     // If inside update distance.
     if (inside && dist < 0.70710678) {

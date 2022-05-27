@@ -9,6 +9,12 @@ struct FmmCellPc {
     color: u32,
 }
 
+let FAR      = 0u;
+let BAND_NEW = 1u;
+let BAND     = 2u;
+let KNOWN    = 3u;
+let OUTSIDE  = 4u;
+
 @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
 @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCellPc>;
 
@@ -31,7 +37,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     var cell = fmm_data[global_id.x];
 
     // Convert value back to f32.
-    cell.value = bitcast<u32>(f32(cell.value) / 1000000.0);
+    if (cell.tag == KNOWN) {
+        cell.value = bitcast<u32>(f32(cell.value) * 0.0001);
+    }
+    else {
+        cell.value = bitcast<u32>(-0.01);
+    }
 
     fmm_data[global_id.x].value = cell.value; 
 }

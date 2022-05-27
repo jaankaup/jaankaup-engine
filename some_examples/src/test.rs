@@ -1,3 +1,5 @@
+use jaankaup_core::common_functions::udiv_up_safe32;
+use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use jaankaup_core::common_functions::{create_buffer_bindgroup_layout, create_uniform_bindgroup_layout};
 use jaankaup_core::pc_parser::VVVC;
 use jaankaup_core::pc_parser::read_pc_data;
@@ -7,7 +9,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use jaankaup_core::input::*;
-use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use jaankaup_core::template::{
         WGPUFeatures,
         WGPUConfiguration,
@@ -36,16 +37,16 @@ use bytemuck::{Pod, Zeroable};
 const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
-const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
+const MAX_NUMBER_OF_AABBS:      usize =  262144; //TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
-const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+const MAX_NUMBER_OF_AABB_WIRES: usize =  40960;
 
 /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
+const MAX_NUMBER_OF_CHARS:      usize =  262144; //TOTAL_INDICES;
 
 /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
-const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
+const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
 const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
@@ -53,9 +54,9 @@ const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 const CLOUD_DATA: &'static str = "CLOUD_DATA";
 
 /// Global dimensions. 
-const FMM_GLOBAL_X: usize = 32; 
-const FMM_GLOBAL_Y: usize = 8; 
-const FMM_GLOBAL_Z: usize = 32; 
+const FMM_GLOBAL_X: usize = 64; 
+const FMM_GLOBAL_Y: usize = 16; 
+const FMM_GLOBAL_Z: usize = 64; 
 
 /// Inner dimensions.
 const FMM_INNER_X: usize = 4; 
@@ -70,7 +71,7 @@ const OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
                                  FMM_INNER_X *
                                  FMM_INNER_Y *
                                  FMM_INNER_Z *
-                                 size_of::<f32>()) as u32 * 16;
+                                 size_of::<f32>()) as u32 * 3;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -135,6 +136,9 @@ struct TestProject {
     compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
     compute_object_fmm_visualizer: ComputeObject,
     fmm_value_fixer: FmmValueFixer,
+    marching_cubes: MarchingCubes,
+    render_vvvvnnnn: Render_VVVVNNNN_camera,
+    render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
 }
 
 impl Application for TestProject {
@@ -176,7 +180,7 @@ impl Application for TestProject {
         // Light source for triangle meshes.
         let light = LightBuffer::create(
                       &configuration.device,
-                      [25.0, 55.0, 25.0], // pos
+                      [25.0, 75.0, 25.0], // pos
                       [25, 25, 130],  // spec
                       [255,200,255], // light 
                       55.0,
@@ -418,6 +422,56 @@ impl Application for TestProject {
                                      ]
         );
 
+
+        // MC Cubes stuff.
+          
+        let mc_params = McParams {
+                base_position: [0.0, 0.0, 0.0, 1.0],
+                isovalue: 0.0,
+                cube_length: 1.0,
+                future_usage1: 0.0,
+                future_usage2: 0.0,
+                noise_global_dimension: [FMM_GLOBAL_X.try_into().unwrap(),
+                                         FMM_GLOBAL_Y.try_into().unwrap(),
+                                         FMM_GLOBAL_Z.try_into().unwrap(),
+                                         0
+                ],
+                noise_local_dimension: [FMM_INNER_X.try_into().unwrap(),
+                                        FMM_INNER_Y.try_into().unwrap(),
+                                        FMM_INNER_Z.try_into().unwrap(),
+                                        0
+                ],
+        };
+
+        buffers.insert(
+            "mc_output".to_string(),
+            configuration.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Mc output buffer"),
+                size: OUTPUT_BUFFER_SIZE as u64, 
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        );
+
+        let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("mc compute shader"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/mc_pc_data.wgsl"))),
+                        }
+        );
+
+        let mc_instance = MarchingCubes::init_with_noise_buffer(
+            &configuration.device,
+            &mc_params,
+            &mc_shader,
+            &buffers.get(&"pc_sample_data".to_string()).unwrap(),
+            &buffers.get(&"mc_output".to_string()).unwrap(),
+        );
+
+        // vvvvnnnn renderer.
+        let render_vvvvnnnn = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let render_vvvvnnnn_bg = render_vvvvnnnn.create_bingroups(&configuration.device, &mut camera, &light, &render_params);
+
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
@@ -450,6 +504,9 @@ impl Application for TestProject {
             compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
             compute_object_fmm_visualizer: compute_object_fmm_visualizer,
             fmm_value_fixer: fmm_value_fixer,
+            marching_cubes: mc_instance,
+            render_vvvvnnnn: render_vvvvnnnn,
+            render_vvvvnnnn_bg: render_vvvvnnnn_bg,
         }
     }
 
@@ -512,6 +569,20 @@ impl Application for TestProject {
     
             clear = false;
         }
+
+        draw_indirect(
+             &mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_vvvvnnnn_bg,
+             &self.render_vvvvnnnn.get_render_object().pipeline,
+             &self.buffers.get("mc_output").unwrap(),
+             self.marching_cubes.get_draw_indirect_buffer(),
+             0,
+             clear
+        );
+
+            clear = false;
     
         queue.submit(Some(encoder.finish())); 
     
@@ -528,6 +599,9 @@ impl Application for TestProject {
         self.gpu_debugger.reset_element_counters(&queue);
     
         self.screen.prepare_for_rendering();
+
+        // Reset counter.
+        self.marching_cubes.reset_counter_value(device, queue);
     }
     
     #[allow(unused)]
@@ -644,15 +718,20 @@ impl Application for TestProject {
         if self.show_domain_tester {
             self.domain_tester.dispatch(&mut encoder);
         }
-    
+
+        self.fmm_value_fixer.dispatch(&mut encoder,
+                                      [udiv_up_safe32(self.point_cloud.get_point_count(), 1024), 1, 1]);
+
         self.point_cloud_handler.point_data_to_interface(&mut encoder);
 
-        self.compute_object_fmm_visualizer.dispatch(
-            &self.compute_bind_groups_fmm_visualizer,
-            &mut encoder,
-            (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-            Some("fmm visualizer dispatch")
-        );
+        // self.compute_object_fmm_visualizer.dispatch(
+        //     &self.compute_bind_groups_fmm_visualizer,
+        //     &mut encoder,
+        //     (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+        //     Some("fmm visualizer dispatch")
+        // );
+
+        self.marching_cubes.dispatch(&mut encoder, total_grid_count as u32 / 256, 1, 1);
     
         queue.submit(Some(encoder.finish())); 
     }
