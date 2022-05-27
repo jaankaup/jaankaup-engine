@@ -181,7 +181,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let dist_to_u32 = u32(dist * 1000000.0);
 
     // If inside update distance.
-    if (inside && dist < 0.25) {
+    //if (inside && dist < 0.25) {
+    if (inside && dist < 0.70710678) {
         let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
         atomicMin(&fmm_data[memory_index].value, dist_to_u32);
     }
@@ -189,7 +190,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // workgroupBarrier(); 
     storageBarrier(); 
 
-    if (inside && dist < 0.25) {
+    if (inside && dist < 0.70710678) {
 
         let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
         let final_value = fmm_data[memory_index].value;

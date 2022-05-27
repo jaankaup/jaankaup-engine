@@ -316,12 +316,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //     atomicAdd(&counter[3], 1u);
     // }
 
-    // let cell = fmm_data[global_id.x];
+    let cell = fmm_data[global_id.x];
 
     //++ let speed = isotropic_data[global_id.x];
     //++ var position = vec3<f32>(decode3Dmorton32(global_id.x)); // * 0.25;
     var position = vec3<f32>(get_cell_index(global_id.x)); // * 0.25;
-    let cell = fmm_data[get_cell_mem_location(get_cell_index(global_id.x))];
+    //let cell = fmm_data[get_cell_mem_location(get_cell_index(global_id.x))];
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);

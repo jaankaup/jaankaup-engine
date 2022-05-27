@@ -548,6 +548,11 @@ impl Application for TestProject {
             if self.point_cloud_draw_iterator * 1024 + 1024 < self.point_cloud.get_point_count() {
                 self.point_cloud_draw_iterator = self.point_cloud_draw_iterator + 1;
                 self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
+                println!("Updating fmm interface from range ({:?} .. {:?} < {:?}",
+                              self.point_cloud_draw_iterator * 1024,
+                              self.point_cloud_draw_iterator * 1024 + 1024,
+                              self.point_cloud.get_point_count()
+                );
             }
         }
     
