@@ -29,7 +29,7 @@ use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler};
+use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
 use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
@@ -134,6 +134,7 @@ struct TestProject {
     show_numbers: bool,
     compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
     compute_object_fmm_visualizer: ComputeObject,
+    fmm_value_fixer: FmmValueFixer,
 }
 
 impl Application for TestProject {
@@ -294,6 +295,11 @@ impl Application for TestProject {
             None)
         );
 
+        let fmm_value_fixer = FmmValueFixer::init(&configuration.device,
+                                                  &buffers.get(&"fmm_visualization_params".to_string()).unwrap(),
+                                                  &buffers.get(&"pc_sample_data".to_string()).unwrap()
+        );
+
         // The fmm scene visualizer.
         let compute_object_fmm_visualizer =
                 ComputeObject::init(
@@ -443,6 +449,7 @@ impl Application for TestProject {
             show_numbers: show_numbers,
             compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
             compute_object_fmm_visualizer: compute_object_fmm_visualizer,
+            fmm_value_fixer: fmm_value_fixer,
         }
     }
 
@@ -544,24 +551,24 @@ impl Application for TestProject {
                }
         }
     
-        if self.keyboard_manager.test_key(&Key::Key0, input) {
-            if self.point_cloud_draw_iterator * 1024 + 1024 < self.point_cloud.get_point_count() {
-                self.point_cloud_draw_iterator = self.point_cloud_draw_iterator + 1;
-                self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
-                println!("Updating fmm interface from range ({:?} .. {:?} < {:?}",
-                              self.point_cloud_draw_iterator * 1024,
-                              self.point_cloud_draw_iterator * 1024 + 1024,
-                              self.point_cloud.get_point_count()
-                );
-            }
-        }
+        // if self.keyboard_manager.test_key(&Key::Key0, input) {
+        //     if self.point_cloud_draw_iterator * 1024 + 1024 < self.point_cloud.get_point_count() {
+        //         self.point_cloud_draw_iterator = self.point_cloud_draw_iterator + 1;
+        //         self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
+        //         println!("Updating fmm interface from range ({:?} .. {:?} < {:?}",
+        //                       self.point_cloud_draw_iterator * 1024,
+        //                       self.point_cloud_draw_iterator * 1024 + 1024,
+        //                       self.point_cloud.get_point_count()
+        //         );
+        //     }
+        // }
     
-        if self.keyboard_manager.test_key(&Key::Key9, input) {
-                if self.point_cloud_draw_iterator != 0 {
-                    self.point_cloud_draw_iterator = self.point_cloud_draw_iterator - 1;
-                    self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
-                }
-        }
+        // if self.keyboard_manager.test_key(&Key::Key9, input) {
+        //         if self.point_cloud_draw_iterator != 0 {
+        //             self.point_cloud_draw_iterator = self.point_cloud_draw_iterator - 1;
+        //             self.point_cloud_handler.update_thread_group_number(queue, self.point_cloud_draw_iterator);
+        //         }
+        // }
     
         if self.keyboard_manager.test_key(&Key::Return, input) {
             self.show_domain_tester = !self.show_domain_tester;

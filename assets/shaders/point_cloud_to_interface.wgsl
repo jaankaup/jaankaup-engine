@@ -147,26 +147,32 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
     let scene_aabb_color = bitcast<f32>(rgba_u32(222u, 0u, 150u, 255u));
+    let point_cloud_aabb_color = bitcast<f32>(rgba_u32(0u, 255u, 150u, 255u));
 
     // Visualize the global fmm domain aabb.
     if (global_id.x == 0u) {
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
               AABB (
-                  4.0 * vec4<f32>(0.0, 0.0, 0.0, scene_aabb_color),
-                  4.0 * vec4<f32>(vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension), 0.1)
+                  4.0 * vec4<f32>(point_cloud_params.min_point, 0.0) + vec4<f32>(0.0, 0.0, 0.0, scene_aabb_color),
+                  4.0 * vec4<f32>(vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension), 0.3)
               );
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
               AABB (
-                  4.0 * vec4<f32>(point_cloud_params.min_point, scene_aabb_color),
+                  4.0 * vec4<f32>(point_cloud_params.min_point, 0.0) + vec4<f32>(0.0, 0.0, 0.0, point_cloud_aabb_color),
                   4.0 * vec4<f32>(point_cloud_params.max_point * point_cloud_params.pc_scale_factor, 0.1)
               );
     }
-    let actual_index = point_cloud_params.thread_group_number * 1024u + global_id.x;
 
-    if (actual_index >= point_cloud_params.point_count) { return; }
+    // let actual_index = point_cloud_params.thread_group_number * 1024u + global_id.x;
+    //if (actual_index >= point_cloud_params.point_count) { return; }
 
-    var p = point_data[actual_index];
+    if (global_id.x >= point_cloud_params.point_count) { return; }
+
+    //var p = point_data[actual_index];
+    var p = point_data[global_id.x];
+
     p.position = p.position * point_cloud_params.pc_scale_factor;
+
     let nearest_cell = vec3<i32>(i32(round(f32(p.position.x))),
                                  i32(round(f32(p.position.y))),
                                  i32(round(f32(p.position.z))));
@@ -181,7 +187,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let dist_to_u32 = u32(dist * 1000000.0);
 
     // If inside update distance.
-    //if (inside && dist < 0.25) {
     if (inside && dist < 0.70710678) {
         let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
         atomicMin(&fmm_data[memory_index].value, dist_to_u32);
@@ -201,14 +206,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             atomicExchange(&fmm_data[memory_index].color, p.color);
             fmm_data[memory_index].tag = KNOWN;
 
-            output_arrow[atomicAdd(&counter[1], 1u)] =  
-                  Arrow (
-                      4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
-                      4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
-                      //fmm_data[memory_index].color,
-                      p.color,
-                      0.05
-            );
+            //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+            //++       Arrow (
+            //++           4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
+            //++           4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
+            //++           //fmm_data[memory_index].color,
+            //++           p.color,
+            //++           0.05
+            //++ );
         }
     }
 }

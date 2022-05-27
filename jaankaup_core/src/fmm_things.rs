@@ -378,6 +378,10 @@ impl PointCloudParamsBuffer {
     pub fn get_buffer(&self) -> &wgpu::Buffer {
         &self.pc_params_buffer
     }
+
+    pub fn get_point_count(&self) -> u32 {
+        self.pc_params.point_count
+    }
 }
 
 /// Struct that generates and owns point data buffer.
@@ -555,9 +559,70 @@ impl PointCloudHandler {
          self.compute_object_point_to_interface.dispatch(
              &self.point_to_interface_bind_groups,
              encoder,
-             1, 1, 1, Some("Point data to interface dispatch")
-             //udiv_up_safe32(total_grid_count, 1024), 1, 1, Some("Point data to interface dispatch")
+             //1, 1, 1, Some("Point data to interface dispatch")
+             udiv_up_safe32(self.point_cloud_params_buffer.pc_params.point_count, 1024), 1, 1, Some("Point data to interface dispatch")
          );
      }
 }
 
+pub struct FmmValueFixer {
+    compute_object: ComputeObject,
+    bind_groups: Vec<wgpu::BindGroup>,
+}
+
+impl FmmValueFixer {
+
+    pub fn init(device: &wgpu::Device,
+                fmm_params_buffer: &wgpu::Buffer,
+                fmm_data: &wgpu::Buffer,
+                ) -> Self {
+
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("fmm_value_fixer.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_value_fixer.wgsl"))),
+
+                    }),
+                    Some("FmmValueFixer ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage,read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string()
+        );
+
+        let bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                    &fmm_params_buffer.as_entire_binding(),
+                    &fmm_data.as_entire_binding(),
+                    ],
+                ]
+        );
+
+        Self {
+            compute_object: compute_object, 
+            bind_groups: bind_groups,
+        }
+    }
+
+    pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder, dispatch_dimensions: [u32; 3]) {
+
+        self.compute_object.dispatch(
+            &self.bind_groups,
+            encoder,
+            dispatch_dimensions[0], dispatch_dimensions[1], dispatch_dimensions[2], Some("Domain tester dispatch")
+        );
+    }
+}
