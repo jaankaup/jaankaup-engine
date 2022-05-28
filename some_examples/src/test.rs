@@ -1,6 +1,11 @@
 use jaankaup_core::common_functions::udiv_up_safe32;
 use jaankaup_algorithms::mc::{McParams, MarchingCubes};
-use jaankaup_core::common_functions::{create_buffer_bindgroup_layout, create_uniform_bindgroup_layout};
+use jaankaup_core::common_functions::{
+    create_buffer_bindgroup_layout,
+    create_uniform_bindgroup_layout,
+    set_bit_to,
+    get_bit,
+};
 use jaankaup_core::pc_parser::VVVC;
 use jaankaup_core::pc_parser::read_pc_data;
 use itertools::Itertools;
@@ -136,17 +141,18 @@ struct TestProject {
     compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
     compute_object_fmm_visualizer: ComputeObject,
     fmm_value_fixer: FmmValueFixer,
-    marching_cubes: MarchingCubes,
+    //mc marching_cubes: MarchingCubes,
     render_vvvvnnnn: Render_VVVVNNNN_camera,
     render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
-    show_marching_cubes: bool,
+    //mc show_marching_cubes: bool,
+    fmm_visualization_params: FmmVisualizationParams,
 }
 
 impl Application for TestProject {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
-        let show_marching_cubes = false;
+        //mc let show_marching_cubes = false;
         let show_numbers = false;
         let show_domain_tester = false;
         let point_cloud_draw_iterator = 0;
@@ -427,48 +433,48 @@ impl Application for TestProject {
 
         // MC Cubes stuff.
           
-        let mc_params = McParams {
-                base_position: [0.0, 0.0, 0.0, 1.0],
-                isovalue: 1.0,
-                cube_length: 1.0,
-                future_usage1: 0.0,
-                future_usage2: 0.0,
-                noise_global_dimension: [FMM_GLOBAL_X.try_into().unwrap(),
-                                         FMM_GLOBAL_Y.try_into().unwrap(),
-                                         FMM_GLOBAL_Z.try_into().unwrap(),
-                                         0
-                ],
-                noise_local_dimension: [FMM_INNER_X.try_into().unwrap(),
-                                        FMM_INNER_Y.try_into().unwrap(),
-                                        FMM_INNER_Z.try_into().unwrap(),
-                                        0
-                ],
-        };
+        //mc let mc_params = McParams {
+        //mc         base_position: [0.0, 0.0, 0.0, 1.0],
+        //mc         isovalue: 1.0,
+        //mc         cube_length: 1.0,
+        //mc         future_usage1: 0.0,
+        //mc         future_usage2: 0.0,
+        //mc         noise_global_dimension: [FMM_GLOBAL_X.try_into().unwrap(),
+        //mc                                  FMM_GLOBAL_Y.try_into().unwrap(),
+        //mc                                  FMM_GLOBAL_Z.try_into().unwrap(),
+        //mc                                  0
+        //mc         ],
+        //mc         noise_local_dimension: [FMM_INNER_X.try_into().unwrap(),
+        //mc                                 FMM_INNER_Y.try_into().unwrap(),
+        //mc                                 FMM_INNER_Z.try_into().unwrap(),
+        //mc                                 0
+        //mc         ],
+        //mc };
 
-        buffers.insert(
-            "mc_output".to_string(),
-            configuration.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Mc output buffer"),
-                size: OUTPUT_BUFFER_SIZE as u64, 
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            })
-        );
+        //mc buffers.insert(
+        //mc     "mc_output".to_string(),
+        //mc     configuration.device.create_buffer(&wgpu::BufferDescriptor {
+        //mc         label: Some("Mc output buffer"),
+        //mc         size: OUTPUT_BUFFER_SIZE as u64, 
+        //mc         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //mc         mapped_at_creation: false,
+        //mc     })
+        //mc );
 
-        let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("mc compute shader"),
-                        source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/mc_pc_data.wgsl"))),
-                        }
-        );
+        //mc let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        //mc                 label: Some("mc compute shader"),
+        //mc                 source: wgpu::ShaderSource::Wgsl(
+        //mc                     Cow::Borrowed(include_str!("../../assets/shaders/mc_pc_data.wgsl"))),
+        //mc                 }
+        //mc );
 
-        let mc_instance = MarchingCubes::init_with_noise_buffer(
-            &configuration.device,
-            &mc_params,
-            &mc_shader,
-            &buffers.get(&"pc_sample_data".to_string()).unwrap(),
-            &buffers.get(&"mc_output".to_string()).unwrap(),
-        );
+        //mc let mc_instance = MarchingCubes::init_with_noise_buffer(
+        //mc     &configuration.device,
+        //mc     &mc_params,
+        //mc     &mc_shader,
+        //mc     &buffers.get(&"pc_sample_data".to_string()).unwrap(),
+        //mc     &buffers.get(&"mc_output".to_string()).unwrap(),
+        //mc );
 
         // vvvvnnnn renderer.
         let render_vvvvnnnn = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
@@ -506,10 +512,11 @@ impl Application for TestProject {
             compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
             compute_object_fmm_visualizer: compute_object_fmm_visualizer,
             fmm_value_fixer: fmm_value_fixer,
-            marching_cubes: mc_instance,
+            //mc marching_cubes: mc_instance,
             render_vvvvnnnn: render_vvvvnnnn,
             render_vvvvnnnn_bg: render_vvvvnnnn_bg,
-            show_marching_cubes: show_marching_cubes,
+            //mc show_marching_cubes: show_marching_cubes,
+            fmm_visualization_params: fmm_visualization_params,
         }
     }
 
@@ -573,21 +580,21 @@ impl Application for TestProject {
             clear = false;
         }
 
-        if self.show_marching_cubes {
-            draw_indirect(
-                 &mut encoder,
-                 &view,
-                 self.screen.depth_texture.as_ref().unwrap(),
-                 &self.render_vvvvnnnn_bg,
-                 &self.render_vvvvnnnn.get_render_object().pipeline,
-                 &self.buffers.get("mc_output").unwrap(),
-                 self.marching_cubes.get_draw_indirect_buffer(),
-                 0,
-                 clear
-            );
+        //mc if self.show_marching_cubes {
+        //mc     draw_indirect(
+        //mc          &mut encoder,
+        //mc          &view,
+        //mc          self.screen.depth_texture.as_ref().unwrap(),
+        //mc          &self.render_vvvvnnnn_bg,
+        //mc          &self.render_vvvvnnnn.get_render_object().pipeline,
+        //mc          &self.buffers.get("mc_output").unwrap(),
+        //mc          self.marching_cubes.get_draw_indirect_buffer(),
+        //mc          0,
+        //mc          clear
+        //mc     );
 
-            clear = false;
-        }
+        //mc     clear = false;
+        //mc }
     
         queue.submit(Some(encoder.finish())); 
     
@@ -606,7 +613,7 @@ impl Application for TestProject {
         self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.marching_cubes.reset_counter_value(device, queue);
+        //mc self.marching_cubes.reset_counter_value(device, queue);
     }
     
     #[allow(unused)]
@@ -629,6 +636,46 @@ impl Application for TestProject {
                    self.cell_iterator = temp_coordinate; 
                }
         }
+
+
+        // Fmm visualizer.  
+
+        // Far.
+        if self.keyboard_manager.test_key(&Key::Key1, input) {
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 0) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 0, bit);
+        }
+
+        // Band.
+        if self.keyboard_manager.test_key(&Key::Key2, input) {
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 1) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 1, bit);
+        }
+
+        // Known.
+        if self.keyboard_manager.test_key(&Key::Key3, input) {
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 2) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 2, bit);
+        }
+        
+        // Numbers.
+        if self.keyboard_manager.test_key(&Key::N, input) {
+            let bit = if get_bit(self.fmm_visualization_params.visualization_method, 6) == 0 { true } else { false };
+            self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 6, bit);
+        }
+
+
+        println!("{:#008b}", self.fmm_visualization_params.visualization_method);
+
+        queue.write_buffer(
+            &self.buffers.get(&"fmm_visualization_params".to_string()).unwrap(),
+            0,
+            bytemuck::cast_slice(&[self.fmm_visualization_params])
+        );
+        // if self.keys.test_key(&Key::Key4, input) {
+        //     let bit = if get_bit(self.fmm_visualization_params.visualization_method, 3) == 0 { true } else { false };
+        //     self.fmm_visualization_params.visualization_method = set_bit_to(self.fmm_visualization_params.visualization_method, 3, bit);
+        // }
     
         // if self.keyboard_manager.test_key(&Key::Key0, input) {
         //     if self.point_cloud_draw_iterator * 1024 + 1024 < self.point_cloud.get_point_count() {
@@ -657,9 +704,9 @@ impl Application for TestProject {
             self.show_numbers = !self.show_numbers;
             self.domain_tester.update_show_numbers(queue, self.show_numbers);
         }
-        if self.keyboard_manager.test_key(&Key::M, input) {
-            self.show_marching_cubes = !self.show_marching_cubes;
-        }
+        //mc if self.keyboard_manager.test_key(&Key::M, input) {
+        //mc     self.show_marching_cubes = !self.show_marching_cubes;
+        //mc }
     }
     
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {
@@ -727,21 +774,21 @@ impl Application for TestProject {
             self.domain_tester.dispatch(&mut encoder);
         }
 
+        self.point_cloud_handler.point_data_to_interface(&mut encoder);
         self.fmm_value_fixer.dispatch(&mut encoder,
                                       [udiv_up_safe32(self.point_cloud.get_point_count(), 1024), 1, 1]);
+        // println!("udiv_up_safe32({}, 1024, 1, 1) == {}", self.point_cloud.get_point_count(),  udiv_up_safe32(self.point_cloud.get_point_count(), 1024));
 
-        self.point_cloud_handler.point_data_to_interface(&mut encoder);
+        self.compute_object_fmm_visualizer.dispatch(
+            &self.compute_bind_groups_fmm_visualizer,
+            &mut encoder,
+            (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+            Some("fmm visualizer dispatch")
+        );
 
-        // self.compute_object_fmm_visualizer.dispatch(
-        //     &self.compute_bind_groups_fmm_visualizer,
-        //     &mut encoder,
-        //     (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-        //     Some("fmm visualizer dispatch")
-        // );
-
-        if self.show_marching_cubes { 
-            self.marching_cubes.dispatch(&mut encoder, total_grid_count as u32 / 256, 1, 1);
-        }
+        //mc if self.show_marching_cubes { 
+        //mc     self.marching_cubes.dispatch(&mut encoder, total_grid_count as u32 / 256, 1, 1);
+        //mc }
     
         queue.submit(Some(encoder.finish())); 
     }
@@ -855,8 +902,12 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Key9, 5.0);
         keys.register_key(Key::Key0, 5.0);
         keys.register_key(Key::Return, 50.0);
+        keys.register_key(Key::Key1, 50.0);
+        keys.register_key(Key::Key2, 50.0);
+        keys.register_key(Key::Key3, 50.0);
+        keys.register_key(Key::Key4, 50.0);
+        //mc keys.register_key(Key::M, 50.0);
         keys.register_key(Key::N, 50.0);
-        keys.register_key(Key::M, 50.0);
         
         keys
 }

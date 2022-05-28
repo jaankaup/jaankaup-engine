@@ -605,8 +605,8 @@ impl FmmValueFixer {
                 &compute_object.bind_group_layouts,
                 &vec![
                     vec![
-                    &fmm_params_buffer.as_entire_binding(),
-                    &fmm_data.as_entire_binding(),
+                        &fmm_params_buffer.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
                     ],
                 ]
         );

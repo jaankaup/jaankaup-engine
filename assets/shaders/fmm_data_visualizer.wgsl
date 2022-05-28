@@ -22,8 +22,8 @@ struct Char {
     auxiliary_data: u32,
 };
 
-let FONT_SIZE = 0.015;
-let AABB_SIZE = 0.026;
+let FONT_SIZE = 0.25;
+let AABB_SIZE = 0.26;
 
 // FMM tags
 // 0 :: Far
@@ -326,18 +326,18 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
     let color_known = rgba_u32(0u, 255u, 0u, 255u);
-    let color_text = rgba_u32(155u, 0u, 155u, 255u);
-    var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_known, color_far, 0u);
+    let color_text = rgba_u32(255u, 255u, 255u, 255u);
+    var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_band, color_known, 0u);
     //let colors_ptr = &colors;
 
     var col = colors[cell.tag];
 
     // TODO: spaces!
-    let value = vec4<f32>(f32(cell.value), 0.0, 0.0, 0.0);
+    let value = vec4<f32>(cell.value, 0.0, 0.0, 0.0);
     let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
     let element_position = position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.25, 0.0, -AABB_SIZE - 0.001);
     let renderable_element = Char (
-                    element_position,
+                    4.0 * element_position,
                     FONT_SIZE,
                     value,
                     1u,
@@ -349,13 +349,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if ((fmm_visualization_params.visualization_method & 1u) != 0u && cell.tag == FAR) {
 
         visualize_cell(position, col);
+
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 
             output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
-         }
+        }
     }
+
     if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
         visualize_cell(position, col);
+
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 
             output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
@@ -363,12 +366,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
 
     if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
-        //col = cell.color;
-        visualize_cell(position, cell.color);
-        // if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+                           
+        // visualize_cell(position, cell.color);
+        visualize_cell(position, col);
 
-        //     output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
-        // }
+        if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
+
+            output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+        }
     }
 
     //++ let ranged_color = mapRange(0.0, 100.0, 0.0, 255.0, speed);

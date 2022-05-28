@@ -36,13 +36,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     var cell = fmm_data[global_id.x];
 
+    //mc // Convert value back to f32.
+    //mc if (cell.tag == KNOWN) {
+    //mc     cell.value = bitcast<u32>(f32(cell.value) * (-1.0) * 0.0001);
+    //mc }
+    //mc else {
+    //mc     cell.value = bitcast<u32>(1.0);
+    //mc }
+
     // Convert value back to f32.
     if (cell.tag == KNOWN) {
-        cell.value = bitcast<u32>(f32(cell.value) * (-1.0) * 0.0001);
+        cell.value = bitcast<u32>(f32(cell.value) * 0.00001);
     }
     else {
-        cell.value = bitcast<u32>(1.0);
+        cell.value = bitcast<u32>(1.4);
     }
 
-    fmm_data[global_id.x].value = cell.value; 
+    fmm_data[global_id.x].value = bitcast<u32>(cell.value); 
 }
