@@ -357,7 +357,7 @@ fn calculate_density(v: vec3<i32>) -> f32 {
         v.z < 0 ||
         v.x >= i32(mc_uniform.noise_local_dimension.x * mc_uniform.noise_global_dimension.x) ||
         v.y >= i32(mc_uniform.noise_local_dimension.y * mc_uniform.noise_global_dimension.y) ||
-        v.z >= i32(mc_uniform.noise_local_dimension.z * mc_uniform.noise_global_dimension.z)) { return -10.0; }
+        v.z >= i32(mc_uniform.noise_local_dimension.z * mc_uniform.noise_global_dimension.z)) { return 10.0; }
 
     let stride = mc_uniform.noise_local_dimension.x * mc_uniform.noise_local_dimension.y * mc_uniform.noise_local_dimension.z;
 

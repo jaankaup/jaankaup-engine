@@ -37,13 +37,13 @@ use bytemuck::{Pod, Zeroable};
 const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
-const MAX_NUMBER_OF_AABBS:      usize =  262144; //TOTAL_INDICES;
+const MAX_NUMBER_OF_AABBS:      usize =  TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
 const MAX_NUMBER_OF_AABB_WIRES: usize =  40960;
 
 /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-const MAX_NUMBER_OF_CHARS:      usize =  262144; //TOTAL_INDICES;
+const MAX_NUMBER_OF_CHARS:      usize =  TOTAL_INDICES;
 
 /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
 const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
@@ -54,9 +54,9 @@ const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 const CLOUD_DATA: &'static str = "CLOUD_DATA";
 
 /// Global dimensions. 
-const FMM_GLOBAL_X: usize = 64; 
-const FMM_GLOBAL_Y: usize = 16; 
-const FMM_GLOBAL_Z: usize = 64; 
+const FMM_GLOBAL_X: usize = 32; 
+const FMM_GLOBAL_Y: usize = 8; 
+const FMM_GLOBAL_Z: usize = 32; 
 
 /// Inner dimensions.
 const FMM_INNER_X: usize = 4; 
@@ -71,7 +71,7 @@ const OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
                                  FMM_INNER_X *
                                  FMM_INNER_Y *
                                  FMM_INNER_Z *
-                                 size_of::<f32>()) as u32 * 3;
+                                 size_of::<f32>()) as u32 * 8;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -139,12 +139,14 @@ struct TestProject {
     marching_cubes: MarchingCubes,
     render_vvvvnnnn: Render_VVVVNNNN_camera,
     render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
+    show_marching_cubes: bool,
 }
 
 impl Application for TestProject {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
+        let show_marching_cubes = false;
         let show_numbers = false;
         let show_domain_tester = false;
         let point_cloud_draw_iterator = 0;
@@ -427,7 +429,7 @@ impl Application for TestProject {
           
         let mc_params = McParams {
                 base_position: [0.0, 0.0, 0.0, 1.0],
-                isovalue: 0.0,
+                isovalue: 1.0,
                 cube_length: 1.0,
                 future_usage1: 0.0,
                 future_usage2: 0.0,
@@ -507,6 +509,7 @@ impl Application for TestProject {
             marching_cubes: mc_instance,
             render_vvvvnnnn: render_vvvvnnnn,
             render_vvvvnnnn_bg: render_vvvvnnnn_bg,
+            show_marching_cubes: show_marching_cubes,
         }
     }
 
@@ -541,16 +544,16 @@ impl Application for TestProject {
     
         let mut clear = true;
     
-        //++ draw(&mut encoder,
-        //++      &view,
-        //++      self.screen.depth_texture.as_ref().unwrap(),
-        //++      &self.triangle_mesh_bindgroups,
-        //++      &self.triangle_mesh_renderer.get_render_object().pipeline,
-        //++      &fire_tower.get_buffer(),
-        //++      0..3,
-        //++      //0..fire_tower.get_triangle_count() * 3, 
-        //++      clear
-        //++ );
+        draw(&mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.triangle_mesh_bindgroups,
+             &self.triangle_mesh_renderer.get_render_object().pipeline,
+             &fire_tower.get_buffer(),
+             0..3,
+             //0..fire_tower.get_triangle_count() * 3, 
+             clear
+        );
     
         //++ clear = false;
         // println!("{}", self.point_count);
@@ -570,19 +573,21 @@ impl Application for TestProject {
             clear = false;
         }
 
-        draw_indirect(
-             &mut encoder,
-             &view,
-             self.screen.depth_texture.as_ref().unwrap(),
-             &self.render_vvvvnnnn_bg,
-             &self.render_vvvvnnnn.get_render_object().pipeline,
-             &self.buffers.get("mc_output").unwrap(),
-             self.marching_cubes.get_draw_indirect_buffer(),
-             0,
-             clear
-        );
+        if self.show_marching_cubes {
+            draw_indirect(
+                 &mut encoder,
+                 &view,
+                 self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_vvvvnnnn_bg,
+                 &self.render_vvvvnnnn.get_render_object().pipeline,
+                 &self.buffers.get("mc_output").unwrap(),
+                 self.marching_cubes.get_draw_indirect_buffer(),
+                 0,
+                 clear
+            );
 
             clear = false;
+        }
     
         queue.submit(Some(encoder.finish())); 
     
@@ -651,6 +656,9 @@ impl Application for TestProject {
         if self.keyboard_manager.test_key(&Key::N, input) {
             self.show_numbers = !self.show_numbers;
             self.domain_tester.update_show_numbers(queue, self.show_numbers);
+        }
+        if self.keyboard_manager.test_key(&Key::M, input) {
+            self.show_marching_cubes = !self.show_marching_cubes;
         }
     }
     
@@ -731,7 +739,9 @@ impl Application for TestProject {
         //     Some("fmm visualizer dispatch")
         // );
 
-        self.marching_cubes.dispatch(&mut encoder, total_grid_count as u32 / 256, 1, 1);
+        if self.show_marching_cubes { 
+            self.marching_cubes.dispatch(&mut encoder, total_grid_count as u32 / 256, 1, 1);
+        }
     
         queue.submit(Some(encoder.finish())); 
     }
@@ -846,6 +856,7 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Key0, 5.0);
         keys.register_key(Key::Return, 50.0);
         keys.register_key(Key::N, 50.0);
+        keys.register_key(Key::M, 50.0);
         
         keys
 }
