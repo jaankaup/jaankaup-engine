@@ -49,7 +49,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         cell.value = bitcast<u32>(f32(cell.value) * 0.00001);
     }
     else {
-        cell.value = bitcast<u32>(1.4);
+        cell.value = bitcast<u32>(0.1);
     }
 
     fmm_data[global_id.x].value = bitcast<u32>(cell.value); 

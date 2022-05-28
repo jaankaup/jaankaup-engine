@@ -8,11 +8,10 @@ let BAND     = 1u;
 let KNOWN    = 2u;
 
 /// A struct for one fast marching methow cell.
-struct FmmCell {
+struct FmmCellPc {
     tag: atomic<u32>,
     value: f32,
-    update: atomic<u32>,
-    misc: u32,
+    color: u32,
 };
 
 /// A struct that holds information for a single computational domain area.
@@ -20,30 +19,23 @@ struct FmmBlock {
     index: u32,
     band_point_count: u32,
 };
+@group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+@group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCellPc>;
 
-//
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |   |   |   |   |   |   |   |   |   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |   |   |   |   |   |   |   |   |   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |   |   |   |   |   |   |   |   |   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |   |   |   |   |   |   |   |   |   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |   |   |   |   |   |   |   |   |   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |   |   |   |   |   |   |   |   |   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |   |   |   |   |   |   |   |   |   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// |c12|c13|c14|c15|c28|c29|c30|c31|   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// | c8| c9|c10|c11|c24|c25|c26|c27|   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// | c4| c5| c6| c7|c20|c21|c22|c23|   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
-// | c0| c1| c2| c3|c16|c17|c18|c19|   |   |   |
-// +---+---+---+---+---+---+---+---+---+---+---+ 
+@group(0) @binding(2)
+var<storage, read_write> temp_prefix_sum: array<u32>;
 
+// debug.
+@group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+@group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
+@group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
+@group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
+@group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
 
+@compute
+@workgroup_size(1024,1,1)
+fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
+        @builtin(local_invocation_index) local_index: u32,
+        @builtin(global_invocation_id)   global_id: vec3<u32>) {
+
+}

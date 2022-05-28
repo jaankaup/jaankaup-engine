@@ -16,6 +16,7 @@ pub mod render_things;
 pub mod shaders;
 pub mod fmm_things;
 pub mod pc_parser;
+pub mod fast_marching_method;
 pub use wgpu;
 pub use winit;
 pub use log;
