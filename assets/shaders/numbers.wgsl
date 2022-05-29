@@ -462,7 +462,7 @@ fn my_modf(f: f32) -> ModF {
 /// if the given integer is < 0, return 0. Otherwise 1 is returned.
 fn the_sign_of_i32(n: i32) -> u32 {
     return (u32(n) >> 31u);
-    //return 1u ^ (u32(n) >> 31u);
+    // return 1u ^ (u32(n) >> 31u);
 }
 
 fn abs_i32(n: i32) -> u32 {
@@ -518,7 +518,9 @@ fn number_of_chars_i32(n: i32) -> u32 {
 fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
 
     let m = my_modf(f);
-    return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u;
+    let minus = select(0u, 1u, m.fract < 0.0 && i32(m.whole) == 0); // New
+    return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u + minus;
+
 }
 
 fn log_number_new(
@@ -582,6 +584,13 @@ fn log_f32_fract(
 fn log_float(f: f32, max_decimals: u32, base_pos: ptr<function, vec3<f32>>, total_vertex_count: u32, col: u32, font_size: f32) {
 
     let m = my_modf(f);
+    
+    // Create minus for -0.xxxx.
+    if (i32(m.whole) == 0 && f < 0.0) {
+        create_char(10u, total_vertex_count, *base_pos, col, font_size);
+        *base_pos = *base_pos + vec3<f32>(0.7, 0.0, 0.0) * font_size;
+    }
+
     log_number_new(i32(m.whole), base_pos, total_vertex_count, col, font_size);
 
     *base_pos = *base_pos - vec3<f32>(0.1, 0.0, 0.0) * font_size;

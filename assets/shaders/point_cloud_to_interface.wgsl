@@ -31,6 +31,11 @@ struct FmmCellPc {
     color: atomic<u32>,
 }
 
+struct ModF {
+    fract: f32,
+    whole: f32,
+};
+
 // Debugging.
 struct AABB {
     min: vec4<f32>, 
@@ -67,6 +72,20 @@ struct Arrow {
 @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
 @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
 @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+
+fn my_modf(f: f32) -> ModF {
+    let iptr = trunc(f);
+    let fptr = f - iptr;
+    return ModF (
+        select(fptr, (-1.0)*fptr, f < 0.0),
+        iptr
+    );
+}
+
+fn udiv_up_safe32(x: u32, y: u32) -> u32 {
+    let tmp = (x + y - 1u) / y;
+    return select(tmp, 0u, y == 0u); 
+}
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
     var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
@@ -139,6 +158,8 @@ fn get_cell_mem_location(v: vec3<u32>) -> u32 {
     return global_index + local_index; 
 }
 
+// fn sdSphere(p: vec3<f32>, s: f32 ) { return length(p)-s; }
+
 @compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -163,57 +184,67 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
               );
     }
 
-    // let actual_index = point_cloud_params.thread_group_number * 1024u + global_id.x;
-    //if (actual_index >= point_cloud_params.point_count) { return; }
+    let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
 
-    if (global_id.x >= point_cloud_params.point_count) { return; }
+    for (var i: u32 = 0u; i < number_of_chunks; i = i + 1u) { 
 
-    //var p = point_data[actual_index];
-    var p = point_data[global_id.x];
+        let actual_index = i * 1024u + local_index;
 
-    p.position = p.position * point_cloud_params.pc_scale_factor;
+        if (actual_index < point_cloud_params.point_count) {
 
-    let nearest_cell = vec3<i32>(i32(round(f32(p.position.x))),
-                                 i32(round(f32(p.position.y))),
-                                 i32(round(f32(p.position.z))));
+            var p = point_data[actual_index];
 
-    // Check if cell is inside the computational domain.
-    let inside = isInside(nearest_cell);
+            p.position = p.position * point_cloud_params.pc_scale_factor;
 
-    // Calculate the distance between point and nearest cell.
-    let dist = distance(p.position, vec3<f32>(nearest_cell));
+            let nearest_cell = vec3<i32>(i32(round(f32(p.position.x))),
+                                         i32(round(f32(p.position.y))),
+                                         i32(round(f32(p.position.z))));
 
-    // 0.045 => 45000
-    let dist_to_u32 = u32(dist * 100000.0);
+            // Check if cell is inside the computational domain.
+            let inside = isInside(nearest_cell);
 
-    // If inside update distance.
-    if (inside && dist < 0.70710678) {
-        let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
-        atomicMin(&fmm_data[memory_index].value, dist_to_u32);
-    }
+            // Calculate the distance between point and nearest cell. 0.1 is the radius of the ball.
+            let dist = distance(p.position, vec3<f32>(nearest_cell)) - 1.0;
 
-    // workgroupBarrier(); 
-    storageBarrier(); 
+            // 0.045 => 45000
+            var dist_to_u32 = u32(abs(dist) * 1000000.0);
 
-    if (inside && dist < 0.70710678) {
+            // If inside update distance.
+            if (inside && abs(dist) < 0.70710678) {
+                
+                let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
+                atomicMin(&fmm_data[memory_index].value, dist_to_u32);
+            }
+        } // if
 
-        let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
-        let final_value = fmm_data[memory_index].value;
+        // workgroupBarrier(); 
+        storageBarrier(); 
 
-        // Update the color and tag.
-        if (final_value == dist_to_u32) {
+        if (actual_index < point_cloud_params.point_count && inside && abs(dist) < 0.70710678) {
 
-            atomicExchange(&fmm_data[memory_index].color, p.color);
-            fmm_data[memory_index].tag = KNOWN;
+            let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
 
-            //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
-            //++       Arrow (
-            //++           4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
-            //++           4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
-            //++           //fmm_data[memory_index].color,
-            //++           p.color,
-            //++           0.05
-            //++ );
+            var final_value = fmm_data[memory_index].value;
+
+            // Update the color and tag.
+            if (final_value == dist_to_u32) {
+
+                // Add sign.
+                if (dist < 0.0) { final_value = final_value | (1u << 31u); } 
+
+                atomicExchange(&fmm_data[memory_index].color, p.color);
+                fmm_data[memory_index].tag = KNOWN;
+                atomicExchange(&fmm_data[memory_index].value, final_value);
+
+                //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+                //++       Arrow (
+                //++           4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
+                //++           4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
+                //++           //fmm_data[memory_index].color,
+                //++           p.color,
+                //++           0.05
+                //++ );
+            }
         }
     }
 }

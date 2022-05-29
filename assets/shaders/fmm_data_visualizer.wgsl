@@ -175,8 +175,16 @@ fn number_of_chars_i32(n: i32) -> u32 {
 fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
 
     let m = my_modf(f);
-    return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u;
+    let minus = select(0u, 1u, m.fract < 0.0 && i32(m.whole) == 0); // New
+    return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u + minus;
 }
+
+//++ fn number_of_chars_f32(f: f32, number_of_decimals: u32) -> u32 {
+//++ 
+//++     let m = my_modf(f);
+//++     return number_of_chars_i32(i32(m.whole)) + number_of_decimals + 1u;
+//++ }
+
 
 // dots, brachets
 // vec_dim_count == 0   _  not used

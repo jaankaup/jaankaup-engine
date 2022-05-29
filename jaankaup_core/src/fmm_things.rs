@@ -559,8 +559,8 @@ impl PointCloudHandler {
          self.compute_object_point_to_interface.dispatch(
              &self.point_to_interface_bind_groups,
              encoder,
-             //1, 1, 1, Some("Point data to interface dispatch")
-             udiv_up_safe32(self.point_cloud_params_buffer.pc_params.point_count, 1024), 1, 1, Some("Point data to interface dispatch")
+             1, 1, 1, Some("Point data to interface dispatch")
+             // udiv_up_safe32(self.point_cloud_params_buffer.pc_params.point_count, 1024), 1, 1, Some("Point data to interface dispatch")
          );
      }
 }
