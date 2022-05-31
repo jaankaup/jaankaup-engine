@@ -186,6 +186,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
 
+    let min_distance = 0.70710678;
+
     for (var i: u32 = 0u; i < number_of_chunks; i = i + 1u) { 
 
         let actual_index = i * 1024u + local_index;
@@ -196,21 +198,22 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
             p.position = p.position * point_cloud_params.pc_scale_factor;
 
-            let nearest_cell = vec3<i32>(i32(round(f32(p.position.x))),
-                                         i32(round(f32(p.position.y))),
-                                         i32(round(f32(p.position.z))));
+            let nearest_cell = vec3<i32>(i32(round(p.position.x)),
+                                         i32(round(p.position.y)),
+                                         i32(round(p.position.z)));
 
             // Check if cell is inside the computational domain.
             let inside = isInside(nearest_cell);
 
             // Calculate the distance between point and nearest cell. 0.1 is the radius of the ball.
-            let dist = distance(p.position, vec3<f32>(nearest_cell)) - 1.0;
+            let dist = distance(p.position, vec3<f32>(nearest_cell)); // - min_distance;
 
             // 0.045 => 45000
             var dist_to_u32 = u32(abs(dist) * 1000000.0);
 
             // If inside update distance.
-            if (inside && abs(dist) < 0.70710678) {
+            //if (inside && abs(dist) < min_distance) {
+            if (inside) {
                 
                 let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
                 atomicMin(&fmm_data[memory_index].value, dist_to_u32);
@@ -220,7 +223,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         // workgroupBarrier(); 
         storageBarrier(); 
 
-        if (actual_index < point_cloud_params.point_count && inside && abs(dist) < 0.70710678) {
+        // if (actual_index < point_cloud_params.point_count && inside && abs(dist) < min_distance) {
+        if (actual_index < point_cloud_params.point_count && inside) {
 
             let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
 

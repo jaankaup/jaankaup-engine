@@ -37,7 +37,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     var cell = fmm_data[global_id.x];
     let the_sign = select(1.0, -1.0, (cell.value >> 31u) != 0u); 
     // let the_sign = select(1.0, -1.0, (cell.value & (1u << 31u)) != 0u); 
-    //let the_sign = select(555.0, 666.0, (cell.value & (1u << 31u)) != 0u); 
 
     //mc // Convert value back to f32.
     //mc if (cell.tag == KNOWN) {
@@ -50,7 +49,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // Convert value back to f32.
     if (cell.tag == KNOWN) {
         cell.value = bitcast<u32>(f32(cell.value & (!(1u << 31u))) * 0.000001 * the_sign);
-        //cell.value = bitcast<u32>(the_sign * select(0.6, 0.5, the_sign < 0.0));;
     }
     else {
         cell.value = bitcast<u32>(1.0);

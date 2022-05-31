@@ -42,13 +42,13 @@ use bytemuck::{Pod, Zeroable};
 const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
-const MAX_NUMBER_OF_AABBS:      usize = 1024; //  TOTAL_INDICES;
+const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
 const MAX_NUMBER_OF_AABB_WIRES: usize =  40960;
 
 /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-const MAX_NUMBER_OF_CHARS:      usize = 1024; //  TOTAL_INDICES;
+const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 
 /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
 const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
@@ -59,9 +59,9 @@ const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 const CLOUD_DATA: &'static str = "CLOUD_DATA";
 
 /// Global dimensions. 
-const FMM_GLOBAL_X: usize = 64; // 32; 
-const FMM_GLOBAL_Y: usize = 16; // 8; 
-const FMM_GLOBAL_Z: usize = 64; // 32; 
+const FMM_GLOBAL_X: usize = 32; 
+const FMM_GLOBAL_Y: usize = 8; 
+const FMM_GLOBAL_Z: usize = 32; 
 
 /// Inner dimensions.
 const FMM_INNER_X: usize = 4; 
@@ -780,12 +780,14 @@ impl Application for TestProject {
                                       [udiv_up_safe32(self.point_cloud.get_point_count(), 1024), 1, 1]);
         // println!("udiv_up_safe32({}, 1024, 1, 1) == {}", self.point_cloud.get_point_count(),  udiv_up_safe32(self.point_cloud.get_point_count(), 1024));
 
-        // self.compute_object_fmm_visualizer.dispatch(
-        //     &self.compute_bind_groups_fmm_visualizer,
-        //     &mut encoder,
-        //     (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-        //     Some("fmm visualizer dispatch")
-        // );
+        if self.fmm_visualization_params.visualization_method != 0 {
+            self.compute_object_fmm_visualizer.dispatch(
+                &self.compute_bind_groups_fmm_visualizer,
+                &mut encoder,
+                (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+                Some("fmm visualizer dispatch")
+            );
+        }
 
          if self.once {
              self.marching_cubes.dispatch(&mut encoder, total_grid_count as u32 / 256, 1, 1);
