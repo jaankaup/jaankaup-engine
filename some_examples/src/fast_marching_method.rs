@@ -1,3 +1,4 @@
+use jaankaup_core::radix::KeyMemoryIndex;
 use std::mem::size_of;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -25,6 +26,7 @@ use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_core::render_object::{draw, draw_indirect};
+use jaankaup_core::radix::{RadixSort};
 
 /// Max number of arrows for gpu debugger.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -96,7 +98,7 @@ struct FastMarchingMethod {
     triangle_mesh_renderer: Render_VVVVNNNN_camera,
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
-    triangle_meshes: HashMap<String, TriangleMesh>,
+    radix_sort: RadixSort,
 }
 
 impl Application for FastMarchingMethod {
@@ -150,22 +152,19 @@ impl Application for FastMarchingMethod {
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-        // Container for triangle meshes.
-        let mut triangle_meshes: HashMap<String, TriangleMesh> = HashMap::new();
+        let radix_input_buffer = buffer_from_data::<KeyMemoryIndex>(
+            &configuration.device,
+            &vec![KeyMemoryIndex { key: 123, memory_location: 55, }  ; 2555 as usize],
 
-        // Load fire tower mesh.
-        let fire_tower_mesh = load_vvvnnn_mesh(
-                         &configuration.device,
-                         include_str!("../../assets/models/wood.obj")[..].to_string(),
-                         FIRE_TOWER_MESH,
-                         2.0,
-                         [50.0, 25.0, 50.0],
-                         [11, 0, 155]
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None
         );
 
-        triangle_meshes.insert(
-            FIRE_TOWER_MESH.to_string(),
-            fire_tower_mesh);
+        // Radix sort
+        let radix_sort = RadixSort::init(&configuration.device, &radix_input_buffer, 128);
+
+        // Store radix input buffer. TODO: create a better sample buffer.
+        buffers.insert("radix_buffer".to_string(), radix_input_buffer);
 
         Self {
             camera: camera,
@@ -178,7 +177,7 @@ impl Application for FastMarchingMethod {
             triangle_mesh_renderer: triangle_mesh_renderer,
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
-            triangle_meshes: triangle_meshes,
+            radix_sort: radix_sort,
         }
     }
 
@@ -201,8 +200,6 @@ impl Application for FastMarchingMethod {
         });
 
         let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let fire_tower = self.triangle_meshes.get(&FIRE_TOWER_MESH.to_string()).unwrap();
 
         let mut clear = true;
 
@@ -277,7 +274,7 @@ fn create_gpu_debugger(device: &wgpu::Device,
                        sc_desc: &wgpu::SurfaceConfiguration,
                        camera: &mut Camera) -> GpuDebugger {
 
-        GpuDebugger::Init(
+        GpuDebugger::init(
                 &device,
                 &sc_desc,
                 &camera.get_camera_uniform(&device),
@@ -287,6 +284,7 @@ fn create_gpu_debugger(device: &wgpu::Device,
                 MAX_NUMBER_OF_AABBS.try_into().unwrap(),
                 MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
                 64,
+                1.0,
         )
 }
 
