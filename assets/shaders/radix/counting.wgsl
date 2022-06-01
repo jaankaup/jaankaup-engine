@@ -39,32 +39,25 @@ fn extract_digit_8(key: u32, group: u32) -> u32 {
     return (key & (0x000000ffu << shift)) >> shift;
 }
 
-@compute
-@workgroup_size(1024,1,1)
-fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
-        @builtin(local_invocation_index) local_index: u32,
-        @builtin(workgroup_id) work_group_id: vec3<u32>,
-        @builtin(global_invocation_id)   global_id: vec3<u32>) {
-
-        let key_block = KeyBlock(0u, 1024u, 5u, 2096u);
-
-        // Reset histogram.
+// fn format_local_histogram(local_index: ptr<function, u32>) {
+fn format_local_histogram(local_index: u32) {
 
         if (local_index < 256u) {
             local_radix256_histogram[local_index] = 0u;
         }
 
         workgroupBarrier();
+}
 
-        // Load keys.
+fn local_count(local_index: u32, workgroup_index: u32) {
 
         for (var i: u32 = 0u; i < KPT ; i = i + 1u) {
 
             // without bucket offset.
-            let key_index = 1024u * KPT * work_group_id.x + local_index + 1024u * i; 
+            let key_index = 1024u * KPT * workgroup_index + local_index + 1024u * i; 
 
             // If the thread index is smaller than key count, load the key and do the count.
-            if (key_index < 30000u) { //key_block.key_count) 
+            if (key_index < 130000u) { //key_block.key_count) 
 
                 // Get the key-value pair.
                 let data = data1[key_index]; // + key_block.bucket_offset];
@@ -74,10 +67,30 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         // Do we need this?
         workgroupBarrier();
+}
 
-        // Update global histogram.
-        
+fn update_global_histogram(local_index: u32) {
+
         if (local_index < 256u) {
             atomicAdd(&global_histogram[local_index], local_radix256_histogram[local_index]);
         }
+}
+
+fn counting_sort(local_index: u32, workgroup_index: u32) {
+
+        format_local_histogram(local_index);
+        local_count(local_index, workgroup_index);
+        update_global_histogram(local_index);
+}
+
+@compute
+@workgroup_size(1024,1,1)
+fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
+        @builtin(local_invocation_index) local_index: u32,
+        @builtin(workgroup_id) workgroup_id: vec3<u32>,
+        @builtin(global_invocation_id)   global_id: vec3<u32>) {
+
+        // let key_block = KeyBlock(0u, 1024u, 5u, 2096u);
+        counting_sort(local_index, workgroup_id.x);
+
 }

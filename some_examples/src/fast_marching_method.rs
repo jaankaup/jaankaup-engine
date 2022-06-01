@@ -153,7 +153,7 @@ impl Application for FastMarchingMethod {
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-        let key_count: u32 = 30000;
+        let key_count: u32 = 130000;
 
         let mut rng = rand::thread_rng();
         let mut radix_test_data: Vec<KeyMemoryIndex> = Vec::with_capacity(key_count as usize);
