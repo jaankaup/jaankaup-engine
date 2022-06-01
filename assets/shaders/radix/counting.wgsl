@@ -1,5 +1,13 @@
 // Keys per thread.
 let KPT = 8u;
+let KP_BITONIC = 3u;
+let NUMBER_OF_THREADS = 1024u;
+
+struct Bucket {
+    bucket_id: u32,
+    bucket_offset: u32,
+    size: u32,
+}; 
 
 struct KeyMemoryIndex {
     key: u32,
@@ -23,11 +31,48 @@ var<storage, read_write> data2: array<KeyMemoryIndex>;
 var<storage, read_write> global_histogram: array<atomic<u32>>;
 
 var<workgroup> local_radix256_histogram: array<atomic<u32>, 256>;
-//++ var<private> private_keys: array<KeyMemoryIndex, KPT>;
+var<workgroup> bitonic_temp: array<KeyMemoryIndex , 3072>;
+// var<workgroup> bitonic_temp: array<u32 ; NUMBER_OF_THREADS * KP_BITONIC>;
 
 fn udiv_up_safe32(x: u32, y: u32) -> u32 {
     let tmp = (x + y - 1u) / y;
     return select(tmp, 0u, y == 0u); 
+}
+
+// Bitonic sort.
+//++ fn bitonic(thread_index: u32) {
+//++ 
+//++   for (var k: u32 = 2u; k <= NUMBER_OF_THREADS; k = k << 1u) {
+//++   for (var j: u32 = k >> 1u ; j > 0u; j = j >> 1u) {
+//++     workgroupBarrier();
+//++ 
+//++     let index = thread_index; 
+//++     let ixj = index ^ j;
+//++     let a = workgroup_chars[index];
+//++     let b = workgroup_chars[ixj];
+//++     let draw_index_a = get_draw_index(a.auxiliary_data);
+//++     let draw_index_b = get_draw_index(b.auxiliary_data);
+//++ 
+//++     if (ixj > index && (((index & k) == 0u && draw_index_a > draw_index_b) || ((index & k) != 0u && draw_index_a < draw_index_b)) ) {
+//++             workgroup_chars[index] = b;
+//++             workgroup_chars[ixj] = a;
+//++     }
+//++   }};
+//++ }
+
+fn load_keys_to_bitonic_temp(bucket: ptr<function, Bucket>, local_index: u32) {
+
+    for (var i:u32 = 0u ; i < KP_BITONIC ; i = i + 1u) {
+
+        let key_index = local_index + NUMBER_OF_THREADS * i; 
+
+        if (key_index < (*bucket).size) {
+            bitonic_temp[key_index] = data1[key_index + (*bucket).bucket_offset];
+        }
+        else {
+            bitonic_temp[key_index] = KeyMemoryIndex(0xffffffffu, 0xffffffffu);
+        }
+    } 
 }
              
 // group :: 0 0xff000000
@@ -49,18 +94,18 @@ fn format_local_histogram(local_index: u32) {
         workgroupBarrier();
 }
 
-fn local_count(local_index: u32, workgroup_index: u32) {
+fn local_count(bucket: ptr<function, Bucket>, local_index: u32, workgroup_index: u32) {
 
         for (var i: u32 = 0u; i < KPT ; i = i + 1u) {
 
             // without bucket offset.
-            let key_index = 1024u * KPT * workgroup_index + local_index + 1024u * i; 
+            let key_index = NUMBER_OF_THREADS * KPT * workgroup_index + local_index + NUMBER_OF_THREADS * i; 
 
             // If the thread index is smaller than key count, load the key and do the count.
-            if (key_index < 130000u) { //key_block.key_count) 
+            if (key_index < (*bucket).size) { //key_block.key_count) 
 
                 // Get the key-value pair.
-                let data = data1[key_index]; // + key_block.bucket_offset];
+                let data = data1[key_index + (*bucket).bucket_offset]; // + key_block.bucket_offset];
                 atomicAdd(&local_radix256_histogram[extract_digit_8(data.key, 3u)], 1u);
             }
         }
@@ -76,10 +121,10 @@ fn update_global_histogram(local_index: u32) {
         }
 }
 
-fn counting_sort(local_index: u32, workgroup_index: u32) {
+fn counting_sort(bucket: ptr<function, Bucket>, local_index: u32, workgroup_index: u32) {
 
         format_local_histogram(local_index);
-        local_count(local_index, workgroup_index);
+        local_count(bucket, local_index, workgroup_index);
         update_global_histogram(local_index);
 }
 
@@ -90,7 +135,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-        // let key_block = KeyBlock(0u, 1024u, 5u, 2096u);
-        counting_sort(local_index, workgroup_id.x);
+        var test_bucket = Bucket(0u, 0u, 30000u);
 
+        counting_sort(&test_bucket, local_index, workgroup_id.x);
 }
