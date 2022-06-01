@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use crate::misc::Convert2Vec;
+use crate::impl_convert;
 use crate::common_functions::udiv_up_safe32;
 use crate::render_object::create_bind_groups;
 use crate::render_object::ComputeObject;
@@ -30,6 +32,8 @@ pub struct KeyMemoryIndex {
     pub key: u32,
     pub memory_location: u32,
 }
+
+impl_convert!{KeyMemoryIndex}
 
 pub struct RadixSort {
     aux_buffer: wgpu::Buffer, 

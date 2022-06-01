@@ -39,38 +39,64 @@ fn udiv_up_safe32(x: u32, y: u32) -> u32 {
     return select(tmp, 0u, y == 0u); 
 }
 
-// Bitonic sort.
 //++ fn bitonic(thread_index: u32) {
 //++ 
-//++   for (var k: u32 = 2u; k <= NUMBER_OF_THREADS; k = k << 1u) {
-//++   for (var j: u32 = k >> 1u ; j > 0u; j = j >> 1u) {
-//++     workgroupBarrier();
+//++     for (var i: u32 = 0u; i <= 2u * NUMBER_OF_THREADS; i = i << 1u) {
+//++     for (var x: u32 = i; x >= 2 ; x = x >> 1u)
 //++ 
-//++     let index = thread_index; 
-//++     let ixj = index ^ j;
-//++     let a = workgroup_chars[index];
-//++     let b = workgroup_chars[ixj];
-//++     let draw_index_a = get_draw_index(a.auxiliary_data);
-//++     let draw_index_b = get_draw_index(b.auxiliary_data);
+//++         
+//++         workgroupBarrier();
 //++ 
-//++     if (ixj > index && (((index & k) == 0u && draw_index_a > draw_index_b) || ((index & k) != 0u && draw_index_a < draw_index_b)) ) {
-//++             workgroup_chars[index] = b;
-//++             workgroup_chars[ixj] = a;
-//++     }
-//++   }};
+//++     }} 
+//++ 
 //++ }
 
+fn bitonic(thread_index: u32) {
+
+  for (var k: u32 = 2u; k <= NUMBER_OF_THREADS * KP_BITONIC; k = k << 1u) {
+  for (var j: u32 = k >> 1u ; j > 0u; j = j >> 1u) {
+    workgroupBarrier();
+    for (var i: u32 = 0u ; i<KP_BITONIC; i = i + 1u)  {
+        let index = thread_index + i * NUMBER_OF_THREADS; 
+        let ixj = index ^ j;
+        let a = bitonic_temp[index];
+        let b = bitonic_temp[ixj];
+
+        if (ixj > index &&
+            (((index & k) == 0u && a.key > b.key) || 
+            ((index & k) != 0u && a.key < b.key)) ) {
+                bitonic_temp[index] = b;
+                bitonic_temp[ixj] = a;
+        }
+  }}};
+}
+
 fn load_keys_to_bitonic_temp(bucket: ptr<function, Bucket>, local_index: u32) {
+
+    for (var i:u32 = 0u ; i < KP_BITONIC ; i = i + 1u) {
+
+        let key_index = local_index + NUMBER_OF_THREADS * i;
+
+        // Load key/pair to the workgroup memory.
+        if (key_index < (*bucket).size) {
+            bitonic_temp[key_index] = data1[key_index + (*bucket).bucket_offset];
+        }
+
+        // Add dummy key/pairt to the workgroup memory.
+        else {
+            bitonic_temp[key_index] = KeyMemoryIndex(0xffffffffu, 0xffffffffu);
+        }
+    } 
+}
+
+fn save_keys_from_bitonic_temp(bucket: ptr<function, Bucket>, local_index: u32) {
 
     for (var i:u32 = 0u ; i < KP_BITONIC ; i = i + 1u) {
 
         let key_index = local_index + NUMBER_OF_THREADS * i; 
 
         if (key_index < (*bucket).size) {
-            bitonic_temp[key_index] = data1[key_index + (*bucket).bucket_offset];
-        }
-        else {
-            bitonic_temp[key_index] = KeyMemoryIndex(0xffffffffu, 0xffffffffu);
+            data1[key_index + (*bucket).bucket_offset] = bitonic_temp[key_index]; 
         }
     } 
 }
@@ -128,6 +154,13 @@ fn counting_sort(bucket: ptr<function, Bucket>, local_index: u32, workgroup_inde
         update_global_histogram(local_index);
 }
 
+fn bitonic_sort(bucket: ptr<function, Bucket>, local_index: u32) {
+
+    load_keys_to_bitonic_temp(bucket, local_index);
+    bitonic(local_index);
+    save_keys_from_bitonic_temp(bucket, local_index);
+}
+
 @compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -136,6 +169,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
         var test_bucket = Bucket(0u, 0u, 30000u);
+        var test_bucket_bitonic = Bucket(0u, 0u, 1800u);
 
         counting_sort(&test_bucket, local_index, workgroup_id.x);
+        bitonic_sort(&test_bucket_bitonic, local_index);
 }

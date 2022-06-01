@@ -196,7 +196,19 @@ impl Application for FastMarchingMethod {
             println!("{} :: {}", i, radix_histogram[i]);
         }
 
+        let bitonic_result = to_vec::<KeyMemoryIndex>(
+                &configuration.device,
+                &configuration.queue,
+                &buffers.get(&"radix_buffer".to_string()).unwrap(),
+                0,
+                (size_of::<KeyMemoryIndex>()) as wgpu::BufferAddress * (3000 as u64)
+            );
+
         println!("{}", radix_histogram.iter().sum::<u32>());
+
+        for i in 0..bitonic_result.len() {
+            println!("{} = {:?}", i, bitonic_result[i]);
+        }
 
         Self {
             camera: camera,
