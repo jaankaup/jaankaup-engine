@@ -15,7 +15,7 @@ use jaankaup_core::template::{
 };
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
-use jaankaup_core::buffer::{buffer_from_data};
+use jaankaup_core::buffer::{buffer_from_data, to_vec};
 use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
@@ -153,20 +153,27 @@ impl Application for FastMarchingMethod {
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
+        let key_count: u32 = 30000;
+
+        let mut rng = rand::thread_rng();
+        let mut radix_test_data: Vec<KeyMemoryIndex> = Vec::with_capacity(key_count as usize);
+
+        for i in 0..key_count {
+            radix_test_data.push(KeyMemoryIndex { key: rng.gen_range(0..256), memory_location: 55, }); 
+        }
+
         let radix_input_buffer = buffer_from_data::<KeyMemoryIndex>(
             &configuration.device,
-            &vec![KeyMemoryIndex { key: 123, memory_location: 55, }  ; 30000 as usize],
-
+            &radix_test_data,
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None
         );
 
         // Radix sort
-        let radix_sort = RadixSort::init(&configuration.device, &radix_input_buffer, 30000, 30000);
+        let radix_sort = RadixSort::init(&configuration.device, &radix_input_buffer, key_count, key_count);
 
         // Store radix input buffer. TODO: create a better sample buffer.
         buffers.insert("radix_buffer".to_string(), radix_input_buffer);
-
         
         let mut encoder = configuration.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
@@ -176,6 +183,20 @@ impl Application for FastMarchingMethod {
         radix_sort.initial_counting_sort(&mut encoder);
 
         configuration.queue.submit(Some(encoder.finish())); 
+
+        let radix_histogram = to_vec::<u32>(
+                &configuration.device,
+                &configuration.queue,
+                radix_sort.get_global_histogram(),
+                0,
+                (size_of::<u32>()) as wgpu::BufferAddress * (256 as u64)
+            );
+
+        for i in 0..256 {
+            println!("{} :: {}", i, radix_histogram[i]);
+        }
+
+        println!("{}", radix_histogram.iter().sum::<u32>());
 
         Self {
             camera: camera,

@@ -146,6 +146,10 @@ impl RadixSort {
         }
     }
 
+    pub fn get_global_histogram(&self) -> &wgpu::Buffer {
+        &self.histogram_buffer
+    }
+
     pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
 
     }
@@ -155,10 +159,12 @@ impl RadixSort {
 
         // The GPU counting sort.
           
+        println!("radix sort dispatch count :: {}", udiv_up_safe32(self.n, 1024 * KPT)); 
+
         self.radix_sort_compute_object.dispatch(
             &self.bind_groups,
             encoder,
-            udiv_up_safe32(self.n, 1024 * KPT), 1, 1, Some("Radix dispatch.")
+            udiv_up_safe32(self.n, 1024 * KPT) + 1, 1, 1, Some("Radix dispatch.")
         );
     }
 }

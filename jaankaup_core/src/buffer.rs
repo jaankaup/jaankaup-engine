@@ -37,7 +37,7 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     buffer: &wgpu::Buffer,
     _src_offset: wgpu::BufferAddress,
     copy_size: wgpu::BufferAddress,
-    _spawner: &Spawner,
+    // _spawner: &Spawner,
     ) -> Vec<T> {
 
     // TODO: Recycle staging buffers.

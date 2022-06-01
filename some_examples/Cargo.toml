@@ -10,6 +10,7 @@ jaankaup_models = { path = "../assets/models" }
 jaankaup_algorithms = { path = "../algorithms" }
 bytemuck = { version = "1.4", features = ["derive"] }
 itertools = { version = "0.8.2" }
+rand = { version = "0.8.5"} 
 
 [[example]]
 name = "basic"

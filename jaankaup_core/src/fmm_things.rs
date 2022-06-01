@@ -300,7 +300,7 @@ impl DomainTester {
         self.compute_object.dispatch(
             &self.bind_groups,
             encoder,
-            udiv_up_safe32(total_grid_count, 1024), 1, 1, Some("Domain tester dispatch")
+            udiv_up_safe32(total_grid_count, 1024) + 1, 1, 1, Some("Domain tester dispatch")
         );
     }
 }

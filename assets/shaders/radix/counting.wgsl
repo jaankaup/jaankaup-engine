@@ -20,7 +20,7 @@ var<storage, read_write> data1: array<KeyMemoryIndex>;
 var<storage, read_write> data2: array<KeyMemoryIndex>;
 
 @group(0) @binding(2)
-var<storage, read_write> global_histogram: array<u32>;
+var<storage, read_write> global_histogram: array<atomic<u32>>;
 
 var<workgroup> local_radix256_histogram: array<atomic<u32>, 256>;
 //++ var<private> private_keys: array<KeyMemoryIndex, KPT>;
@@ -35,7 +35,7 @@ fn udiv_up_safe32(x: u32, y: u32) -> u32 {
 // group :: 2 0x0000ff00
 // group :: 3 0x000000ff
 fn extract_digit_8(key: u32, group: u32) -> u32 {
-    let shift = group * 8u; 
+    let shift = (3u - group) * 8u; 
     return (key & (0x000000ffu << shift)) >> shift;
 }
 
@@ -50,8 +50,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         // Reset histogram.
 
-        if (global_id.x < 256u) {
-            local_radix256_histogram[global_id.x] = 0u;
+        if (local_index < 256u) {
+            local_radix256_histogram[local_index] = 0u;
         }
 
         workgroupBarrier();
@@ -60,20 +60,24 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         for (var i: u32 = 0u; i < KPT ; i = i + 1u) {
 
-            // let key_index = key_block.bucket_offset + global_id.x * 1024u * i; 
-
             // without bucket offset.
-            let key_index = 1024u * KPT * work_group_id.x + local_id.x + 1024u * i; 
+            let key_index = 1024u * KPT * work_group_id.x + local_index + 1024u * i; 
 
             // If the thread index is smaller than key count, load the key and do the count.
-            if (key_index < key_block.key_count) {
-
-                // thread_keys[i] = data1[key_index + key_block.bucket_offset];
-                // private_keys[i] = data1[key_index + key_block.bucket_offset];
+            if (key_index < 30000u) { //key_block.key_count) 
 
                 // Get the key-value pair.
-                let data = data1[key_index + key_block.bucket_offset];
+                let data = data1[key_index]; // + key_block.bucket_offset];
                 atomicAdd(&local_radix256_histogram[extract_digit_8(data.key, 3u)], 1u);
             }
+        }
+
+        // Do we need this?
+        workgroupBarrier();
+
+        // Update global histogram.
+        
+        if (local_index < 256u) {
+            atomicAdd(&global_histogram[local_index], local_radix256_histogram[local_index]);
         }
 }

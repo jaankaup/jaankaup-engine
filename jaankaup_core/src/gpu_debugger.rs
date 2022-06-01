@@ -771,8 +771,7 @@ impl GpuDebugger {
                 &queue,
                 self.buffers.get(&"char_params".to_string()).unwrap(),
                 0,
-                (size_of::<CharParams>()) as wgpu::BufferAddress,
-                spawner,
+                (size_of::<CharParams>()) as wgpu::BufferAddress
             );
 
             // println!("{:?}", charparams_result[0]);

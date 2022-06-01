@@ -34,8 +34,8 @@ impl Histogram {
                                    &queue,
                                    &self.histogram,
                                    0 as wgpu::BufferAddress,
-                                   (std::mem::size_of::<u32>() * self.data.len()) as wgpu::BufferAddress,
-                                   spawner);
+                                   (std::mem::size_of::<u32>() * self.data.len()) as wgpu::BufferAddress
+        );
         result
     }
     

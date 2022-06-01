@@ -126,14 +126,13 @@ impl GpuTimer {
     }
 
     /// Store the content of start and end counter parts.
-    pub fn create_timestamp_data(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, spawner: &Spawner) {
+    pub fn create_timestamp_data(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         self.data = 
             to_vec::<TimestampData>(&device,
                                 &queue,
                                 &self.query_buffer,
                                 0 as wgpu::BufferAddress,
-                                (size_of::<TimestampData>() * self.max_number_of_time_stamps as usize) as wgpu::BufferAddress,
-                                spawner
+                                (size_of::<TimestampData>() * self.max_number_of_time_stamps as usize) as wgpu::BufferAddress
         );
     }
 
