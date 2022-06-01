@@ -55,7 +55,10 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     let res: Vec<T>;
 
     let buffer_slice = staging_buffer.slice(..);
-    let _ = buffer_slice.map_async(wgpu::MapMode::Read);
+    //++ let (sender, receiver) = futures_intrusive::channel::shared::oneshot_channel();
+    //++ let _ = buffer_slice.map_async(wgpu::MapMode::Read, true);
+    // let _ = buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
+    buffer_slice.map_async(wgpu::MapMode::Read, move |_| ());
     device.poll(wgpu::Maintain::Wait);
 
     // Wasm version crashes: DOMException.getMappedRange: Buffer not mapped.

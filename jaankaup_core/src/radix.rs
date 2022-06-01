@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use crate::common_functions::udiv_up_safe32;
 use crate::render_object::create_bind_groups;
 use crate::render_object::ComputeObject;
 use crate::common_functions::create_buffer_bindgroup_layout;
@@ -32,13 +33,20 @@ pub struct KeyMemoryIndex {
 
 pub struct RadixSort {
     aux_buffer: wgpu::Buffer, 
+    histogram_buffer: wgpu::Buffer,
+    bucket_buffer: wgpu::Buffer,
     radix_sort_compute_object: ComputeObject,
     bind_groups: Vec<wgpu::BindGroup>,
+    n: u32,
 }
+
+const KPT: u32 = 8;
+const LOCAL_SORT_THRESHOLD: u32 = 4096;
+const KEYBLOCK_SIZE: u32 = 1024 * KPT;
 
 impl RadixSort {
 
-    pub fn init(device: &wgpu::Device, input_data: &wgpu::Buffer, input_buffer_size: u32) -> Self {
+    pub fn init(device: &wgpu::Device, input_data: &wgpu::Buffer, input_buffer_size: u32, n: u32) -> Self {
 
         // let buffer= buffer_from_data::<u32>(
         //     &device,
@@ -51,6 +59,30 @@ impl RadixSort {
                 device.create_buffer(&wgpu::BufferDescriptor{
                 label: Some("Radix sort aux_buffer"),
                 size: (input_buffer_size as usize * std::mem::size_of::<KeyMemoryIndex>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+        );
+
+        // Max number of buckets. floor(n/local_sort_threshold)
+
+        let max_number_of_buckets = 256 * input_buffer_size / LOCAL_SORT_THRESHOLD;
+
+        println!("Number of buckets :: {}", max_number_of_buckets);
+
+        let histogram_buffer = 
+                device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("Radix sort histogram buffer."),
+                size: (256 as usize * std::mem::size_of::<u32>()) as u64,
+                usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+                }
+        );
+
+        let bucket_buffer = 
+                device.create_buffer(&wgpu::BufferDescriptor{
+                label: Some("Bucket buffer."),
+                size: (max_number_of_buckets as usize * std::mem::size_of::<u32>()) as u64,
                 usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
                 }
@@ -76,6 +108,9 @@ impl RadixSort {
 
                             // @group(0) @binding(1) var<storage, read_write> data1: array<KeyMemoryIndex>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(2) var<storage, read_write> global_histogram: array<u32>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string()
@@ -90,6 +125,7 @@ impl RadixSort {
                     vec![
                          &input_data.as_entire_binding(),
                          &aux_buffer.as_entire_binding(),
+                         &histogram_buffer.as_entire_binding(),
 
                          // &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                          // &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
@@ -102,15 +138,27 @@ impl RadixSort {
 
         Self {
             aux_buffer: aux_buffer,
+            histogram_buffer: histogram_buffer, 
+            bucket_buffer: bucket_buffer, 
             radix_sort_compute_object: radix_sort_compute_object,
             bind_groups: bind_groups,
+            n: n,
         }
     }
 
+    pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
+
+    }
+
     /// Sorts the global data for msb 8 bits and creates the initial buckets.
-    pub fn initial_counting_sort(&self) {
+    pub fn initial_counting_sort(&self, encoder: &mut wgpu::CommandEncoder) {
 
         // The GPU counting sort.
-        
+          
+        self.radix_sort_compute_object.dispatch(
+            &self.bind_groups,
+            encoder,
+            udiv_up_safe32(self.n, 1024 * KPT), 1, 1, Some("Radix dispatch.")
+        );
     }
 }

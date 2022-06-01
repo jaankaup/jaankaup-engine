@@ -1,3 +1,4 @@
+use rand::Rng;
 use jaankaup_core::radix::KeyMemoryIndex;
 use std::mem::size_of;
 use std::borrow::Cow;
@@ -154,17 +155,27 @@ impl Application for FastMarchingMethod {
 
         let radix_input_buffer = buffer_from_data::<KeyMemoryIndex>(
             &configuration.device,
-            &vec![KeyMemoryIndex { key: 123, memory_location: 55, }  ; 2555 as usize],
+            &vec![KeyMemoryIndex { key: 123, memory_location: 55, }  ; 30000 as usize],
 
             wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             None
         );
 
         // Radix sort
-        let radix_sort = RadixSort::init(&configuration.device, &radix_input_buffer, 128);
+        let radix_sort = RadixSort::init(&configuration.device, &radix_input_buffer, 30000, 30000);
 
         // Store radix input buffer. TODO: create a better sample buffer.
         buffers.insert("radix_buffer".to_string(), radix_input_buffer);
+
+        
+        let mut encoder = configuration.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Radix sort counting sort encoder"),
+        });
+
+        radix_sort.initial_counting_sort(&mut encoder);
+
+        configuration.queue.submit(Some(encoder.finish())); 
 
         Self {
             camera: camera,
