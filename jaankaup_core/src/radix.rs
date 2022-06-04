@@ -186,10 +186,13 @@ impl RadixSort {
           
         println!("radix sort dispatch count :: {}", udiv_up_safe32(self.n, 1024 * KPT)); 
 
-        self.radix_sort_compute_object.dispatch(
+        self.radix_sort_compute_object.dispatch_push_constants::<u32>(
             &self.bind_groups,
             encoder,
-            udiv_up_safe32(self.n, 1024 * KPT) + 1, 1, 1, Some("Radix dispatch.")
+            udiv_up_safe32(self.n, 1024 * KPT) + 1, 1, 1,
+            0,
+            123,
+            Some("Radix dispatch.")
         );
     }
 }

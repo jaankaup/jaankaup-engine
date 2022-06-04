@@ -73,13 +73,40 @@ impl ComputeObject {
         }
     }
 
-    pub fn dispatch(&self, bind_groups: &Vec<wgpu::BindGroup>, encoder: &mut wgpu::CommandEncoder, x: u32, y: u32, z: u32, label: wgpu::Label) {
+    pub fn dispatch(&self,
+                    bind_groups: &Vec<wgpu::BindGroup>,
+                    encoder: &mut wgpu::CommandEncoder,
+                    x: u32,
+                    y: u32,
+                    z: u32,
+                    label: wgpu::Label) {
 
         let mut pass = encoder.begin_compute_pass(
             &wgpu::ComputePassDescriptor { label: label}
         );
         pass.set_pipeline(&self.pipeline);
-        pass.set_push_constants(0, bytemuck::cast_slice(&[66]));
+        for (e, bgs) in bind_groups.iter().enumerate() {
+            pass.set_bind_group(e as u32, &bgs, &[]);
+        }
+        pass.dispatch_workgroups(x, y, z)
+    }
+
+    pub fn dispatch_push_constants<T: Pod + Zeroable> (
+                    &self,
+                    bind_groups: &Vec<wgpu::BindGroup>,
+                    encoder: &mut wgpu::CommandEncoder,
+                    x: u32,
+                    y: u32,
+                    z: u32,
+                    push_constant_offset: u32,
+                    push_constant_data: T,
+                    label: wgpu::Label) {
+
+        let mut pass = encoder.begin_compute_pass(
+            &wgpu::ComputePassDescriptor { label: label}
+        );
+        pass.set_pipeline(&self.pipeline);
+        pass.set_push_constants(push_constant_offset, bytemuck::cast_slice(&[push_constant_data]));
         for (e, bgs) in bind_groups.iter().enumerate() {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }
