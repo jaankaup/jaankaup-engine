@@ -1,3 +1,4 @@
+// use std::borrow::Cow::Borrowed;
 use crate::impl_convert;
 use crate::misc::Convert2Vec;
 use bytemuck::{Pod, Zeroable};
@@ -49,7 +50,12 @@ impl ComputeObject {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: label,
             bind_group_layouts: &bind_group_layouts.iter().collect::<Vec<_>>(),
-            push_constant_ranges: &[],
+            push_constant_ranges: &[wgpu::PushConstantRange {
+                stages: wgpu::ShaderStages::COMPUTE,
+                range: 0..4,
+            }],
+
+            // push_constant_ranges: &[],
         });
 
         // Create the pipeline.
@@ -73,6 +79,7 @@ impl ComputeObject {
             &wgpu::ComputePassDescriptor { label: label}
         );
         pass.set_pipeline(&self.pipeline);
+        pass.set_push_constants(0, bytemuck::cast_slice(&[66]));
         for (e, bgs) in bind_groups.iter().enumerate() {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }

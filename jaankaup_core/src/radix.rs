@@ -1,17 +1,27 @@
 use std::borrow::Cow;
 use crate::misc::Convert2Vec;
 use crate::impl_convert;
-use crate::common_functions::udiv_up_safe32;
+use crate::common_functions::{create_uniform_bindgroup_layout, udiv_up_safe32};
 use crate::render_object::create_bind_groups;
 use crate::render_object::ComputeObject;
 use crate::common_functions::create_buffer_bindgroup_layout;
 use crate::buffer::{buffer_from_data};
 use bytemuck::{Pod, Zeroable};
 
-struct Bucket {
-    bucket_id: u32,
-    size: u32,
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct RadixSortParams {
+    phase: u32,    
 }
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct Bucket {
+    pub bucket_id: u32,
+    pub rank: u32,
+    pub bucket_offset: u32,
+    pub size: u32,
+} 
 
 struct KeyBlock {
 	key_offset: u32,
@@ -20,10 +30,21 @@ struct KeyBlock {
 	bucket_offset: u32,
 }
 
-struct LocalSortBlock {
-	bucket_id: u32,
-	bucket_offset: u32,
-	is_merged: u32,
+// #[repr(C)]
+// #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+// pub struct LocalSortBlock {
+// 	pub bucket_id: u32,
+// 	pub bucket_offset: u32,
+// 	pub is_merged: u32,
+// }
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct LocalSortBlock {
+	pub local_sort_id: u32,
+	pub local_offset: u32,
+	pub local_key_count: u32,
+	pub is_merged: u32,
 }
 
 #[repr(C)]
@@ -104,13 +125,13 @@ impl RadixSort {
                     Some("Fmm radix sort compute object"),
                     &vec![
                         vec![
-                            //++ // @group(0) @binding(0) var<uniform> fmm_params: FmmVisualizationParams;
-                            //++ create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+                            // // @group(0) @binding(0) var<uniform> fmm_params: FmmVisualizationParams;
+                            // create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
                             // @group(0) @binding(0) var<storage, read_write> data1: array<KeyMemoryIndex>;
                             create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(0) @binding(1) var<storage, read_write> data1: array<KeyMemoryIndex>;
+                            // @group(0) @binding(1) var<storage, read_write> data2: array<KeyMemoryIndex>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(2) var<storage, read_write> global_histogram: array<u32>;

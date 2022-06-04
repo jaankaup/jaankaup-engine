@@ -1,5 +1,5 @@
 use rand::Rng;
-use jaankaup_core::radix::KeyMemoryIndex;
+use jaankaup_core::radix::{KeyMemoryIndex, Bucket, LocalSortBlock};
 use std::mem::size_of;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -75,7 +75,8 @@ impl WGPUFeatures for FastMarchingMethodFeatures {
     }
 
     fn required_features() -> wgpu::Features {
-        wgpu::Features::empty()
+        wgpu::Features::PUSH_CONSTANTS
+        // wgpu::Features::empty()
     }
 
     fn required_limits() -> wgpu::Limits {
@@ -83,6 +84,7 @@ impl WGPUFeatures for FastMarchingMethodFeatures {
         limits.max_compute_invocations_per_workgroup = 1024;
         limits.max_compute_workgroup_size_x = 1024;
         limits.max_storage_buffers_per_shader_stage = 10;
+        limits.max_push_constant_size = 4;
         limits
     }
 }
@@ -153,7 +155,7 @@ impl Application for FastMarchingMethod {
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-        let key_count: u32 = 130000;
+        let key_count: u32 = 1000000;
 
         let mut rng = rand::thread_rng();
         let mut radix_test_data: Vec<KeyMemoryIndex> = Vec::with_capacity(key_count as usize);
@@ -208,6 +210,111 @@ impl Application for FastMarchingMethod {
 
         for i in 0..bitonic_result.len() {
             println!("{} = {:?}", i, bitonic_result[i]);
+        }
+
+        // let exclusive_sum: Vec<u32> = vec![vec![0 as u32], radix_histogram]
+        //     .into_iter()
+        //     .flatten()
+        //     .into_iter()
+        //     .scan(0, |state, x| { *state = *state + x; Some(state) })
+        //     .collect();
+
+        let mut exclusive_scan: Vec<u32> = vec![0; 257];
+
+        println!("len radix_histogram == {}", radix_histogram.len());
+        println!("len exclusive_scan == {}", exclusive_scan.len());
+        
+        for i in 1..257 {
+            exclusive_scan[i] = exclusive_scan[i-1] + radix_histogram[i-1];
+        }
+
+        println!("{:?}", exclusive_scan);
+
+        // let temp_sum = 0; 
+
+        // for i in 1..radix_histogram.len() {
+        //     let previous = temp_sum + radix_histogram[i-1];
+        //     exclusive_sum[    
+        // }
+
+        let mut sub_buckets: Vec<Bucket> = Vec::new();
+        let mut local_blocks: Vec<LocalSortBlock> = Vec::new();
+        let mut bucket_id_counter = 1;
+
+        for i in 0..radix_histogram.len() {
+            if radix_histogram[i] >= 3072 {
+                sub_buckets.push(Bucket {
+                    bucket_id: bucket_id_counter,
+                    rank: 1,
+                    bucket_offset: exclusive_scan[i],
+                    size: radix_histogram[i],
+                    }
+                );
+                bucket_id_counter = bucket_id_counter + 1; 
+            }
+        }
+
+        let mut keys_so_far = 0;
+        // let mut offset = 0;
+        let mut temp_bucket_offset = 0;
+        // let mut temp_local_block: Option<LocalBlock> = None;
+
+        for i in 0..radix_histogram.len() {
+
+            let temp_sum = radix_histogram[i] + keys_so_far;
+
+            // Found a sub bucket and there was no local bucket.
+            if keys_so_far == 0 && radix_histogram[i] >= 3072 {
+                continue;
+            }
+
+            // Start a new local block.
+            else if radix_histogram[i] < 3072 && keys_so_far == 0 {
+                keys_so_far = radix_histogram[i];
+                temp_bucket_offset = exclusive_scan[i];
+            }
+
+            else if keys_so_far > 0 && temp_sum < 3072 {
+                keys_so_far = temp_sum;
+            }
+
+            // Save local block.
+            else if keys_so_far > 0 && temp_sum >= 3072 {
+
+                local_blocks.push(
+                    LocalSortBlock {
+	                    local_sort_id: 0,
+	                    local_offset: temp_bucket_offset,
+	                    local_key_count: keys_so_far,
+	                    is_merged: 0,
+                    }
+                );
+
+                keys_so_far = 0;
+	            // temp_bucket_offset = 0;
+            }
+            else if i == radix_histogram.len() - 1 && temp_sum > 0 {
+
+                local_blocks.push(
+                    LocalSortBlock {
+	                    local_sort_id: 0,
+	                    local_offset: temp_bucket_offset,
+	                    local_key_count: temp_sum,
+	                    is_merged: 0,
+                    }
+                );
+            }
+        }
+        println!("keys_so_far = {}", keys_so_far);
+
+        println!("sub buckets");
+        for i in sub_buckets.iter() {
+            println!("{:?}", i);
+        }
+
+        println!("local blocks");
+        for i in local_blocks.iter() {
+            println!("{:?}", i);
         }
 
         Self {
@@ -311,6 +418,7 @@ fn log_adapter_info(adapter: &wgpu::Adapter) {
         log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
         log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
         log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
+        log::info!("max_push_constant_size: {:?}", adapter_limits.max_push_constant_size);
 }
 
 /// Initialize and create GpuDebugger for this project. TODO: add MAX_... to function parameters.
