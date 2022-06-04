@@ -191,7 +191,7 @@ impl RadixSort {
             encoder,
             udiv_up_safe32(self.n, 1024 * KPT) + 1, 1, 1,
             0,
-            123,
+            0,
             Some("Radix dispatch.")
         );
     }

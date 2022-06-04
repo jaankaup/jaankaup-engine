@@ -193,11 +193,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     var test_bucket = Bucket(0u, 0u, 0u, 1000000u);
     var test_bucket_bitonic = Bucket(0u, 0u, 0u, 1800u);
 
-    // if (pc.phase == 0u) {
-    //     counting_sort(&test_bucket, local_index, workgroup_id.x);
-    //     bitonic_sort(&test_bucket_bitonic, local_index);
-    // }
-    if (local_index < 256u) {
-        data1[local_index] = KeyMemoryIndex(local_index, pc.phase);
+    if (pc.phase == 0u) {
+        counting_sort(&test_bucket, local_index, workgroup_id.x);
+        bitonic_sort(&test_bucket_bitonic, local_index);
     }
 }
