@@ -37,6 +37,7 @@ use jaankaup_core::aabb::Triangle_vvvvnnnn;
 // use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_core::radix::{RadixSort};
 use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
+use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -73,6 +74,16 @@ const FMM_INNER_Z: usize = 4;
 //                                     FMM_INNER_Y *
 //                                     FMM_INNER_Z *
 //                                     size_of::<f32>()) as u32 * 16;
+//
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmVisualizationParams {
+    fmm_global_dimension: [u32; 3],
+    visualization_method: u32, // ???.
+    fmm_inner_dimension: [u32; 3],
+    future_usage: u32,
+}
 
 /// Features and limits for FastMarchingMethod application.
 struct FastMarchingMethodFeatures {}
@@ -114,6 +125,8 @@ struct FastMarchingMethod {
     point_cloud: PointCloud,
     compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
     compute_object_fmm_visualizer: ComputeObject,
+    render_vvvvnnnn: Render_VVVVNNNN_camera,
+    render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
 }
 
 impl Application for FastMarchingMethod {
@@ -122,6 +135,9 @@ impl Application for FastMarchingMethod {
 
         // Log adapter info.
         log_adapter_info(&configuration.adapter);
+
+        // Buffer hash_map.
+        let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
@@ -155,6 +171,19 @@ impl Application for FastMarchingMethod {
                     1.0
         );
 
+        // A dummy buffer for rendering (nothing). 
+        let dummy_buffer = buffer_from_data::<f32>(
+            &configuration.device,
+            &[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            wgpu::BufferUsages::VERTEX,
+            None
+        );
+        buffers.insert("dummy_buffer".to_string(), dummy_buffer);
+
+        // vvvvnnnn renderer.
+        let render_vvvvnnnn = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let render_vvvvnnnn_bg = render_vvvvnnnn.create_bingroups(&configuration.device, &mut camera, &light, &render_params);
+
         // RenderObject for basic triangle mesh rendering.
         let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
 
@@ -164,8 +193,6 @@ impl Application for FastMarchingMethod {
                     &configuration.device, &mut camera, &light, &render_params
                 );
 
-        // Buffer hash_map.
-        let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         // Generate the point cloud.
         let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
@@ -255,6 +282,26 @@ impl Application for FastMarchingMethod {
                     ],
                     &"main".to_string(),
                     None
+        );
+
+        // Fmm scene visualizer parasm
+        let fmm_visualization_params = 
+                 FmmVisualizationParams {
+                     fmm_global_dimension: [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
+                     visualization_method: 0, // ???.
+                     //visualization_method: 4, // ???.
+                     //visualization_method: 1 | 2 | 4, // ???.
+                     fmm_inner_dimension: [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+                     future_usage: 0,
+        };
+
+        buffers.insert(
+            "fmm_visualization_params".to_string(),
+            buffer_from_data::<FmmVisualizationParams>(
+            &configuration.device,
+            &vec![fmm_visualization_params],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            None)
         );
 
         let compute_bind_groups_fmm_visualizer =
@@ -454,6 +501,8 @@ impl Application for FastMarchingMethod {
             point_cloud: point_cloud,
             compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
             compute_object_fmm_visualizer: compute_object_fmm_visualizer,
+            render_vvvvnnnn: render_vvvvnnnn,
+            render_vvvvnnnn_bg: render_vvvvnnnn_bg,
         }
     }
 
@@ -470,14 +519,25 @@ impl Application for FastMarchingMethod {
             &surface
         );
 
+        let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
+
         let mut encoder = device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
         });
 
-        let view = self.screen.surface_texture.as_ref().unwrap().texture.create_view(&wgpu::TextureViewDescriptor::default());
-
         let mut clear = true;
+
+        // Always, render something :).
+        draw(&mut encoder,
+             &view,
+             self.screen.depth_texture.as_ref().unwrap(),
+             &self.render_vvvvnnnn_bg, 
+             &self.render_vvvvnnnn.get_render_object().pipeline,
+             &self.buffers.get(&"dummy_buffer".to_string()).unwrap(),
+             0..1, 
+             clear
+        );
 
         // draw(&mut encoder,
         //      &view,

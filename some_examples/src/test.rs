@@ -204,6 +204,7 @@ impl Application for TestProject {
                     4.0
         );
 
+
         // RenderObject for basic triangle mesh rendering.
         let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
 
