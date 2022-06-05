@@ -4,12 +4,17 @@ let KP_BITONIC = 3u;
 //let NUMBER_OF_THREADS = 256u;
 let NUMBER_OF_THREADS = 1024u;
 
-// Phase 0 :: initial count
+// Phase 0 :: initial count. Create 256 buckets (rank 1).
 
 struct PushConstants {
     phase: u32,    
 };
 
+struct BucketIterator {
+    number_of_buckets: u32,
+}
+
+// Sub bucket.
 struct Bucket {
     bucket_id: u32,
     rank: u32,
@@ -17,11 +22,13 @@ struct Bucket {
     size: u32,
 }; 
 
+// Key/value pair.
 struct KeyMemoryIndex {
     key: u32,
     memory_location: u32,
 };
 
+// Do we need this?
 struct KeyBlock {
     key_offset: u32,
     key_count: u32,
@@ -29,6 +36,7 @@ struct KeyBlock {
     bucket_offset: u32,
 };
 
+// A struct for band conflict free prefix sum indices.
 struct PrivateData {
     ai: u32,
     bi: u32,
@@ -52,11 +60,16 @@ var<storage, read_write> data2: array<KeyMemoryIndex>;
 @group(0) @binding(2)
 var<storage, read_write> global_histogram: array<atomic<u32>>;
 
+// Todo: multiple histograms.
 // @group(0) @binding(3)
 // var<storage, read_write> global_histogram: array<atomic<u32>>;
 
+// Buckets to be processed. 
+// @group(0) @binding(4)
+// var<storage, read_write> global_histogram: array<Bucket>;
+
 var<private> private_data: PrivateData;
-var<workgroup> local_radix256_histogram: array<atomic<u32>, 256>;
+var<workgroup> local_radix256_histogram: array<atomic<u32>, 1024>; // Space for 4 workgroup histograms. 
 var<workgroup> bitonic_temp: array<KeyMemoryIndex , 3072>;
 
 // var<workgroup> bitonic_temp: array<u32 ; NUMBER_OF_THREADS * KP_BITONIC>;
@@ -101,7 +114,7 @@ fn load_keys_to_bitonic_temp(bucket: ptr<function, Bucket>, local_index: u32) {
         else {
             bitonic_temp[key_index] = KeyMemoryIndex(0xffffffffu, 0xffffffffu);
         }
-    } 
+    }
 }
 
 fn save_keys_from_bitonic_temp(bucket: ptr<function, Bucket>, local_index: u32) {
@@ -194,8 +207,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     var test_bucket = Bucket(0u, 0u, 0u, 1000000u);
     var test_bucket_bitonic = Bucket(0u, 0u, 0u, 1800u);
 
+    // Perform the initial counting sort.
     if (pc.phase == 0u) {
         counting_sort(&test_bucket, local_index, workgroup_id.x);
-        bitonic_sort(&test_bucket_bitonic, local_index);
+        // bitonic_sort(&test_bucket_bitonic, local_index);
+    }
+
+    // Prefix sum.
+    if (pc.phase == 1u) {
+
     }
 }

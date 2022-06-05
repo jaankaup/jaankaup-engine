@@ -173,7 +173,7 @@ impl RadixSort {
             bind_groups: bind_groups,
             n: n,
         }
-    }
+        }
 
     pub fn get_global_histogram(&self) -> &wgpu::Buffer {
         &self.histogram_buffer
@@ -195,7 +195,7 @@ impl RadixSort {
             encoder,
             udiv_up_safe32(self.n, 1024 * KPT) + 1, 1, 1,
             0,
-            0,
+            0, // phase
             Some("Radix dispatch.")
         );
     }

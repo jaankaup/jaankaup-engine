@@ -1,10 +1,11 @@
-use jaankaup_core::common_functions::udiv_up_safe32;
 use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use jaankaup_core::common_functions::{
+    udiv_up_safe32,
     create_buffer_bindgroup_layout,
     create_uniform_bindgroup_layout,
     set_bit_to,
     get_bit,
+    encode_rgba_u32,
 };
 use jaankaup_core::pc_parser::VVVC;
 use jaankaup_core::pc_parser::read_pc_data;
@@ -34,7 +35,6 @@ use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
-use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
 use bytemuck::{Pod, Zeroable};
 

@@ -13,6 +13,14 @@ use jaankaup_core::template::{
         BasicLoop,
         Spawner,
 };
+use jaankaup_core::common_functions::{
+    udiv_up_safe32,
+    create_buffer_bindgroup_layout,
+    create_uniform_bindgroup_layout,
+    set_bit_to,
+    get_bit,
+    encode_rgba_u32,
+};
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
 use jaankaup_core::buffer::{buffer_from_data, to_vec};
@@ -23,11 +31,12 @@ use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
+use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObject, create_bind_groups};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::aabb::Triangle_vvvvnnnn;
-use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::render_object::{draw, draw_indirect};
+// use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_core::radix::{RadixSort};
+use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
 
 /// Max number of arrows for gpu debugger.
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
@@ -101,7 +110,10 @@ struct FastMarchingMethod {
     triangle_mesh_renderer: Render_VVVVNNNN_camera,
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
-    radix_sort: RadixSort,
+    //radix radix_sort: RadixSort,
+    point_cloud: PointCloud,
+    compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
+    compute_object_fmm_visualizer: ComputeObject,
 }
 
 impl Application for FastMarchingMethod {
@@ -155,167 +167,277 @@ impl Application for FastMarchingMethod {
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-        let key_count: u32 = 1000000;
+        // Generate the point cloud.
+        let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
-        let mut rng = rand::thread_rng();
-        let mut radix_test_data: Vec<KeyMemoryIndex> = Vec::with_capacity(key_count as usize);
+        // Store point data.
+        let pc_sample_data = 
+            buffers.insert(
+                "pc_sample_data".to_string(),
+                buffer_from_data::<FmmCellPc>(
+                &configuration.device,
+                &vec![FmmCellPc {
+                    tag: 0,
+                    value: 10000000,
+                    color: 0,
+                    // padding: 0,
+                } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                None)
+            );
 
-        for i in 0..key_count {
-            radix_test_data.push(KeyMemoryIndex { key: rng.gen_range(0..256), memory_location: 55, }); 
-        }
+        let pc_min_coord = point_cloud.get_min_coord();
+        let pc_max_coord = point_cloud.get_max_coord();
 
-        let radix_input_buffer = buffer_from_data::<KeyMemoryIndex>(
-            &configuration.device,
-            &radix_test_data,
-            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            None
+        // Create scale factor for point data so it fits under computation domain ranges.
+        let point_cloud_scale_factor_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32 / pc_max_coord[0];
+        let point_cloud_scale_factor_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32 / pc_max_coord[1];
+        let point_cloud_scale_factor_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32 / pc_max_coord[2];
+
+        let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
+
+        let point_cloud_handler = PointCloudHandler::init(
+                &configuration.device,
+                [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
+                [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+                point_cloud.get_point_count(),
+                pc_min_coord,
+                pc_max_coord,
+                pc_scale_factor, // scale_factor
+                0, //point_cloud_draw_iterator,
+                false, //show_numbers,
+                &buffers.get("pc_sample_data").unwrap(),
+                point_cloud.get_buffer(),
+                &gpu_debugger
         );
 
-        // Radix sort
-        let radix_sort = RadixSort::init(&configuration.device, &radix_input_buffer, key_count, key_count);
+        // The fmm scene visualizer.
+        let compute_object_fmm_visualizer =
+                ComputeObject::init(
+                    &configuration.device,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("fmm_data_visualizer.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_data_visualizer.wgsl"))),
+                    
+                    }),
+                    Some("Fmm data visualizer compute object"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmVisualizationParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-        // Store radix input buffer. TODO: create a better sample buffer.
-        buffers.insert("radix_buffer".to_string(), radix_input_buffer);
-        
-        let mut encoder = configuration.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor {
-                label: Some("Radix sort counting sort encoder"),
-        });
+                            // @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-        radix_sort.initial_counting_sort(&mut encoder);
+                            // // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            // create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-        configuration.queue.submit(Some(encoder.finish())); 
+                            // // @group(0) @binding(3) var<storage, read_write> isotropic_data: array<f32>;
+                            // create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-        let radix_histogram = to_vec::<u32>(
+                            // @group(0) @binding(2) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(3) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None
+        );
+
+        let compute_bind_groups_fmm_visualizer =
+            create_bind_groups(
                 &configuration.device,
-                &configuration.queue,
-                radix_sort.get_global_histogram(),
-                0,
-                (size_of::<u32>()) as wgpu::BufferAddress * (256 as u64)
-            );
+                &compute_object_fmm_visualizer.bind_group_layout_entries,
+                &compute_object_fmm_visualizer.bind_group_layouts,
+                &vec![
+                    vec![
+                         &buffers.get(&"fmm_visualization_params".to_string()).unwrap().as_entire_binding(),
+                         &buffers.get(&"pc_sample_data".to_string()).unwrap().as_entire_binding(),
+                         // &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
+                         // &buffers.get(&"isotropic_data".to_string()).unwrap().as_entire_binding(),
+                         &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                         &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ]
+                ]
+        );
 
-        for i in 0..256 {
-            println!("{} :: {}", i, radix_histogram[i]);
-        }
+        //radix let key_count: u32 = 1000000;
 
-        let bitonic_result = to_vec::<KeyMemoryIndex>(
-                &configuration.device,
-                &configuration.queue,
-                &buffers.get(&"radix_buffer".to_string()).unwrap(),
-                0,
-                (size_of::<KeyMemoryIndex>()) as wgpu::BufferAddress * (3000 as u64)
-            );
+        //radix let mut rng = rand::thread_rng();
+        //radix let mut radix_test_data: Vec<KeyMemoryIndex> = Vec::with_capacity(key_count as usize);
 
-        println!("{}", radix_histogram.iter().sum::<u32>());
+        //radix for i in 0..key_count {
+        //radix     radix_test_data.push(KeyMemoryIndex { key: rng.gen_range(0..256), memory_location: 55, }); 
+        //radix }
 
-        for i in 0..bitonic_result.len() {
-            println!("{} = {:?}", i, bitonic_result[i]);
-        }
+        //radix let radix_input_buffer = buffer_from_data::<KeyMemoryIndex>(
+        //radix     &configuration.device,
+        //radix     &radix_test_data,
+        //radix     wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //radix     None
+        //radix );
 
-        // let exclusive_sum: Vec<u32> = vec![vec![0 as u32], radix_histogram]
-        //     .into_iter()
-        //     .flatten()
-        //     .into_iter()
-        //     .scan(0, |state, x| { *state = *state + x; Some(state) })
-        //     .collect();
+        //radix // Radix sort
+        //radix let radix_sort = RadixSort::init(&configuration.device, &radix_input_buffer, key_count, key_count);
 
-        let mut exclusive_scan: Vec<u32> = vec![0; 257];
+        //radix // Store radix input buffer. TODO: create a better sample buffer.
+        //radix buffers.insert("radix_buffer".to_string(), radix_input_buffer);
+        //radix 
+        //radix let mut encoder = configuration.device.create_command_encoder(
+        //radix     &wgpu::CommandEncoderDescriptor {
+        //radix         label: Some("Radix sort counting sort encoder"),
+        //radix });
 
-        println!("len radix_histogram == {}", radix_histogram.len());
-        println!("len exclusive_scan == {}", exclusive_scan.len());
-        
-        for i in 1..257 {
-            exclusive_scan[i] = exclusive_scan[i-1] + radix_histogram[i-1];
-        }
+        //radix radix_sort.initial_counting_sort(&mut encoder);
 
-        println!("{:?}", exclusive_scan);
+        //radix configuration.queue.submit(Some(encoder.finish())); 
 
-        // let temp_sum = 0; 
+        //radix let radix_histogram = to_vec::<u32>(
+        //radix         &configuration.device,
+        //radix         &configuration.queue,
+        //radix         radix_sort.get_global_histogram(),
+        //radix         0,
+        //radix         (size_of::<u32>()) as wgpu::BufferAddress * (256 as u64)
+        //radix     );
 
-        // for i in 1..radix_histogram.len() {
-        //     let previous = temp_sum + radix_histogram[i-1];
-        //     exclusive_sum[    
-        // }
+        //radix for i in 0..256 {
+        //radix     println!("{} :: {}", i, radix_histogram[i]);
+        //radix }
 
-        let mut sub_buckets: Vec<Bucket> = Vec::new();
-        let mut local_blocks: Vec<LocalSortBlock> = Vec::new();
-        let mut bucket_id_counter = 1;
+        //radix let bitonic_result = to_vec::<KeyMemoryIndex>(
+        //radix         &configuration.device,
+        //radix         &configuration.queue,
+        //radix         &buffers.get(&"radix_buffer".to_string()).unwrap(),
+        //radix         0,
+        //radix         (size_of::<KeyMemoryIndex>()) as wgpu::BufferAddress * (3000 as u64)
+        //radix     );
 
-        for i in 0..radix_histogram.len() {
-            if radix_histogram[i] >= 3072 {
-                sub_buckets.push(Bucket {
-                    bucket_id: bucket_id_counter,
-                    rank: 1,
-                    bucket_offset: exclusive_scan[i],
-                    size: radix_histogram[i],
-                    }
-                );
-                bucket_id_counter = bucket_id_counter + 1; 
-            }
-        }
+        //radix println!("{}", radix_histogram.iter().sum::<u32>());
 
-        let mut keys_so_far = 0;
-        // let mut offset = 0;
-        let mut temp_bucket_offset = 0;
-        // let mut temp_local_block: Option<LocalBlock> = None;
+        //radix for i in 0..bitonic_result.len() {
+        //radix     println!("{} = {:?}", i, bitonic_result[i]);
+        //radix }
 
-        for i in 0..radix_histogram.len() {
+        //radix // let exclusive_sum: Vec<u32> = vec![vec![0 as u32], radix_histogram]
+        //radix //     .into_iter()
+        //radix //     .flatten()
+        //radix //     .into_iter()
+        //radix //     .scan(0, |state, x| { *state = *state + x; Some(state) })
+        //radix //     .collect();
 
-            let temp_sum = radix_histogram[i] + keys_so_far;
+        //radix let mut exclusive_scan: Vec<u32> = vec![0; 257];
 
-            // Found a sub bucket and there was no local bucket.
-            if keys_so_far == 0 && radix_histogram[i] >= 3072 {
-                continue;
-            }
+        //radix println!("len radix_histogram == {}", radix_histogram.len());
+        //radix println!("len exclusive_scan == {}", exclusive_scan.len());
+        //radix 
+        //radix for i in 1..257 {
+        //radix     exclusive_scan[i] = exclusive_scan[i-1] + radix_histogram[i-1];
+        //radix }
 
-            // Start a new local block.
-            else if radix_histogram[i] < 3072 && keys_so_far == 0 {
-                keys_so_far = radix_histogram[i];
-                temp_bucket_offset = exclusive_scan[i];
-            }
+        //radix println!("{:?}", exclusive_scan);
 
-            else if keys_so_far > 0 && temp_sum < 3072 {
-                keys_so_far = temp_sum;
-            }
+        //radix // let temp_sum = 0; 
 
-            // Save local block.
-            else if keys_so_far > 0 && temp_sum >= 3072 {
+        //radix // for i in 1..radix_histogram.len() {
+        //radix //     let previous = temp_sum + radix_histogram[i-1];
+        //radix //     exclusive_sum[    
+        //radix // }
 
-                local_blocks.push(
-                    LocalSortBlock {
-	                    local_sort_id: 0,
-	                    local_offset: temp_bucket_offset,
-	                    local_key_count: keys_so_far,
-	                    is_merged: 0,
-                    }
-                );
+        //radix let mut sub_buckets: Vec<Bucket> = Vec::new();
+        //radix let mut local_blocks: Vec<LocalSortBlock> = Vec::new();
+        //radix let mut bucket_id_counter = 1;
 
-                keys_so_far = 0;
-	            // temp_bucket_offset = 0;
-            }
-            else if i == radix_histogram.len() - 1 && temp_sum > 0 {
+        //radix for i in 0..radix_histogram.len() {
+        //radix     if radix_histogram[i] >= 3072 {
+        //radix         sub_buckets.push(Bucket {
+        //radix             bucket_id: bucket_id_counter,
+        //radix             rank: 1,
+        //radix             bucket_offset: exclusive_scan[i],
+        //radix             size: radix_histogram[i],
+        //radix             }
+        //radix         );
+        //radix         bucket_id_counter = bucket_id_counter + 1; 
+        //radix     }
+        //radix }
 
-                local_blocks.push(
-                    LocalSortBlock {
-	                    local_sort_id: 0,
-	                    local_offset: temp_bucket_offset,
-	                    local_key_count: temp_sum,
-	                    is_merged: 0,
-                    }
-                );
-            }
-        }
-        println!("keys_so_far = {}", keys_so_far);
+        //radix let mut keys_so_far = 0;
+        //radix // let mut offset = 0;
+        //radix let mut temp_bucket_offset = 0;
+        //radix // let mut temp_local_block: Option<LocalBlock> = None;
 
-        println!("sub buckets");
-        for i in sub_buckets.iter() {
-            println!("{:?}", i);
-        }
+        //radix for i in 0..radix_histogram.len() {
 
-        println!("local blocks");
-        for i in local_blocks.iter() {
-            println!("{:?}", i);
-        }
+        //radix     let temp_sum = radix_histogram[i] + keys_so_far;
+
+        //radix     // Found a sub bucket and there was no local bucket.
+        //radix     if keys_so_far == 0 && radix_histogram[i] >= 3072 {
+        //radix         continue;
+        //radix     }
+
+        //radix     // Start a new local block.
+        //radix     else if radix_histogram[i] < 3072 && keys_so_far == 0 {
+        //radix         keys_so_far = radix_histogram[i];
+        //radix         temp_bucket_offset = exclusive_scan[i];
+        //radix     }
+
+        //radix     else if keys_so_far > 0 && temp_sum < 3072 {
+        //radix         keys_so_far = temp_sum;
+        //radix     }
+
+        //radix     // Save local block.
+        //radix     else if keys_so_far > 0 && temp_sum >= 3072 {
+
+        //radix         local_blocks.push(
+        //radix             LocalSortBlock {
+	    //radix                 local_sort_id: 0,
+	    //radix                 local_offset: temp_bucket_offset,
+	    //radix                 local_key_count: keys_so_far,
+	    //radix                 is_merged: 0,
+        //radix             }
+        //radix         );
+
+        //radix         keys_so_far = 0;
+	    //radix         // temp_bucket_offset = 0;
+        //radix     }
+        //radix     else if i == radix_histogram.len() - 1 && temp_sum > 0 {
+
+        //radix         local_blocks.push(
+        //radix             LocalSortBlock {
+	    //radix                 local_sort_id: 0,
+	    //radix                 local_offset: temp_bucket_offset,
+	    //radix                 local_key_count: temp_sum,
+	    //radix                 is_merged: 0,
+        //radix             }
+        //radix         );
+        //radix     }
+        //radix }
+        //radix println!("keys_so_far = {}", keys_so_far);
+
+        //radix println!("sub buckets");
+        //radix for i in sub_buckets.iter() {
+        //radix     println!("{:?}", i);
+        //radix }
+
+        //radix println!("local blocks");
+        //radix for i in local_blocks.iter() {
+        //radix     println!("{:?}", i);
+        //radix }
 
         Self {
             camera: camera,
@@ -328,7 +450,10 @@ impl Application for FastMarchingMethod {
             triangle_mesh_renderer: triangle_mesh_renderer,
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
-            radix_sort: radix_sort,
+            //radix radix_sort: radix_sort,
+            point_cloud: point_cloud,
+            compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
+            compute_object_fmm_visualizer: compute_object_fmm_visualizer,
         }
     }
 
