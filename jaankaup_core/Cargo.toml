@@ -11,8 +11,8 @@ input_debug = []
 texture_debug = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="32af4f56079fd2203c46c9c452cfe33fd60a5721" }
-# wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="8063edc6482cfc828895ec0feaa446767fecc510" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="444836f7471a2742f280b17faab2562486249cc7" }
+# wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="32af4f56079fd2203c46c9c452cfe33fd60a5721" }
 winit = { version = "0.26"}
 futures-intrusive = "0.4"
 async-executor = "1.0"
