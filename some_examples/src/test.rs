@@ -204,7 +204,6 @@ impl Application for TestProject {
                     4.0
         );
 
-
         // RenderObject for basic triangle mesh rendering.
         let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
 
@@ -707,9 +706,9 @@ impl Application for TestProject {
             self.show_numbers = !self.show_numbers;
             self.domain_tester.update_show_numbers(queue, self.show_numbers);
         }
-         if self.keyboard_manager.test_key(&Key::M, input) {
-             self.show_marching_cubes = !self.show_marching_cubes;
-         }
+        if self.keyboard_manager.test_key(&Key::M, input) {
+            self.show_marching_cubes = !self.show_marching_cubes;
+        }
     }
     
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {

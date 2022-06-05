@@ -43,16 +43,18 @@ use bytemuck::{Pod, Zeroable};
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
 
 /// Max number of aabbs for gpu debugger.
-const MAX_NUMBER_OF_AABBS:      usize = 262144;
+const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
 const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 
 /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-const MAX_NUMBER_OF_CHARS:      usize = 262144;
+const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 
 /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
 const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
+
+const TOTAL_INDICES: usize = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
 const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
@@ -75,6 +77,15 @@ const FMM_INNER_Z: usize = 4;
 //                                     FMM_INNER_Z *
 //                                     size_of::<f32>()) as u32 * 16;
 //
+
+
+struct AppRenderParams {
+    draw_point_cloud: bool,
+    visualization_method: u32,
+    step: bool,
+    show_numbers: bool,
+    update: bool,
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -127,6 +138,11 @@ struct FastMarchingMethod {
     compute_object_fmm_visualizer: ComputeObject,
     render_vvvvnnnn: Render_VVVVNNNN_camera,
     render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
+    render_object_vvvc: RenderObject,
+    render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
+    app_render_params: AppRenderParams,
+    render_params_point_cloud: RenderParamBuffer,
+    fmm_value_fixer: FmmValueFixer,
 }
 
 impl Application for FastMarchingMethod {
@@ -140,9 +156,18 @@ impl Application for FastMarchingMethod {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 30.0, 10.0), -89.0, 0.0);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 130.0, 480.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.02);
+        camera.set_movement_sensitivity(0.1);
+
+
+        let app_render_params = AppRenderParams {
+             draw_point_cloud: false,
+             visualization_method: 0,
+             step: false,
+             show_numbers: false,
+             update: false,
+        };
 
         // Gpu debugger.
         let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
@@ -184,6 +209,34 @@ impl Application for FastMarchingMethod {
         let render_vvvvnnnn = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
         let render_vvvvnnnn_bg = render_vvvvnnnn.create_bingroups(&configuration.device, &mut camera, &light, &render_params);
 
+        // vvvc
+        let render_object_vvvc =
+                RenderObject::init(
+                    &configuration.device,
+                    &configuration.sc_desc,
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("renderer_v3c1_x4.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1_x4.wgsl"))),
+
+                    }),
+                    &vec![wgpu::VertexFormat::Float32x3, wgpu::VertexFormat::Uint32],
+                    &vec![
+                        vec![
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::VERTEX),
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::VERTEX),
+                        ],
+                    ],
+                    Some("Debug visualizator vvvc x4 renderer with camera."),
+                    true,
+                    wgpu::PrimitiveTopology::PointList
+        );
+
+        let render_params = RenderParamBuffer::create(
+                    &configuration.device,
+                    4.0
+        );
+
         // RenderObject for basic triangle mesh rendering.
         let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
 
@@ -223,6 +276,12 @@ impl Application for FastMarchingMethod {
 
         let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
 
+        let render_params_point_cloud = RenderParamBuffer::create(
+                    &configuration.device,
+                    pc_scale_factor
+        );
+
+
         let point_cloud_handler = PointCloudHandler::init(
                 &configuration.device,
                 [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
@@ -236,6 +295,18 @@ impl Application for FastMarchingMethod {
                 &buffers.get("pc_sample_data").unwrap(),
                 point_cloud.get_buffer(),
                 &gpu_debugger
+        );
+
+        let render_bind_groups_vvvc = create_bind_groups(
+                                     &configuration.device,
+                                     &render_object_vvvc.bind_group_layout_entries,
+                                     &render_object_vvvc.bind_group_layouts,
+                                     &vec![
+                                          vec![
+                                              &camera.get_camera_uniform(&configuration.device).as_entire_binding(),
+                                              &render_params_point_cloud.get_buffer().as_entire_binding(),
+                                         ]
+                                     ]
         );
 
         // The fmm scene visualizer.
@@ -304,6 +375,11 @@ impl Application for FastMarchingMethod {
             None)
         );
 
+        let fmm_value_fixer = FmmValueFixer::init(&configuration.device,
+                                                  &buffers.get(&"fmm_visualization_params".to_string()).unwrap(),
+                                                  &buffers.get(&"pc_sample_data".to_string()).unwrap()
+        );
+
         let compute_bind_groups_fmm_visualizer =
             create_bind_groups(
                 &configuration.device,
@@ -323,6 +399,16 @@ impl Application for FastMarchingMethod {
                     ]
                 ]
         );
+
+        let mut encoder = configuration.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Domain tester encoder"),
+        });
+
+        point_cloud_handler.point_data_to_interface(&mut encoder);
+        fmm_value_fixer.dispatch(&mut encoder, [udiv_up_safe32(point_cloud.get_point_count(), 1024) + 1, 1, 1]);
+
+        configuration.queue.submit(Some(encoder.finish())); 
 
         //radix let key_count: u32 = 1000000;
 
@@ -503,7 +589,12 @@ impl Application for FastMarchingMethod {
             compute_object_fmm_visualizer: compute_object_fmm_visualizer,
             render_vvvvnnnn: render_vvvvnnnn,
             render_vvvvnnnn_bg: render_vvvvnnnn_bg,
-        }
+            render_object_vvvc: render_object_vvvc,
+            render_bind_groups_vvvc: render_bind_groups_vvvc,
+            app_render_params: app_render_params,
+            render_params_point_cloud: render_params_point_cloud,
+            fmm_value_fixer: fmm_value_fixer,
+         }
     }
 
     fn render(&mut self,
@@ -539,6 +630,21 @@ impl Application for FastMarchingMethod {
              clear
         );
 
+        if self.app_render_params.draw_point_cloud {
+    
+            draw(&mut encoder,
+                 &view,
+                 &self.screen.depth_texture.as_ref().unwrap(),
+                 &self.render_bind_groups_vvvc,
+                 &self.render_object_vvvc.pipeline,
+                 &self.point_cloud.get_buffer(),
+                 0..self.point_cloud.get_point_count(),
+                 clear
+            );
+    
+            // clear = false;
+        }
+
         // draw(&mut encoder,
         //      &view,
         //      self.screen.depth_texture.as_ref().unwrap(),
@@ -553,12 +659,68 @@ impl Application for FastMarchingMethod {
 
         queue.submit(Some(encoder.finish())); 
 
+        self.gpu_debugger.render(
+                  &device,
+                  &queue,
+                  &view,
+                  self.screen.depth_texture.as_ref().unwrap(),
+                  &mut clear,
+                  spawner
+        );
+    
+        self.gpu_debugger.reset_element_counters(&queue);
+
         self.screen.prepare_for_rendering();
     }
 
     #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input: &InputCache) {
         self.camera.update_from_input(&queue, &input);
+
+        // Far.
+        if self.keyboard_manager.test_key(&Key::Key1, input) {
+            let bit = if get_bit(self.app_render_params.visualization_method, 0) == 0 { true } else { false };
+            self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 0, bit);
+            self.app_render_params.update = true;
+        }
+
+        // Band.
+        if self.keyboard_manager.test_key(&Key::Key2, input) {
+            let bit = if get_bit(self.app_render_params.visualization_method, 1) == 0 { true } else { false };
+            self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 1, bit);
+            self.app_render_params.update = true;
+        }
+
+        // Known.
+        if self.keyboard_manager.test_key(&Key::Key3, input) {
+            let bit = if get_bit(self.app_render_params.visualization_method, 2) == 0 { true } else { false };
+            self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 2, bit);
+            self.app_render_params.update = true;
+        }
+        
+        // Numbers.
+        if self.keyboard_manager.test_key(&Key::N, input) {
+            let bit = if get_bit(self.app_render_params.visualization_method, 6) == 0 { true } else { false };
+            self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 6, bit);
+            self.app_render_params.update = true;
+        }
+
+        if self.app_render_params.update {
+
+            let fmm_visualization_params = 
+                     FmmVisualizationParams {
+                         fmm_global_dimension: [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
+                         visualization_method: self.app_render_params.visualization_method,
+                         fmm_inner_dimension: [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+                         future_usage: 0,
+            };
+
+            queue.write_buffer(
+                &self.buffers.get(&"fmm_visualization_params".to_string()).unwrap(),
+                0,
+                bytemuck::cast_slice(&[fmm_visualization_params])
+            );
+        }
     }
 
     fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration, _new_size: winit::dpi::PhysicalSize<u32>) {
@@ -578,10 +740,21 @@ impl Application for FastMarchingMethod {
                                FMM_INNER_Y *
                                FMM_INNER_Z;
 
-        //++ let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Noise & Mc encoder.") });
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm visualizer encoder.") });
 
         //++ queue.submit(Some(encoder_command.finish()));
 
+        if self.app_render_params.visualization_method != 0 {
+            self.compute_object_fmm_visualizer.dispatch(
+                &self.compute_bind_groups_fmm_visualizer,
+                &mut encoder,
+                (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+                Some("fmm visualizer dispatch")
+            );
+            self.app_render_params.update = false;
+        }
+
+        queue.submit(Some(encoder.finish())); 
     }
 }
 
