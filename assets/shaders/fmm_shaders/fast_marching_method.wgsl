@@ -19,6 +19,10 @@
 
 // Algorithm states.
 
+struct PushConstants {
+    phase: u32,    
+};
+
 // Thread private data for prefix sum.
 struct PrivatePrefixSum {
     ai: u32,         // Thread index
@@ -62,6 +66,9 @@ var<storage,read_write> filtered_blocks: array<FmmBlock>;
 
 let THREAD_COUNT = 1024u;
 let SCAN_BLOCK_SIZE = 2176u; 
+
+// Push constants.
+var<push_constant> pc: PushConstants;
 
 // The output of global active fmm block scan.
 var<workgroup> shared_prefix_sum: array<u32, SCAN_BLOCK_SIZE>; 

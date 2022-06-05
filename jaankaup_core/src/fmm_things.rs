@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use crate::pc_parser::{read_pc_data, VVVC};
 use crate::render_object::create_bind_groups;
 use crate::common_functions::{
@@ -627,5 +628,67 @@ impl FmmValueFixer {
             encoder,
             dispatch_dimensions[0], dispatch_dimensions[1], dispatch_dimensions[2], Some("Domain tester dispatch")
         );
+    }
+}
+
+pub struct FastMarchingMethod {
+    compute_object: ComputeObject,
+    // bind_groups: Vec<wgpu::BindGroup>,
+    fmm_params_buffer: FmmParamsBuffer,
+    fmm_data: wgpu::Buffer,
+}
+
+impl FastMarchingMethod {
+    pub fn init(device: &wgpu::Device,
+                global_dimension: [u32; 3],
+                local_dimension: [u32; 3]
+                ) -> Self {
+
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("fmm_value_fixer.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/fast_marching_method.wgsl"))),
+
+                    }),
+                    Some("FastMarchingMethod ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<storage,read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    Some(vec![wgpu::PushConstantRange {
+                        stages: wgpu::ShaderStages::COMPUTE,
+                        range: 0..4,
+                    }]),
+        );
+
+        let fmm_params_buffer =  FmmParamsBuffer::create(&device, global_dimension, local_dimension);
+
+        // Store point data.
+        let fmm_data = 
+                buffer_from_data::<FmmCellPc>(
+                device,
+                &vec![FmmCellPc {
+                    tag: 0,
+                    value: 10000000,
+                    color: 0,
+                } ; (global_dimension[0] * global_dimension[1] * global_dimension[2] * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap()],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                None
+            );
+
+        Self {
+            compute_object: compute_object,
+            fmm_params_buffer: fmm_params_buffer,
+            fmm_data: fmm_data,
+        }
     }
 }
