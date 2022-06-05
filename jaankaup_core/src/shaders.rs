@@ -322,7 +322,8 @@ impl NoiseMaker {
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    entry_point
+                    entry_point,
+                    None
         );
         
         let params = NoiseParamBuffer::create(

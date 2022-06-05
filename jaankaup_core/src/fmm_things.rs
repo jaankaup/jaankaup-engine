@@ -237,7 +237,8 @@ impl DomainTester {
                             create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let bind_groups = create_bind_groups(
@@ -497,7 +498,8 @@ impl PointCloudHandler {
                             create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
  
         let point_to_interface_bind_groups = create_bind_groups(
@@ -596,7 +598,8 @@ impl FmmValueFixer {
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let bind_groups = create_bind_groups(

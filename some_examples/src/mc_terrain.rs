@@ -498,7 +498,7 @@ fn create_gpu_debugger(device: &wgpu::Device,
                        sc_desc: &wgpu::SurfaceConfiguration,
                        camera: &mut Camera) -> GpuDebugger {
 
-        GpuDebugger::Init(
+        GpuDebugger::init(
                 &device,
                 &sc_desc,
                 &camera.get_camera_uniform(&device),
@@ -508,6 +508,7 @@ fn create_gpu_debugger(device: &wgpu::Device,
                 MAX_NUMBER_OF_AABBS.try_into().unwrap(),
                 MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
                 64,
+                1.0,
         )
 }
 

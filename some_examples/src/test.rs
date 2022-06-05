@@ -357,7 +357,8 @@ impl Application for TestProject {
 
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let compute_bind_groups_fmm_visualizer =

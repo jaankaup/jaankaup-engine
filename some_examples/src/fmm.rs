@@ -594,7 +594,8 @@ impl Application for Fmm {
                             create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let compute_bind_groups_fmm = create_bind_groups(
@@ -658,7 +659,8 @@ impl Application for Fmm {
                             //debug create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let compute_bind_groups_fmm_triangle =
@@ -726,7 +728,8 @@ impl Application for Fmm {
 
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let compute_bind_groups_fmm_prefix_scan =
@@ -788,7 +791,8 @@ impl Application for Fmm {
 
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let compute_bind_groups_reduce =
@@ -854,7 +858,8 @@ impl Application for Fmm {
 
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let compute_bind_groups_fmm_visualizer =
@@ -925,7 +930,8 @@ impl Application for Fmm {
 
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let compute_bind_groups_initial_band_points =
@@ -998,7 +1004,8 @@ impl Application for Fmm {
 
                         ],
                     ],
-                    &"sync_and_calculate_all_bands".to_string()
+                    &"sync_and_calculate_all_bands".to_string(),
+                    None
         );
 
         Fmm::addOutsideCell(&configuration.queue, &buffers.get(&"fmm_data".to_string()).unwrap());

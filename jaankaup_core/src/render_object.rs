@@ -38,6 +38,7 @@ impl ComputeObject {
                 label: wgpu::Label,
                 bind_group_layout_entries: &Vec<Vec<wgpu::BindGroupLayoutEntry>>,
                 entry_point: &String,
+                push_constant_ranges: Option<Vec<wgpu::PushConstantRange>>
             ) -> Self {
 
 
@@ -50,11 +51,11 @@ impl ComputeObject {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: label,
             bind_group_layouts: &bind_group_layouts.iter().collect::<Vec<_>>(),
-            push_constant_ranges: &[wgpu::PushConstantRange {
-                stages: wgpu::ShaderStages::COMPUTE,
-                range: 0..4,
-            }],
-
+            push_constant_ranges: &push_constant_ranges.unwrap_or_else(|| vec![]),
+            //push_constant_ranges: &[wgpu::PushConstantRange {
+            //    stages: wgpu::ShaderStages::COMPUTE,
+            //    range: 0..4,
+            //}],
             // push_constant_ranges: &[],
         });
 
@@ -91,7 +92,7 @@ impl ComputeObject {
         pass.dispatch_workgroups(x, y, z)
     }
 
-    pub fn dispatch_push_constants<T: Pod + Zeroable> (
+    pub fn dispatch_push_constants<T: Pod> (
                     &self,
                     bind_groups: &Vec<wgpu::BindGroup>,
                     encoder: &mut wgpu::CommandEncoder,

@@ -176,19 +176,20 @@ fn bitonic_sort(bucket: ptr<function, Bucket>, local_index: u32) {
     save_keys_from_bitonic_temp(bucket, local_index);
 }
 
-@compute
-@workgroup_size(1024,1,1)
-fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
-        @builtin(local_invocation_index) local_index: u32,
-        @builtin(workgroup_id) workgroup_id: vec3<u32>,
-        @builtin(global_invocation_id)   global_id: vec3<u32>) {
-
     // let ai = local_index; 
     // let bi = ai + NUMBER_OF_THREADS;
     // let ai_bcf = ai + (ai >> 4u); 
     // let bi_bcf = bi + (bi >> 4u);
     // let global_ai = ai + workgroup_id.x * (NUMBER_OF_THREADS * 2u);
     // let global_bi = bi + workgroup_id.x * (NUMBER_OF_THREADS * 2u);
+
+
+@compute
+@workgroup_size(1024,1,1)
+fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
+        @builtin(local_invocation_index) local_index: u32,
+        @builtin(workgroup_id) workgroup_id: vec3<u32>,
+        @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
     var test_bucket = Bucket(0u, 0u, 0u, 1000000u);
     var test_bucket_bitonic = Bucket(0u, 0u, 0u, 1800u);

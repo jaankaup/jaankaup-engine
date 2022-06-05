@@ -350,7 +350,8 @@ impl Application for DebugVisualizator {
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         println!("Creating compute bind groups.");

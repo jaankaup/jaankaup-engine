@@ -125,7 +125,8 @@ impl MarchingCubes {
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    None
         );
 
         let mc_params_buffer = buffer_from_data::<McParams>(

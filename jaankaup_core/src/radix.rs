@@ -138,7 +138,11 @@ impl RadixSort {
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
-                    &"main".to_string()
+                    &"main".to_string(),
+                    Some(vec![wgpu::PushConstantRange {
+                        stages: wgpu::ShaderStages::COMPUTE,
+                        range: 0..4,
+                    }]),
         );
 
         let bind_groups =
