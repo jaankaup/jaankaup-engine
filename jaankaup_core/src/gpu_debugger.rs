@@ -267,7 +267,7 @@ impl GpuDebugger {
             )
         );
 
-        println!("max_number_of_vertices == {}", max_number_of_vertices);
+        // println!("max_number_of_vertices == {}", max_number_of_vertices);
 
         buffers.insert(
             "output_render".to_string(),

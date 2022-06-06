@@ -285,12 +285,12 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     let optional_features = P::optional_features();
     let required_features = P::required_features();
     let adapter_features = adapter.features();
-    let adapter_limits = adapter.limits();
-    log::info!("optional_features == {:?}", optional_features);
-    log::info!("required_features == {:?}", required_features);
-    log::info!("adapter_features == {:?}", adapter_features);
-    log::info!("adapter_limits == {:?}", adapter_limits);
-    log::info!("(optional_features & adapter_features) | required_features == {:?}", (optional_features & adapter_features) | required_features);
+    // let adapter_limits = adapter.limits();
+    // log::info!("optional_features == {:?}", optional_features);
+    // log::info!("required_features == {:?}", required_features);
+    // log::info!("adapter_features == {:?}", adapter_features);
+    // log::info!("adapter_limits == {:?}", adapter_limits);
+    // log::info!("(optional_features & adapter_features) | required_features == {:?}", (optional_features & adapter_features) | required_features);
     assert!(
         adapter_features.contains(required_features),
         "Adapter does not support required features for this example: {:?}",

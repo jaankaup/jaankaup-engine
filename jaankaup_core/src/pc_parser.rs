@@ -63,7 +63,7 @@ pub fn read_pc_data(file: &String) -> ([f32; 3], [f32; 3], Vec<VVVC>) {
             color: result[i].color,
         });
     }
-    println!("{:?}", aabb);
+    // println!("{:?}", aabb);
     aabb.max = aabb.max - aabb.min;  
     aabb.min.x = 0.0;
     aabb.min.y = 0.0;
