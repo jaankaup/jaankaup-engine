@@ -14,7 +14,6 @@ use crate::common_functions::{
 };
 use crate::render_things::LightBuffer;
 use crate::buffer::{buffer_from_data, to_vec};
-use crate::camera::Camera;
 
 use crate::histogram::Histogram;
 
@@ -68,14 +67,17 @@ struct OtherRenderParams {
     scale_factor: f32,
 }
 
+#[allow(dead_code)]
 fn get_points_per_char(aux_data: u32) -> u32 {
     aux_data & 0x3FFF
 }
 
+#[allow(dead_code)]
 fn get_number_of_chars(aux_data: u32) -> u32 {
     (aux_data & 0x3fc000) >> 14
 }
 
+#[allow(dead_code)]
 fn get_draw_index(aux_data: u32) -> u32 {
     (aux_data & 0xfc00000) >> 22
 }
@@ -120,13 +122,13 @@ pub struct GpuDebugger {
     arrow_aabb_params: ArrowAabbParams,
     histogram_element_counter: Histogram,
     max_number_of_vertices: u32,
-    max_number_of_chars: u32,
-    max_number_of_arrows: u32,
-    max_number_of_aabbs: u32,
-    max_number_of_aabb_wires: u32,
+    _max_number_of_chars: u32,
+    _max_number_of_arrows: u32,
+    _max_number_of_aabbs: u32,
+    _max_number_of_aabb_wires: u32,
     thread_count: u32,
     histogram_dispatch_counter: Histogram,
-    light: LightBuffer,
+    _light: LightBuffer,
 }
 
 impl GpuDebugger {
@@ -535,13 +537,13 @@ impl GpuDebugger {
             arrow_aabb_params: arrow_aabb_params,
             histogram_element_counter: histogram_element_counter,
             max_number_of_vertices: max_number_of_vertices,
-            max_number_of_chars: max_number_of_chars,
-            max_number_of_arrows: max_number_of_arrows,
-            max_number_of_aabbs: max_number_of_aabbs,
-            max_number_of_aabb_wires: max_number_of_aabb_wires,
+            _max_number_of_chars: max_number_of_chars,
+            _max_number_of_arrows: max_number_of_arrows,
+            _max_number_of_aabbs: max_number_of_aabbs,
+            _max_number_of_aabb_wires: max_number_of_aabb_wires,
             thread_count: thread_count,
             histogram_dispatch_counter: histogram_dispatch_counter,
-            light: light,
+            _light: light,
         }
     }
 
@@ -692,8 +694,6 @@ impl GpuDebugger {
 
         // This will crash if == 0. TODO: fix.
         if number_of_chars > 0 {
-
-            let mut current_char_index = 0;
 
             // println!("number of chars == {}", number_of_chars);
 

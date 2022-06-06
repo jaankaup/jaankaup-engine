@@ -8,27 +8,17 @@ use jaankaup_core::template::{
         BasicLoop,
         Spawner,
 };
-use jaankaup_core::render_object::{RenderObject, ComputeObject, create_bind_groups, draw, draw_indirect, DrawIndirect};
+use jaankaup_core::render_object::draw_indirect;
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
-use jaankaup_core::shaders::{Render_VVVVNNNN_camera_textures2, NoiseMaker,NoiseParams};
+use jaankaup_core::shaders::{RenderVvvvnnnnCameraTextures2, NoiseMaker};
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
-use jaankaup_core::buffer::{buffer_from_data, to_vec};
 use jaankaup_core::wgpu;
 use jaankaup_core::winit;
 use jaankaup_core::log;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
-use jaankaup_core::misc::Convert2Vec;
-use jaankaup_core::impl_convert;
-use jaankaup_core::common_functions::{
-    encode_rgba_u32, 
-    create_uniform_bindgroup_layout,
-    create_buffer_bindgroup_layout
-};
-use jaankaup_core::histogram::Histogram;
 use jaankaup_algorithms::mc::{McParams, MarchingCubes};
-use bytemuck::{Pod, Zeroable};
 
 use winit::event as ev;
 pub use ev::VirtualKeyCode as Key;
@@ -51,23 +41,10 @@ const NOISE_BUFFER_SIZE: u32 = GLOBAL_NOISE_X_DIMENSION *
 const MC_OUTPUT_BUFFER_SIZE: u32 = NOISE_BUFFER_SIZE * 8;
 
 /// The number of vertices per chunk.
-const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
+//const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64; // 128 * 64 * 36 = 262144 verticex. 
 
 /// The size of draw buffer;
-const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
-
-const THREAD_COUNT: u32 = 64;
-
-// #[repr(C)]
-// #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-// struct NoiseParams {
-//     global_dim: [u32; 3],
-//     time: f32,
-//     local_dim: [u32; 3],
-//     value: f32,
-//     position: [f32; 3],
-//     value2: f32,
-// }
+// const VERTEX_BUFFER_SIZE: usize = 8 * MAX_VERTEX_CAPACITY * size_of::<f32>();
 
 struct McAppFeatures {}
 
@@ -88,21 +65,20 @@ impl WGPUFeatures for McAppFeatures {
 
 // State for this application.
 struct McApp {
-    pub screen: ScreenTexture, 
-    light: LightBuffer,
-    triangle_mesh_renderer_tex2: Render_VVVVNNNN_camera_textures2,
+    screen: ScreenTexture, 
+    _light: LightBuffer,
+    triangle_mesh_renderer_tex2: RenderVvvvnnnnCameraTextures2,
     triangle_mesh_bindgroups_tex2: Vec<wgpu::BindGroup>,
     // pub noise_compute_object: ComputeObject, 
     // pub noise_compute_bind_groups: Vec<wgpu::BindGroup>,
-    pub textures: HashMap<String, Texture>,
-    pub buffers: HashMap<String, wgpu::Buffer>,
-    pub camera: Camera,
+    _textures: HashMap<String, Texture>,
+    buffers: HashMap<String, wgpu::Buffer>,
+    camera: Camera,
     //pub histogram: Histogram,
     // pub draw_count: u32,
     // pub visualization_params: VisualizationParams,
-    pub keys: KeyboardManager,
-    pub marching_cubes: MarchingCubes,
-    pub update: bool,
+    // pub keys: KeyboardManager,
+    marching_cubes: MarchingCubes,
     noise_maker: NoiseMaker,
 }
 
@@ -186,8 +162,6 @@ impl Application for McApp {
                       0.000013
         );
 
-        let mut keys = KeyboardManager::init();
-
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (50.0, 60.0, 150.0), -90.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
@@ -196,7 +170,7 @@ impl Application for McApp {
         McApp::create_textures(&configuration, &mut textures);
 
         // RenderObject for basic triangle mesh rendering with 2 textures.
-        let triangle_mesh_renderer_tex2 = Render_VVVVNNNN_camera_textures2::init(&configuration.device, &configuration.sc_desc);
+        let triangle_mesh_renderer_tex2 = RenderVvvvnnnnCameraTextures2::init(&configuration.device, &configuration.sc_desc);
 
         let triangle_mesh_bindgroups_tex2 = 
                 triangle_mesh_renderer_tex2.create_bingroups(
@@ -311,20 +285,19 @@ impl Application for McApp {
 
         Self {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            light: light,
+            _light: light,
             triangle_mesh_renderer_tex2: triangle_mesh_renderer_tex2,
             triangle_mesh_bindgroups_tex2: triangle_mesh_bindgroups_tex2,
             //++ noise_compute_object: noise_compute_object,
             //++ noise_compute_bind_groups: noise_compute_bind_groups,
-            textures: textures,
+            _textures: textures,
             buffers: buffers,
             camera: camera,
             // histogram: histogram,
             // draw_count: 0,
             // visualization_params: params,
-            keys: keys,
+            // keys: keys,
             marching_cubes: mc_instance,
-            update: true,
             noise_maker: noise_maker,
         }
     }
@@ -334,7 +307,7 @@ impl Application for McApp {
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
-              spawner: &Spawner) {
+              _spawner: &Spawner) {
 
         self.screen.acquire_screen_texture(
             &device,
@@ -365,7 +338,7 @@ impl Application for McApp {
         self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.marching_cubes.reset_counter_value(device, queue);
+        self.marching_cubes.reset_counter_value(queue);
     }
 
     #[allow(unused)]

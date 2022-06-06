@@ -367,7 +367,8 @@ impl Texture {
         queue.submit(Some(encoder.finish()));
 
         let buffer_slice = staging_buffer.slice(..);
-        let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read, |_| ());
+        // let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read, |_| ());
+        buffer_slice.map_async(wgpu::MapMode::Read, |_| ());
         device.poll(wgpu::Maintain::Wait);
 
         let res: Vec<T>;

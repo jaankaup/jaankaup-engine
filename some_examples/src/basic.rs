@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::borrow::Cow;
 use jaankaup_core::template::{
         WGPUFeatures,
         WGPUConfiguration,
@@ -7,9 +6,7 @@ use jaankaup_core::template::{
         BasicLoop,
         Spawner,
 };
-//use jaankaup_core::misc::Convert2Vec;
-//use jaankaup_core::impl_convert;
-use jaankaup_core::render_object::{RenderObject,create_bind_groups,draw};
+use jaankaup_core::render_object::draw;
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
 use jaankaup_core::wgpu;
@@ -18,7 +15,7 @@ use jaankaup_core::log;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::texture::Texture;
 use jaankaup_models::cube::create_cube;
-use jaankaup_core::shaders::{Render_VVVVNNNN_camera, Render_VVVVNNNN_camera_textures2};
+use jaankaup_core::shaders::{RenderVvvvnnnnCamera, RenderVvvvnnnnCameraTextures2};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 //use bytemuck::{Pod,Zeroable};
 
@@ -44,9 +41,9 @@ struct BasicApp {
     pub screen: ScreenTexture, 
     //++ pub render_object: RenderObject, 
     //++ pub bind_groups: Vec<wgpu::BindGroup>,
-    light: LightBuffer,
-    render_params: RenderParamBuffer,
-    triangle_mesh_renderer_tex2: Render_VVVVNNNN_camera_textures2,
+    _light: LightBuffer,
+    _render_params: RenderParamBuffer,
+    triangle_mesh_renderer_tex2: RenderVvvvnnnnCameraTextures2,
     triangle_mesh_bindgroups_tex2: Vec<wgpu::BindGroup>,
     pub _textures: HashMap<String, Texture>,
     pub buffers: HashMap<String, wgpu::Buffer>,
@@ -141,10 +138,10 @@ impl Application for BasicApp {
         );
 
         // RenderObject for basic triangle mesh rendering.
-        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let triangle_mesh_renderer = RenderVvvvnnnnCamera::init(&configuration.device, &configuration.sc_desc);
 
         // RenderObject for basic triangle mesh rendering with 2 textures.
-        let triangle_mesh_renderer_tex2 = Render_VVVVNNNN_camera_textures2::init(&configuration.device, &configuration.sc_desc);
+        let triangle_mesh_renderer_tex2 = RenderVvvvnnnnCameraTextures2::init(&configuration.device, &configuration.sc_desc);
 
         // Create bindgroups for triangle_mesh_renderer.
         let triangle_mesh_bindgroups_tex2 = 
@@ -159,8 +156,8 @@ impl Application for BasicApp {
  
         BasicApp {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            light: light,
-            render_params: render_params,
+            _light: light,
+            _render_params: render_params,
             triangle_mesh_renderer_tex2,
             triangle_mesh_bindgroups_tex2: triangle_mesh_bindgroups_tex2,
             _textures: textures,

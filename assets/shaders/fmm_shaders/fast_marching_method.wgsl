@@ -38,9 +38,13 @@ struct PrefixParams {
     data_end_index: u32,
     exclusive_parts_start_index: u32,
     exclusive_parts_end_index: u32,
-    temp_prefix_data_start_index: u32,
-    temp_prefix_data_end_index: u32,
-    stage: u32,
+};
+
+struct FmmParams {
+    global_dimension: vec3<u32>,
+    future_usage: u32,
+    local_dimension: vec3<u32>,
+    future_usage2: u32,
 };
 
 struct FmmBlock {
@@ -50,18 +54,22 @@ struct FmmBlock {
 
 @group(0)
 @binding(0)
-var<uniform> fmm_prefix_params: PrefixParams;
+var<uniform> prefix_params: PrefixParams;
 
 @group(0)
 @binding(1)
-var<storage, read_write> fmm_blocks: array<FmmBlock>;
+var<uniform> fmm_params: FmmParams;
 
 @group(0)
 @binding(2)
-var<storage, read_write> temp_prefix_sum: array<u32>;
+var<storage, read_write> fmm_blocks: array<FmmBlock>;
 
 @group(0)
 @binding(3)
+var<storage, read_write> temp_prefix_sum: array<u32>;
+
+@group(0)
+@binding(4)
 var<storage,read_write> filtered_blocks: array<FmmBlock>;
 
 let THREAD_COUNT = 1024u;
@@ -274,6 +282,64 @@ fn gather_data() {
         let predicate_b = index_b < data_count && b.band_points_count > 0u;
         if (predicate_b) { filtered_blocks[b_offset] = b; }
     }
+}
+
+fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
+    var x_temp = (x      | (x      << 16u)) & 0x030000FFu;
+        x_temp = (x_temp | (x_temp <<  8u)) & 0x0300F00Fu;
+        x_temp = (x_temp | (x_temp <<  4u)) & 0x030C30C3u;
+        x_temp = (x_temp | (x_temp <<  2u)) & 0x09249249u;
+
+    var y_temp = (y      | (y      << 16u)) & 0x030000FFu;
+        y_temp = (y_temp | (y_temp <<  8u)) & 0x0300F00Fu;
+        y_temp = (y_temp | (y_temp <<  4u)) & 0x030C30C3u;
+        y_temp = (y_temp | (y_temp <<  2u)) & 0x09249249u;
+
+    var z_temp = (z      | (z      << 16u)) & 0x030000FFu;
+        z_temp = (z_temp | (z_temp <<  8u)) & 0x0300F00Fu;
+        z_temp = (z_temp | (z_temp <<  4u)) & 0x030C30C3u;
+        z_temp = (z_temp | (z_temp <<  2u)) & 0x09249249u;
+
+    return x_temp | (y_temp << 1u) | (z_temp << 2u);
+}
+
+fn get_third_bits32(m: u32) -> u32 {
+    var x = m & 0x9249249u;
+    x = (x ^ (x >> 2u))  & 0x30c30c3u;
+    x = (x ^ (x >> 4u))  & 0x0300f00fu;
+    x = (x ^ (x >> 8u))  & 0x30000ffu;
+    x = (x ^ (x >> 16u)) & 0x000003ffu;
+
+    return x;
+}
+
+fn decode3Dmorton32(m: u32) -> vec3<u32> {
+    return vec3<u32>(
+        get_third_bits32(m),
+        get_third_bits32(m >> 1u),
+        get_third_bits32(m >> 2u)
+   );
+}
+
+/// xy-plane indexing. (x,y,z) => index
+fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
+  var x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh; // check
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  return vec3<u32>(x, y, z);
+}
+
+/// Load block cells to workgroup memory .
+fn load_block_fmm_cells_to_wg() {
+
+}
+
+/// Harvest the initial active blocks.
+fn update_initial_interface() {
+   
 }
 
 @compute

@@ -115,9 +115,6 @@ struct FmmPrefixParams {
     data_end_index: u32,
     exclusive_parts_start_index: u32,
     exclusive_parts_end_index: u32,
-    temp_prefix_data_start_index: u32,
-    temp_prefix_data_end_index: u32,
-    stage: u32,
 }
 
 #[repr(C)]
@@ -487,9 +484,6 @@ impl Application for Fmm {
                 data_end_index: (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32,
                 exclusive_parts_start_index: exclusive_start,
                 exclusive_parts_end_index: exclusive_end,
-                temp_prefix_data_start_index: temp_prefix_start,
-                temp_prefix_data_end_index: temp_prefix_end,
-                stage: 1,
         };
 
         buffers.insert(

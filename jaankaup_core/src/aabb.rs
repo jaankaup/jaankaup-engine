@@ -215,7 +215,7 @@ impl Triangle {
         let bc = c - b;
 
         // Surface normal ccw.
-        let normal = (b-a).cross(c-a).normalize(); //ac.cross(ab).normalize();
+        // let normal = (b-a).cross(c-a).normalize(); //ac.cross(ab).normalize();
 
         let snom = (p-a).dot(ab);
         let sdenom = (p-b).dot(a-b);
@@ -318,7 +318,7 @@ impl Triangle {
         // let ac = self.a - self.c;
         // let bc = self.b - self.c;
 
-        let n = ab.cross(ac).normalize(); 
+        // let n = ab.cross(ac).normalize(); 
         let s: f32 = 0.5 as f32 * ab.cross(ac).magnitude(); 
         
         let mut n: u32 = (s/epsilon).sqrt().ceil() as u32;

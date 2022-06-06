@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 use crate::misc::Convert2Vec;
 use crate::impl_convert;
-use crate::common_functions::{create_uniform_bindgroup_layout, udiv_up_safe32};
+use crate::common_functions::udiv_up_safe32;
 use crate::render_object::create_bind_groups;
 use crate::render_object::ComputeObject;
 use crate::common_functions::create_buffer_bindgroup_layout;
-use crate::buffer::{buffer_from_data};
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -22,13 +21,6 @@ pub struct Bucket {
     pub bucket_offset: u32,
     pub size: u32,
 } 
-
-struct KeyBlock {
-	key_offset: u32,
-	key_count: u32,
-	bucket_id: u32,
-	bucket_offset: u32,
-}
 
 // #[repr(C)]
 // #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -57,9 +49,9 @@ pub struct KeyMemoryIndex {
 impl_convert!{KeyMemoryIndex}
 
 pub struct RadixSort {
-    aux_buffer: wgpu::Buffer, 
+    _aux_buffer: wgpu::Buffer, 
     histogram_buffer: wgpu::Buffer,
-    bucket_buffer: wgpu::Buffer,
+    _bucket_buffer: wgpu::Buffer,
     radix_sort_compute_object: ComputeObject,
     bind_groups: Vec<wgpu::BindGroup>,
     n: u32,
@@ -67,7 +59,7 @@ pub struct RadixSort {
 
 const KPT: u32 = 8;
 const LOCAL_SORT_THRESHOLD: u32 = 4096;
-const KEYBLOCK_SIZE: u32 = 1024 * KPT;
+// const KEYBLOCK_SIZE: u32 = 1024 * KPT;
 
 impl RadixSort {
 
@@ -166,9 +158,9 @@ impl RadixSort {
         );
 
         Self {
-            aux_buffer: aux_buffer,
+            _aux_buffer: aux_buffer,
             histogram_buffer: histogram_buffer, 
-            bucket_buffer: bucket_buffer, 
+            _bucket_buffer: bucket_buffer, 
             radix_sort_compute_object: radix_sort_compute_object,
             bind_groups: bind_groups,
             n: n,
@@ -179,9 +171,10 @@ impl RadixSort {
         &self.histogram_buffer
     }
 
-    pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
 
-    }
+    // pub fn dispatch(&self, encoder: &wgpu::CommandEncoder) {
+
+    // }
 
     /// Sorts the global data for msb 8 bits and creates the initial buckets.
     pub fn initial_counting_sort(&self, encoder: &mut wgpu::CommandEncoder) {

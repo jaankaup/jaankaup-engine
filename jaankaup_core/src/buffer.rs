@@ -1,8 +1,6 @@
 use crate::misc::Convert2Vec;
 use bytemuck::Pod;
 use wgpu::util::DeviceExt;
-use crate::template::Spawner;
-use std::{thread, time};
 
 /// A struct that holds information for one draw call.
 #[allow(dead_code)]

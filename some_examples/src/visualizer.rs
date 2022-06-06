@@ -37,8 +37,6 @@ const MAX_VERTEX_CAPACITY: usize = 128 * 64 * 64;
 /// The size of draw buffer;
 const VERTEX_BUFFER_SIZE: usize = 16 * MAX_VERTEX_CAPACITY * size_of::<f32>(); // VVVC
 
-const THREAD_COUNT: u32 = 64;
-
 // 
 //  Arrow  
 //
@@ -108,26 +106,23 @@ impl WGPUFeatures for DebugVisualizatorFeatures {
 
 // State for this application.
 struct DebugVisualizator {
-    pub screen: ScreenTexture, 
-    pub render_object_vvvvnnnn: RenderObject, 
-    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
-    pub render_object_vvvc: RenderObject,
-    pub render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
-    pub compute_object: ComputeObject, 
-    pub compute_bind_groups: Vec<wgpu::BindGroup>,
-    pub compute_object_arrow: ComputeObject, 
-    pub compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
-    // pub _textures: HashMap<String, Texture>,
-    pub buffers: HashMap<String, wgpu::Buffer>,
-    pub camera: Camera,
-    pub histogram: Histogram, // [arrow counter, aabb counter, aabb wire counter, Char counter,  
-    pub draw_count_points: u32,
-    pub draw_count_triangles: u32,
-    pub visualization_params: VisualizationParams,
-    pub temp_visualization_params: VisualizationParams,
-    pub keys: KeyboardManager,
-    pub block64mode: bool,
-    pub light: LightBuffer,
+    screen: ScreenTexture, 
+    render_object_vvvvnnnn: RenderObject, 
+    render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
+    render_object_vvvc: RenderObject,
+    render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
+    compute_object: ComputeObject, 
+    compute_bind_groups: Vec<wgpu::BindGroup>,
+    compute_object_arrow: ComputeObject, 
+    compute_bind_groups_arrow: Vec<wgpu::BindGroup>,
+    buffers: HashMap<String, wgpu::Buffer>,
+    camera: Camera,
+    histogram: Histogram, // [arrow counter, aabb counter, aabb wire counter, Char counter,  
+    draw_count_points: u32,
+    draw_count_triangles: u32,
+    _visualization_params: VisualizationParams,
+    _keys: KeyboardManager,
+    _light: LightBuffer,
 }
 
 impl DebugVisualizator {
@@ -152,7 +147,7 @@ impl Application for DebugVisualizator {
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
-        let mut keys = KeyboardManager::init();
+        let keys = KeyboardManager::init();
         // keys.register_key(Key::L, 20.0);
 
         // Camera.
@@ -265,13 +260,6 @@ impl Application for DebugVisualizator {
             iterator_start_index: 0,
             iterator_end_index: 4096,
             //iterator_end_index: 32768,
-            arrow_size: 0.3,
-        };
-
-        let temp_params = VisualizationParams {
-            max_number_of_vertices: 1,
-            iterator_start_index: 0,
-            iterator_end_index: THREAD_COUNT,
             arrow_size: 0.3,
         };
 
@@ -421,11 +409,9 @@ impl Application for DebugVisualizator {
             histogram: histogram,
             draw_count_points: 0,
             draw_count_triangles: 0,
-            visualization_params: params,
-            temp_visualization_params: temp_params,
-            keys: keys,
-            block64mode: false,
-            light: light,
+            _visualization_params: params,
+            _keys: keys,
+            _light: light,
         }
     }
 

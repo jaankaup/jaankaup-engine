@@ -371,7 +371,7 @@ fn create_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder,
                           depth_texture: &'a Texture,
                           clear: bool) -> impl wgpu::util::RenderEncoder<'a> {
 
-    let mut render_pass = encoder.begin_render_pass(
+    let render_pass = encoder.begin_render_pass(
             &wgpu::RenderPassDescriptor {
                 label: Some("Render pass descriptor"),
                 color_attachments: &[

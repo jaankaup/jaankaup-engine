@@ -29,8 +29,6 @@ struct PrefixParams {
     data_end_index: u32,
     exclusive_parts_start_index: u32,
     exclusive_parts_end_index: u32,
-    temp_prefix_data_start_index: u32,
-    temp_prefix_data_end_index: u32,
     stage: u32,
 };
 

@@ -17,27 +17,34 @@ const FMM_GLOBAL_DIMENSION: [usize ; 3] = [32, 8, 32];
 const FMM_INNER_DIMENSION: [usize ; 3] = [4, 4, 4]; 
 
 /// Computational domain dimension. 
+#[allow(dead_code)]
 const FMM_DOMAIN_DIMENSION: [usize ; 3] = [FMM_GLOBAL_DIMENSION[0] * FMM_INNER_DIMENSION[0],
                                            FMM_GLOBAL_DIMENSION[1] * FMM_INNER_DIMENSION[1],
                                            FMM_GLOBAL_DIMENSION[2] * FMM_INNER_DIMENSION[2]]; 
 /// The total fmm cell count. 
+#[allow(dead_code)]
 const FMM_CELL_COUNT: usize = FMM_GLOBAL_DIMENSION[0] * FMM_INNER_DIMENSION[0] *
                               FMM_GLOBAL_DIMENSION[1] * FMM_INNER_DIMENSION[1] *
                               FMM_GLOBAL_DIMENSION[2] * FMM_INNER_DIMENSION[2];
 
 /// Max number of arrows for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_AABBS:      usize = FMM_CELL_COUNT;
 
 /// Max number of box frames for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_AABB_WIRES: usize =  40960;
 
 /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_CHARS:      usize = FMM_CELL_COUNT;
 
 /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
 
 // 
@@ -57,18 +64,19 @@ const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
 struct FastMarchingMethod {
 
     /// Store general buffers here.
-    buffers: HashMap<String, wgpu::Buffer>,
+    _buffers: HashMap<String, wgpu::Buffer>,
 }
 
 impl FastMarchingMethod {
 
-    pub fn init(device: &wgpu::Device,
-                fmm_params_buffer: &wgpu::Buffer,
-                fmm_data: &wgpu::Buffer,
+    #[allow(dead_code)]
+    pub fn init(_device: &wgpu::Device,
+                _fmm_params_buffer: &wgpu::Buffer,
+                _fmm_data: &wgpu::Buffer,
                 ) -> Self {
 
         // Buffer hash_map.
-        let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
+        let buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         // create_buffers(device: &wgpu::Device)
         // let pc_sample_data = 
@@ -87,52 +95,56 @@ impl FastMarchingMethod {
         //     );
 
         Self {
-            buffers: buffers,
+            _buffers: buffers,
 
         }
     }
 
     /// Create the initial interface from given data.
+    #[allow(dead_code)]
     pub fn initialize_initial_interface(&self) {
 
     }
 
     /// Define the initial band cells and update the band values.
+    #[allow(dead_code)]
     pub fn create_initial_band_cells(&self) {
 
     }
 
     /// Update all band point counts from global computational domain. 
+    #[allow(dead_code)]
     pub fn calculate_band_point_counts(&self) {
 
     }
 
-    /// 
+    // 
+    #[allow(dead_code)]
     pub fn refresh_neighbors(&self) {
 
     }
 
-    /// From each active fmm block, find smallest band point and change the tag to known. 
-    /// Add the known cells to update list.
-    pub fn poll_band(&self) {
+    // /// From each active fmm block, find smallest band point and change the tag to known. 
+    // /// Add the known cells to update list.
+    // pub fn poll_band(&self) {
 
-    }
+    // }
 
-    fn create_buffers(device: &wgpu::Device, buffers: &HashMap<String, wgpu::Buffer>) {
+    // fn create_buffers(device: &wgpu::Device, buffers: &HashMap<String, wgpu::Buffer>) {
 
-        // let pc_sample_data = 
-        //     buffers.insert(
-        //         "pc_sample_data".to_string(),
-        //         buffer_from_data::<FmmCellPc>(
-        //         &configuration.device,
-        //         &vec![FmmCellPc {
-        //             tag: 0,
-        //             value: 10000000,
-        //             color: 0,
-        //             // padding: 0,
-        //         } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
-        //         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //         None)
-        //     );
-    }
+    //     // let pc_sample_data = 
+    //     //     buffers.insert(
+    //     //         "pc_sample_data".to_string(),
+    //     //         buffer_from_data::<FmmCellPc>(
+    //     //         &configuration.device,
+    //     //         &vec![FmmCellPc {
+    //     //             tag: 0,
+    //     //             value: 10000000,
+    //     //             color: 0,
+    //     //             // padding: 0,
+    //     //         } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+    //     //         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+    //     //         None)
+    //     //     );
+    // }
 }

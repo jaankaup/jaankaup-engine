@@ -215,6 +215,7 @@ pub fn r3_reverse(z: i32) -> (i32, i32, i32) {
     (x as i32, y as i32, x3 as i32)
 }
 
+#[allow(non_snake_case)]
 pub fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
     let mut x_temp = (x      | (x      << 16 )) & 0x030000FF;
             x_temp = (x_temp | (x_temp <<  8 )) & 0x0300F00F;
@@ -243,7 +244,9 @@ pub fn get_third_bits32(m: u32) -> u32 {
     x
 }
 
-fn decode3Dmorton32(m: u32) -> [u32; 3] {
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+fn decode3dmorton32(m: u32) -> [u32; 3] {
     [get_third_bits32(m), get_third_bits32(m >> 1), get_third_bits32(m >> 2)]
 }
 

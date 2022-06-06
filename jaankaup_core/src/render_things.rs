@@ -2,7 +2,6 @@
 use bytemuck::{Pod, Zeroable};
 use crate::impl_convert;
 use crate::misc::Convert2Vec;
-use crate::common_functions::encode_rgba_u32;
 use crate::buffer::buffer_from_data;
 
 #[repr(C)]
@@ -12,7 +11,7 @@ struct RenderParams {
 }
 
 pub struct RenderParamBuffer {
-    params: RenderParams,
+    _params: RenderParams,
     buffer: wgpu::Buffer,
 }
 
@@ -29,7 +28,7 @@ impl RenderParamBuffer {
         );
 
         Self {
-            params: params,
+            _params: params,
             buffer: buf,
         }
     }
@@ -52,7 +51,7 @@ struct Light {
 }
 
 pub struct LightBuffer {
-    light: Light,
+    _light: Light,
     buffer: wgpu::Buffer,
 }
 
@@ -84,7 +83,7 @@ impl LightBuffer {
         );
 
         Self {
-            light: light,
+            _light: light,
             buffer: buf,
         }
     }

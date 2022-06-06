@@ -16,11 +16,11 @@ use crate::common_functions::{
 use bytemuck::{Zeroable, Pod};
 
 /// RenderObject for renderer_v4n4_debug_visualizator.wgsl.
-pub struct Render_VVVVNNNN_camera {
+pub struct RenderVvvvnnnnCamera  {
     render_object: RenderObject,
 }
 
-impl Render_VVVVNNNN_camera {
+impl RenderVvvvnnnnCamera {
 
     pub fn init(device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration) -> Self {
         Self {
@@ -74,11 +74,11 @@ impl Render_VVVVNNNN_camera {
 }
 
 /// RenderObject for renderer_v4n4_tex.wgsl.
-pub struct Render_VVVVNNNN_camera_textures2 {
+pub struct RenderVvvvnnnnCameraTextures2 {
     render_object: RenderObject,
 }
 
-impl Render_VVVVNNNN_camera_textures2 {
+impl RenderVvvvnnnnCameraTextures2 {
 
     pub fn init(device: &wgpu::Device, sc_desc: &wgpu::SurfaceConfiguration) -> Self {
         Self {

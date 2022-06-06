@@ -7,9 +7,6 @@ use jaankaup_core::common_functions::{
     get_bit,
     encode_rgba_u32,
 };
-use jaankaup_core::pc_parser::VVVC;
-use jaankaup_core::pc_parser::read_pc_data;
-use itertools::Itertools;
 use std::mem::size_of;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -26,15 +23,14 @@ use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObj
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
 use jaankaup_core::buffer::{buffer_from_data};
-use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
+use jaankaup_core::model_loader::{TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
-use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
+use jaankaup_core::shaders::{RenderVvvvnnnnCamera};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
-use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
 use bytemuck::{Pod, Zeroable};
 
@@ -56,7 +52,7 @@ const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
 /// Name for the fire tower mesh (assets/models/wood.obj).
 const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-const CLOUD_DATA: &'static str = "CLOUD_DATA";
+//const CLOUD_DATA: &'static str = "CLOUD_DATA";
 
 /// Global dimensions. 
 const FMM_GLOBAL_X: usize = 32; 
@@ -113,12 +109,12 @@ impl WGPUFeatures for TestProjectFeatures {
 struct TestProject {
     camera: Camera,
     gpu_debugger: GpuDebugger,
-    gpu_timer: Option<GpuTimer>,
+    _gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
-    light: LightBuffer,
-    render_params: RenderParamBuffer,
-    triangle_mesh_renderer: Render_VVVVNNNN_camera,
+    _light: LightBuffer,
+    _render_params: RenderParamBuffer,
+    triangle_mesh_renderer: RenderVvvvnnnnCamera,
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     triangle_meshes: HashMap<String, TriangleMesh>,
@@ -127,22 +123,22 @@ struct TestProject {
     font_size: f32,
     render_object_vvvc: RenderObject,
     render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
-    point_count: u32,
-    permutation_index: u32,
+    _point_count: u32,
+    _permutation_index: u32,
     point_cloud: PointCloud,
     cell_iterator: [i32; 3],
     camera_mode: bool,
     point_cloud_handler: PointCloudHandler,
-    render_params_point_cloud: RenderParamBuffer,
+    _render_params_point_cloud: RenderParamBuffer,
     draw_point_cloud: bool,
-    point_cloud_draw_iterator: u32,
+    _point_cloud_draw_iterator: u32,
     show_domain_tester: bool,
     show_numbers: bool,
     compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
     compute_object_fmm_visualizer: ComputeObject,
     fmm_value_fixer: FmmValueFixer,
     marching_cubes: MarchingCubes,
-    render_vvvvnnnn: Render_VVVVNNNN_camera,
+    render_vvvvnnnn: RenderVvvvnnnnCamera,
     render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
     show_marching_cubes: bool,
     fmm_visualization_params: FmmVisualizationParams,
@@ -167,9 +163,6 @@ impl Application for TestProject {
         let aabb_size: f32 = 0.15;
         let font_size: f32 = 0.016;
 
-        let start_index = 0;
-        let step_size = 1024;
-
         // Log adapter info.
         log_adapter_info(&configuration.adapter);
 
@@ -185,7 +178,7 @@ impl Application for TestProject {
         let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
-        let mut keyboard_manager = create_keyboard_manager();
+        let keyboard_manager = create_keyboard_manager();
 
         // Light source for triangle meshes.
         let light = LightBuffer::create(
@@ -205,7 +198,7 @@ impl Application for TestProject {
         );
 
         // RenderObject for basic triangle mesh rendering.
-        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let triangle_mesh_renderer = RenderVvvvnnnnCamera::init(&configuration.device, &configuration.sc_desc);
 
         // Create bindgroups for triangle_mesh_renderer.
         let triangle_mesh_bindgroups = 
@@ -221,7 +214,6 @@ impl Application for TestProject {
         println!("Point cloud generated.");
 
         println!("Generate fmm sample data.");
-        let pc_sample_data = 
             buffers.insert(
                 "pc_sample_data".to_string(),
                 buffer_from_data::<FmmCellPc>(
@@ -481,17 +473,17 @@ impl Application for TestProject {
          );
 
         // vvvvnnnn renderer.
-        let render_vvvvnnnn = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let render_vvvvnnnn = RenderVvvvnnnnCamera::init(&configuration.device, &configuration.sc_desc);
         let render_vvvvnnnn_bg = render_vvvvnnnn.create_bingroups(&configuration.device, &mut camera, &light, &render_params);
 
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
-            gpu_timer: gpu_timer,
+            _gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            light: light,
-            render_params: render_params,
+            _light: light,
+            _render_params: render_params,
             triangle_mesh_renderer: triangle_mesh_renderer,
             triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
@@ -502,15 +494,15 @@ impl Application for TestProject {
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             //permutation_count: permutation_count as u32,
-            point_count: point_count,
-            permutation_index: permutation_index,
+            _point_count: point_count,
+            _permutation_index: permutation_index,
             point_cloud: point_cloud,
             cell_iterator: cell_iterator,
             camera_mode: camera_mode,
             point_cloud_handler: point_cloud_handler,
-            render_params_point_cloud: render_params_point_cloud,
+            _render_params_point_cloud: render_params_point_cloud,
             draw_point_cloud: draw_point_cloud,
-            point_cloud_draw_iterator: point_cloud_draw_iterator,
+            _point_cloud_draw_iterator: point_cloud_draw_iterator,
             show_domain_tester: show_domain_tester,
             show_numbers: show_numbers,
             compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,

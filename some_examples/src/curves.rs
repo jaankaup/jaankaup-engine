@@ -26,7 +26,6 @@ use jaankaup_core::common_functions::{
     create_buffer_bindgroup_layout,
 };
 use jaankaup_core::histogram::Histogram;
-use jaankaup_core::gpu_debugger::GpuDebugger;
 use bytemuck::{Pod, Zeroable};
 
 use winit::event as ev;
@@ -138,21 +137,20 @@ struct OtherRenderParams {
 
 // State for this application.
 struct DebugVisualizator {
-    pub screen: ScreenTexture,
-    pub render_object: RenderObject,
-    pub render_bind_groups: Vec<wgpu::BindGroup>,
-    pub compute_object: ComputeObject,
-    pub compute_bind_groups: Vec<wgpu::BindGroup>,
-    // pub _textures: HashMap<String, Texture>,
-    pub buffers: HashMap<String, wgpu::Buffer>,
-    pub camera: Camera,
-    pub histogram: Histogram,
-    pub draw_count: u32,
-    pub visualization_params: VisualizationParams,
-    pub temp_visualization_params: VisualizationParams,
-    pub keys: KeyboardManager,
-    pub block64mode: bool,
-    pub light: LightBuffer,
+    screen: ScreenTexture,
+    render_object: RenderObject,
+    render_bind_groups: Vec<wgpu::BindGroup>,
+    compute_object: ComputeObject,
+    compute_bind_groups: Vec<wgpu::BindGroup>,
+    buffers: HashMap<String, wgpu::Buffer>,
+    camera: Camera,
+    histogram: Histogram,
+    draw_count: u32,
+    visualization_params: VisualizationParams,
+    temp_visualization_params: VisualizationParams,
+    keys: KeyboardManager,
+    block64mode: bool,
+    _light: LightBuffer,
 }
 
 impl DebugVisualizator {
@@ -380,7 +378,6 @@ impl Application for DebugVisualizator {
             render_bind_groups: render_bind_groups,
             compute_object: compute_object,
             compute_bind_groups: compute_bind_groups,
-            // _textures: textures,
             buffers: buffers,
             camera: camera,
             histogram: histogram,
@@ -389,7 +386,7 @@ impl Application for DebugVisualizator {
             temp_visualization_params: temp_params,
             keys: keys,
             block64mode: false,
-            light: light,
+            _light: light,
         }
     }
 

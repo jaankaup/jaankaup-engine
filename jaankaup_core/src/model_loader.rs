@@ -126,7 +126,6 @@ pub fn create_from_bytes(data: String,
                 }
                 Primitive::Line(_, _) => { panic!("load_triangles_from_obj not supporting lines."); }
                 Primitive::Point(_) => { panic!("load_triangles_from_obj not supporting points."); }
-                _ => { panic!("Oh no..... Unsupported Primitive!"); }
             }
         }
     }

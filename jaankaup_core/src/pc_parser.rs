@@ -1,10 +1,9 @@
 use crate::common_functions::encode_rgba_u32;
-use std::str::Split;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 use bytemuck::{Pod, Zeroable};
-use crate::aabb::{BBox, BBox64};
+use crate::aabb::BBox64;
 use cgmath::Vector3;
 
 #[repr(C)]
@@ -33,7 +32,7 @@ pub fn read_pc_data(file: &String) -> ([f32; 3], [f32; 3], Vec<VVVC>) {
         let mut first_time = true;
         for line in lines {
             if let Ok(li) = line {
-                let mut sp = li.split(" ").collect::<Vec<&str>>();
+                let sp = li.split(" ").collect::<Vec<&str>>();
 
                 let x = sp[0].parse::<f64>().unwrap();
                 let y = sp[2].parse::<f64>().unwrap();

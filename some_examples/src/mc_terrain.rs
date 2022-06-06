@@ -13,33 +13,14 @@ use jaankaup_core::template::{
 };
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
-use jaankaup_core::buffer::{buffer_from_data};
-use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
+use jaankaup_core::model_loader::{TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
-use jaankaup_core::gpu_debugger::GpuDebugger;
-use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
-use jaankaup_core::shaders::{Render_VVVVNNNN_camera, Render_VVVVNNNN_camera_textures2, NoiseMaker};
+use jaankaup_core::shaders::{RenderVvvvnnnnCamera, RenderVvvvnnnnCameraTextures2, NoiseMaker};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::texture::Texture;
-use jaankaup_core::aabb::Triangle_vvvvnnnn;
 use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_core::render_object::{draw, draw_indirect};
-
-/// Max number of arrows for gpu debugger.
-const MAX_NUMBER_OF_ARROWS:     usize = 40960;
-
-/// Max number of aabbs for gpu debugger.
-const MAX_NUMBER_OF_AABBS:      usize = 262144;
-
-/// Max number of box frames for gpu debugger.
-const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
-
-/// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
-const MAX_NUMBER_OF_CHARS:      usize = 262144;
-
-/// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
-const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
 const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
@@ -89,14 +70,13 @@ impl WGPUFeatures for McTerrainFeatures {
 struct McTerrain {
     camera: Camera,
     // gpu_debugger: GpuDebugger,
-    gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
-    light: LightBuffer,
-    render_params: RenderParamBuffer,
-    triangle_mesh_renderer: Render_VVVVNNNN_camera,
-    triangle_mesh_renderer_tex2: Render_VVVVNNNN_camera_textures2,
-    triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+    _light: LightBuffer,
+    _render_params: RenderParamBuffer,
+    _triangle_mesh_renderer: RenderVvvvnnnnCamera,
+    triangle_mesh_renderer_tex2: RenderVvvvnnnnCameraTextures2,
+    _triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     triangle_mesh_bindgroups_tex2: Vec<wgpu::BindGroup>,
     triangle_mesh_bindgroups_tex2b: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
@@ -105,37 +85,9 @@ struct McTerrain {
     marching_cubes: MarchingCubes,
     selected_noise: usize,
     noise_params: [f32; 5],
-    textures: HashMap<String, Texture>,
+    _textures: HashMap<String, Texture>,
     y_coord: f32,
     texture_setup: bool,
-//++    pub render_object_vvvvnnnn: RenderObject, 
-//++    pub render_bind_groups_vvvvnnnn: Vec<wgpu::BindGroup>,
-//++    pub render_object_vvvc: RenderObject,
-//++    pub render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
-//++    pub compute_object_fmm: ComputeObject, 
-//++    pub compute_bind_groups_fmm: Vec<wgpu::BindGroup>,
-//++    pub compute_object_fmm_triangle: ComputeObject, 
-//++    pub compute_bind_groups_fmm_triangle: Vec<wgpu::BindGroup>,
-//++    pub compute_object_fmm_prefix_scan: ComputeObject,
-//++    pub compute_bind_groups_fmm_prefix_scan: Vec<wgpu::BindGroup>,
-//++    pub compute_object_reduce: ComputeObject,
-//++    pub compute_bind_groups_reduce: Vec<wgpu::BindGroup>,
-//++    pub compute_object_fmm_visualizer: ComputeObject,
-//++    pub compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
-//++    pub compute_object_initial_band_points: ComputeObject,
-//++    pub compute_bind_groups_initial_band_points: Vec<wgpu::BindGroup>,
-//++    pub buffers: HashMap<String, wgpu::Buffer>,
-//++    pub camera: Camera,
-//++    pub triangle_mesh_draw_count: u32,
-//++    pub draw_triangle_mesh: bool,
-//++    pub once: bool,
-//++    pub fmm_prefix_params: FmmPrefixParams, 
-//++    pub gpu_timer: Option<GpuTimer>,
-//++    pub fmm_visualization_params: FmmVisualizationParams,
-//++    pub histogram_fmm: Histogram,
-//++    pub compute_object_calculate_all_band_values: ComputeObject,
-//++    pub light: LightBuffer,
-//++    pub other_render_params: OtherRenderParams,
 }
 
 impl Application for McTerrain {
@@ -158,11 +110,8 @@ impl Application for McTerrain {
         // Gpu debugger.
         // let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
 
-        // Gpu timer.
-        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
-
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
-        let mut keyboard_manager = create_keyboard_manager();
+        let keyboard_manager = create_keyboard_manager();
 
         // Light source for triangle meshes.
         let light = LightBuffer::create(
@@ -183,10 +132,10 @@ impl Application for McTerrain {
         );
 
         // RenderObject for basic triangle mesh rendering.
-        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let triangle_mesh_renderer = RenderVvvvnnnnCamera::init(&configuration.device, &configuration.sc_desc);
 
         // RenderObject for basic triangle mesh rendering with 2 textures.
-        let triangle_mesh_renderer_tex2 = Render_VVVVNNNN_camera_textures2::init(&configuration.device, &configuration.sc_desc);
+        let triangle_mesh_renderer_tex2 = RenderVvvvnnnnCameraTextures2::init(&configuration.device, &configuration.sc_desc);
 
         // Create bindgroups for triangle_mesh_renderer.
         let triangle_mesh_bindgroups = 
@@ -302,14 +251,13 @@ impl Application for McTerrain {
         Self {
             camera: camera,
             // gpu_debugger: gpu_debugger,
-            gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            light: light,
-            render_params: render_params,
-            triangle_mesh_renderer: triangle_mesh_renderer,
-            triangle_mesh_renderer_tex2,
-            triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+            _light: light,
+            _render_params: render_params,
+            _triangle_mesh_renderer: triangle_mesh_renderer,
+            triangle_mesh_renderer_tex2: triangle_mesh_renderer_tex2,
+            _triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             triangle_mesh_bindgroups_tex2: triangle_mesh_bindgroups_tex2,
             triangle_mesh_bindgroups_tex2b: triangle_mesh_bindgroups_tex2b,
             buffers: buffers,
@@ -318,7 +266,7 @@ impl Application for McTerrain {
             marching_cubes: mc_instance,
             selected_noise: selected_noise,
             noise_params: noise_params,
-            textures: textures,
+            _textures: textures,
             y_coord: y_coord,
             texture_setup: texture_setup,
         }
@@ -329,7 +277,7 @@ impl Application for McTerrain {
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
-              spawner: &Spawner) {
+              _spawner: &Spawner) {
 
         self.screen.acquire_screen_texture(
             &device,
@@ -379,7 +327,7 @@ impl Application for McTerrain {
         self.screen.prepare_for_rendering();
 
         // Reset counter.
-        self.marching_cubes.reset_counter_value(device, queue);
+        self.marching_cubes.reset_counter_value(queue);
     }
 
     #[allow(unused)]
@@ -491,25 +439,6 @@ fn log_adapter_info(adapter: &wgpu::Adapter) {
         log::info!("max_compute_workgroup_size_y: {:?}", adapter_limits.max_compute_workgroup_size_y);
         log::info!("max_compute_workgroup_size_z: {:?}", adapter_limits.max_compute_workgroup_size_z);
         log::info!("max_compute_workgroups_per_dimension: {:?}", adapter_limits.max_compute_workgroups_per_dimension);
-}
-
-/// Initialize and create GpuDebugger for this project. TODO: add MAX_... to function parameters.
-fn create_gpu_debugger(device: &wgpu::Device,
-                       sc_desc: &wgpu::SurfaceConfiguration,
-                       camera: &mut Camera) -> GpuDebugger {
-
-        GpuDebugger::init(
-                &device,
-                &sc_desc,
-                &camera.get_camera_uniform(&device),
-                MAX_NUMBER_OF_VVVVNNNN.try_into().unwrap(),
-                MAX_NUMBER_OF_CHARS.try_into().unwrap(),
-                MAX_NUMBER_OF_ARROWS.try_into().unwrap(),
-                MAX_NUMBER_OF_AABBS.try_into().unwrap(),
-                MAX_NUMBER_OF_AABB_WIRES.try_into().unwrap(),
-                64,
-                1.0,
-        )
 }
 
 /// Initialize and create KeyboardManager. Register all the keys that are used in the application.

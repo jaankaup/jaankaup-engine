@@ -1,11 +1,10 @@
-use rand::Rng;
-use jaankaup_core::radix::{KeyMemoryIndex, Bucket, LocalSortBlock};
-use std::mem::size_of;
+//use rand::Rng;
+//use jaankaup_core::radix::{KeyMemoryIndex, Bucket, LocalSortBlock, RadixSort};
+// use std::mem::size_of;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use jaankaup_core::input::*;
-use jaankaup_algorithms::mc::{McParams, MarchingCubes};
 use jaankaup_core::template::{
         WGPUFeatures,
         WGPUConfiguration,
@@ -23,41 +22,46 @@ use jaankaup_core::common_functions::{
 };
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
-use jaankaup_core::buffer::{buffer_from_data, to_vec};
-use jaankaup_core::model_loader::{load_triangles_from_obj, TriangleMesh, create_from_bytes};
+use jaankaup_core::buffer::{buffer_from_data}; //, to_vec};
+use jaankaup_core::model_loader::{TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
-use jaankaup_core::shaders::{Render_VVVVNNNN_camera};
+use jaankaup_core::shaders::{RenderVvvvnnnnCamera};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
-use jaankaup_core::render_object::{draw, draw_indirect, RenderObject, ComputeObject, create_bind_groups};
+use jaankaup_core::render_object::{draw, RenderObject, ComputeObject, create_bind_groups};
 use jaankaup_core::texture::Texture;
-use jaankaup_core::aabb::Triangle_vvvvnnnn;
+// use jaankaup_core::aabb::Triangle_vvvvnnnn;
 // use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::radix::{RadixSort};
-use jaankaup_core::fmm_things::{DomainTester, PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
+use jaankaup_core::fmm_things::{PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
 use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_ARROWS:     usize = 40960;
 
 /// Max number of aabbs for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
 
 /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 
 /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
+#[allow(dead_code)]
 const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
+#[allow(dead_code)]
 const TOTAL_INDICES: usize = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
-const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
+//const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
 /// Mc global dimensions. 
 const FMM_GLOBAL_X: usize = 32; 
@@ -82,8 +86,8 @@ const FMM_INNER_Z: usize = 4;
 struct AppRenderParams {
     draw_point_cloud: bool,
     visualization_method: u32,
-    step: bool,
-    show_numbers: bool,
+    _step: bool,
+    _show_numbers: bool,
     update: bool,
 }
 
@@ -124,25 +128,25 @@ impl WGPUFeatures for FastMarchingMethodFeatures {
 struct FastMarchingMethod {
     camera: Camera,
     gpu_debugger: GpuDebugger,
-    gpu_timer: Option<GpuTimer>,
+    _gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
-    light: LightBuffer,
-    render_params: RenderParamBuffer,
-    triangle_mesh_renderer: Render_VVVVNNNN_camera,
-    triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+    _light: LightBuffer,
+    _render_params: RenderParamBuffer,
+    _triangle_mesh_renderer: RenderVvvvnnnnCamera,
+    _triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     //radix radix_sort: RadixSort,
     point_cloud: PointCloud,
     compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
     compute_object_fmm_visualizer: ComputeObject,
-    render_vvvvnnnn: Render_VVVVNNNN_camera,
+    render_vvvvnnnn: RenderVvvvnnnnCamera,
     render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
     render_object_vvvc: RenderObject,
     render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     app_render_params: AppRenderParams,
-    render_params_point_cloud: RenderParamBuffer,
-    fmm_value_fixer: FmmValueFixer,
+    _render_params_point_cloud: RenderParamBuffer,
+    _fmm_value_fixer: FmmValueFixer,
 }
 
 impl Application for FastMarchingMethod {
@@ -150,7 +154,7 @@ impl Application for FastMarchingMethod {
     fn init(configuration: &WGPUConfiguration) -> Self {
 
         // Log adapter info.
-        log_adapter_info(&configuration.adapter);
+        // log_adapter_info(&configuration.adapter);
 
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
@@ -164,8 +168,8 @@ impl Application for FastMarchingMethod {
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,
              visualization_method: 0,
-             step: false,
-             show_numbers: false,
+             _step: false,
+             _show_numbers: false,
              update: false,
         };
 
@@ -176,7 +180,7 @@ impl Application for FastMarchingMethod {
         let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
-        let mut keyboard_manager = create_keyboard_manager();
+        let keyboard_manager = create_keyboard_manager();
 
         // Light source for triangle meshes.
         let light = LightBuffer::create(
@@ -206,7 +210,7 @@ impl Application for FastMarchingMethod {
         buffers.insert("dummy_buffer".to_string(), dummy_buffer);
 
         // vvvvnnnn renderer.
-        let render_vvvvnnnn = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let render_vvvvnnnn = RenderVvvvnnnnCamera::init(&configuration.device, &configuration.sc_desc);
         let render_vvvvnnnn_bg = render_vvvvnnnn.create_bingroups(&configuration.device, &mut camera, &light, &render_params);
 
         // vvvc
@@ -238,7 +242,7 @@ impl Application for FastMarchingMethod {
         );
 
         // RenderObject for basic triangle mesh rendering.
-        let triangle_mesh_renderer = Render_VVVVNNNN_camera::init(&configuration.device, &configuration.sc_desc);
+        let triangle_mesh_renderer = RenderVvvvnnnnCamera::init(&configuration.device, &configuration.sc_desc);
 
         // Create bindgroups for triangle_mesh_renderer.
         let triangle_mesh_bindgroups = 
@@ -251,7 +255,7 @@ impl Application for FastMarchingMethod {
         let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
         // Store point data.
-        let pc_sample_data = 
+        let _pc_sample_data = 
             buffers.insert(
                 "pc_sample_data".to_string(),
                 buffer_from_data::<FmmCellPc>(
@@ -575,13 +579,13 @@ impl Application for FastMarchingMethod {
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
-            gpu_timer: gpu_timer,
+            _gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
-            light: light,
-            render_params: render_params,
-            triangle_mesh_renderer: triangle_mesh_renderer,
-            triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+            _light: light,
+            _render_params: render_params,
+            _triangle_mesh_renderer: triangle_mesh_renderer,
+            _triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
             //radix radix_sort: radix_sort,
             point_cloud: point_cloud,
@@ -592,8 +596,8 @@ impl Application for FastMarchingMethod {
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             app_render_params: app_render_params,
-            render_params_point_cloud: render_params_point_cloud,
-            fmm_value_fixer: fmm_value_fixer,
+            _render_params_point_cloud: render_params_point_cloud,
+            _fmm_value_fixer: fmm_value_fixer,
          }
     }
 
@@ -765,6 +769,7 @@ fn main() {
 }
 
 /// A helper function for logging adapter information.
+#[allow(dead_code)]
 fn log_adapter_info(adapter: &wgpu::Adapter) {
 
         let adapter_limits = adapter.limits(); 
@@ -821,6 +826,7 @@ fn create_keyboard_manager() -> KeyboardManager {
 }
 
 /// Load a wavefront mesh and store it to hash_map. Drop texture coordinates.
+#[allow(dead_code)]
 fn load_vvvnnn_mesh(device: &wgpu::Device,
                     data: String,
                     buffer_name: &'static str,

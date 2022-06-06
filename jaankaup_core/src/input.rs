@@ -84,6 +84,8 @@ impl InputState {
 #[derive(Clone)]
 pub struct MouseButton {
     state: Option<InputState>,
+
+    #[allow(dead_code)]
     tag: ev::MouseButton,
 }
 
@@ -198,6 +200,7 @@ pub struct InputCache {
     mouse_delta: PhysicalPosition::<f64>,
 
     /// The delta for the mouse scroll.
+    #[allow(dead_code)]
     scroll_delta: f32,
 
     /// Time now in micro seconds.

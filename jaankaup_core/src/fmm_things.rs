@@ -14,19 +14,34 @@ use crate::misc::Convert2Vec;
 use crate::buffer::buffer_from_data;
 
 /// Tag value for Far cell.
+#[allow(dead_code)]
 const FAR: u32      = 0;
 
 /// Tag value for band cell whose value is not yet known.
+#[allow(dead_code)]
 const BAND_NEW: u32 = 1;
 
 /// Tag value for a band cell.
+#[allow(dead_code)]
 const BAND: u32     = 2;
 
 /// Tag value for a known cell.
+#[allow(dead_code)]
 const KNOWN: u32    = 3;
 
 /// Tag value for a cell outside the computational domain.
+#[allow(dead_code)]
 const OUTSIDE: u32  = 4;
+
+/// TODO: remove from fmm.rs.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct FmmPrefixParams {
+    data_start_index: u32,
+    data_end_index: u32,
+    exclusive_parts_start_index: u32,
+    exclusive_parts_end_index: u32,
+}
 
 /// Basic data for the fast marching method.
 #[repr(C)]
@@ -156,6 +171,7 @@ impl ComputationalDomainBuffer {
     pub fn update_global_dimension(&mut self, queue: &wgpu::Queue, global_dimension: [u32; 3]) {
         // TODO: asserts
         self.computational_domain.global_dimension = global_dimension;
+        self.update(queue);
     }
 
     pub fn update_domain_iterator(&mut self, queue: &wgpu::Queue, domain_iterator: [u32; 3]) {
@@ -177,7 +193,7 @@ pub struct DomainTester {
     computational_domain_buffer: ComputationalDomainBuffer,
     compute_object: ComputeObject,
     bind_groups: Vec<wgpu::BindGroup>,
-    domain_iterator: [u32; 3],
+    _domain_iterator: [u32; 3],
 }
 
 impl DomainTester {
@@ -262,7 +278,7 @@ impl DomainTester {
             computational_domain_buffer,
             compute_object: compute_object, 
             bind_groups: bind_groups,
-            domain_iterator: domain_iterator,
+            _domain_iterator: domain_iterator,
         }
     }
 
@@ -436,7 +452,7 @@ pub struct GridDataPc {
 pub struct PointCloudHandler {
     compute_object_point_to_interface: ComputeObject,
     point_to_interface_bind_groups: Vec<wgpu::BindGroup>,
-    fmm_params_buffer: FmmParamsBuffer, // TODO: from parameter, remove this 
+    _fmm_params_buffer: FmmParamsBuffer, // TODO: from parameter, remove this 
     point_cloud_params_buffer: PointCloudParamsBuffer,
 }
 
@@ -525,7 +541,7 @@ impl PointCloudHandler {
         Self {
              compute_object_point_to_interface: compute_object,
              point_to_interface_bind_groups: point_to_interface_bind_groups,
-             fmm_params_buffer: fmm_params_buffer,
+             _fmm_params_buffer: fmm_params_buffer,
              point_cloud_params_buffer: point_cloud_params_buffer,
         }
     }
@@ -548,16 +564,16 @@ impl PointCloudHandler {
 
      pub fn point_data_to_interface(&self, encoder: &mut wgpu::CommandEncoder) {
 
-         let global_dimension = self.fmm_params_buffer.get_global_dimension();
-         let local_dimension = self.fmm_params_buffer.get_local_dimension();
+         //let global_dimension = self.fmm_params_buffer.get_global_dimension();
+         //let local_dimension = self.fmm_params_buffer.get_local_dimension();
 
-         let total_grid_count =
-                         global_dimension[0] *
-                         global_dimension[1] *
-                         global_dimension[2] *
-                         local_dimension[0] *
-                         local_dimension[1] *
-                         local_dimension[2];
+         //let total_grid_count =
+         //                global_dimension[0] *
+         //                global_dimension[1] *
+         //                global_dimension[2] *
+         //                local_dimension[0] *
+         //                local_dimension[1] *
+         //                local_dimension[2];
 
          self.compute_object_point_to_interface.dispatch(
              &self.point_to_interface_bind_groups,
@@ -632,10 +648,10 @@ impl FmmValueFixer {
 }
 
 pub struct FastMarchingMethod {
-    compute_object: ComputeObject,
+    _compute_object: ComputeObject,
     // bind_groups: Vec<wgpu::BindGroup>,
-    fmm_params_buffer: FmmParamsBuffer,
-    fmm_data: wgpu::Buffer,
+    _fmm_params_buffer: FmmParamsBuffer,
+    _fmm_data: wgpu::Buffer,
 }
 
 impl FastMarchingMethod {
@@ -685,10 +701,27 @@ impl FastMarchingMethod {
                 None
             );
 
+        // let temp_prefix_start = 0;
+        // let temp_prefix_end = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32;
+        // let exclusive_start = temp_prefix_end;
+        // let exclusive_end   = exclusive_start + (PREFIX_THREAD_COUNT * 2) as u32;
+
+        // println!("temp_prefix_start == {}", temp_prefix_start);
+        // println!("temp_prefix_end == {}", temp_prefix_end);
+        // println!("exclusive_start == {}", exclusive_start);
+        // println!("exclusive_end == {}", exclusive_end);
+
+        //++ let fmm_prefix_params = FmmPrefixParams {
+        //++         data_start_index: 0,
+        //++         data_end_index: (global_dimension[0] * global_dimension[1] * global_dimension[2]) as u32,
+        //++         exclusive_parts_start_index: exclusive_start,
+        //++         exclusive_parts_end_index: exclusive_end,
+        //++ };
+
         Self {
-            compute_object: compute_object,
-            fmm_params_buffer: fmm_params_buffer,
-            fmm_data: fmm_data,
+            _compute_object: compute_object,
+            _fmm_params_buffer: fmm_params_buffer,
+            _fmm_data: fmm_data,
         }
     }
 }
