@@ -100,10 +100,10 @@ struct FmmVisualizationParams {
     future_usage: u32,
 }
 
-/// Features and limits for FastMarchingMethod application.
-struct FastMarchingMethodFeatures {}
+/// Features and limits for FmmApp application.
+struct FmmAppFeatures {}
 
-impl WGPUFeatures for FastMarchingMethodFeatures {
+impl WGPUFeatures for FmmAppFeatures {
 
     fn optional_features() -> wgpu::Features {
         wgpu::Features::TIMESTAMP_QUERY
@@ -124,8 +124,8 @@ impl WGPUFeatures for FastMarchingMethodFeatures {
     }
 }
 
-/// FastMarchingMethod solver. A Fast marching method (GPU) for solving the eikonal equation.
-struct FastMarchingMethod {
+/// FmmApp solver. A Fast marching method (GPU) for solving the eikonal equation.
+struct FmmApp {
     camera: Camera,
     gpu_debugger: GpuDebugger,
     _gpu_timer: Option<GpuTimer>,
@@ -149,7 +149,7 @@ struct FastMarchingMethod {
     _fmm_value_fixer: FmmValueFixer,
 }
 
-impl Application for FastMarchingMethod {
+impl Application for FmmApp {
 
     fn init(configuration: &WGPUConfiguration) -> Self {
 
@@ -764,7 +764,7 @@ impl Application for FastMarchingMethod {
 
 fn main() {
     
-    jaankaup_core::template::run_loop::<FastMarchingMethod, BasicLoop, FastMarchingMethodFeatures>(); 
+    jaankaup_core::template::run_loop::<FmmApp, BasicLoop, FmmAppFeatures>(); 
     println!("Finished...");
 }
 

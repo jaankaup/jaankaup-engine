@@ -73,7 +73,7 @@ var<storage, read_write> temp_prefix_sum: array<u32>;
 var<storage,read_write> filtered_blocks: array<FmmBlock>;
 
 let THREAD_COUNT = 1024u;
-let SCAN_BLOCK_SIZE = 2176u; 
+let SCAN_BLOCK_SIZE = 2176u;
 
 // Push constants.
 var<push_constant> pc: PushConstants;

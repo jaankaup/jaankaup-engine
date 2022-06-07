@@ -1,5 +1,10 @@
 use bytemuck::{Pod, Zeroable};
+use std::borrow::Cow;
 use std::collections::HashMap;
+use crate::render_object::ComputeObject;
+use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
+use crate::fmm_things::FmmParamsBuffer;
+
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -63,21 +68,66 @@ const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
 /// Struct for parallel fast marching method. 
 struct FastMarchingMethod {
 
+    /// The fmm compute object. 
+    #[allow(dead_code)]
+    compute_object: ComputeObject,
+
     /// Store general buffers here.
-    _buffers: HashMap<String, wgpu::Buffer>,
+    #[allow(dead_code)]
+    buffers: HashMap<String, wgpu::Buffer>,
+
+    /// Fast marching method params.
+    #[allow(dead_code)]
+    fmm_params_buffer: FmmParamsBuffer,
 }
 
 impl FastMarchingMethod {
 
     #[allow(dead_code)]
-    pub fn init(_device: &wgpu::Device,
-                _fmm_params_buffer: &wgpu::Buffer,
-                _fmm_data: &wgpu::Buffer,
+    pub fn init(device: &wgpu::Device,
+                global_dimension: [u32; 3],
+                local_dimension: [u32; 3]
                 ) -> Self {
 
         // Buffer hash_map.
         let buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("fmm_value_fixer.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/fast_marching_method.wgsl"))),
+
+                    }),
+                    Some("FastMarchingMethod ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    Some(vec![wgpu::PushConstantRange {
+                        stages: wgpu::ShaderStages::COMPUTE,
+                        range: 0..4,
+                    }]),
+        );
+
+        let fmm_params_buffer = FmmParamsBuffer::create(device, global_dimension, local_dimension);
         // create_buffers(device: &wgpu::Device)
         // let pc_sample_data = 
         //     buffers.insert(
@@ -95,14 +145,15 @@ impl FastMarchingMethod {
         //     );
 
         Self {
-            _buffers: buffers,
-
+            compute_object: compute_object,
+            buffers: buffers,
+            fmm_params_buffer: fmm_params_buffer, 
         }
     }
 
     /// Create the initial interface from given data.
     #[allow(dead_code)]
-    pub fn initialize_initial_interface(&self) {
+    pub fn initialize_interface(&self) {
 
     }
 
@@ -120,7 +171,12 @@ impl FastMarchingMethod {
 
     // 
     #[allow(dead_code)]
-    pub fn refresh_neighbors(&self) {
+    pub fn update_neighbors(&self) {
+
+    }
+
+    #[allow(dead_code)]
+    pub fn expand_interface(&self) {
 
     }
 
