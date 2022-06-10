@@ -23,6 +23,15 @@ struct PushConstants {
     phase: u32,    
 };
 
+struct PrivateData {
+    ai: u32,
+    bi: u32,
+    ai_bcf: u32,
+    bi_bcf: u32,
+    global_ai: u32,
+    global_bi: u32,
+};
+
 // Thread private data for prefix sum.
 struct PrivatePrefixSum {
     ai: u32,         // Thread index
@@ -115,17 +124,17 @@ fn copy_block_to_shared_temp() {
     let b = fmm_blocks[private_data.global_bi];
 
     // Add prediates here.
-    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < fmm_prefix_params.data_end_index && a.band_points_count > 0u);
-    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < fmm_prefix_params.data_end_index && b.band_points_count > 0u);
+    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < prefix_params.data_end_index && a.band_points_count > 0u);
+    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < prefix_params.data_end_index && b.band_points_count > 0u);
 }
 
 fn copy_exclusive_data_to_shared_aux() {
 
-    let data_count = fmm_prefix_params.exclusive_parts_end_index -
-                     fmm_prefix_params.exclusive_parts_start_index;
+    let data_count = prefix_params.exclusive_parts_end_index -
+                     prefix_params.exclusive_parts_start_index;
 
-    let data_a = temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + private_data.ai];
-    let data_b = temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + private_data.bi];
+    let data_a = temp_prefix_sum[prefix_params.exclusive_parts_start_index + private_data.ai];
+    let data_b = temp_prefix_sum[prefix_params.exclusive_parts_start_index + private_data.bi];
 
     // TODO: remove select.
     shared_aux[private_data.ai_bcf] = select(0u, data_a, private_data.ai < data_count);
@@ -162,7 +171,7 @@ fn local_prefix_sum(workgroup_index: u32) {
     if (private_data.ai == 0u) {
 
         let last_index = (THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u);
-        temp_prefix_sum[fmm_prefix_params.exclusive_parts_start_index + workgroup_index] = shared_prefix_sum[last_index];
+        temp_prefix_sum[prefix_params.exclusive_parts_start_index + workgroup_index] = shared_prefix_sum[last_index];
         shared_prefix_sum[last_index] = 0u;
 
     }
@@ -239,8 +248,8 @@ fn local_prefix_sum_aux() {
 
 fn sum_auxiliar() {
 
-    let data_count = fmm_prefix_params.data_end_index -
-                     fmm_prefix_params.data_start_index;
+    let data_count = prefix_params.data_end_index -
+                     prefix_params.data_start_index;
 
     let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
 
@@ -262,8 +271,8 @@ fn sum_auxiliar() {
 
 fn gather_data() {
 
-    let data_count = fmm_prefix_params.data_end_index -
-                     fmm_prefix_params.data_start_index;
+    let data_count = prefix_params.data_end_index -
+                     prefix_params.data_start_index;
 
     let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
 
@@ -370,7 +379,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // STAGE 1.
     // Create scan data and store it to global memory.
-    if (fmm_prefix_params.stage == 1u) {
+    if (pc.phase == 1u) {
 
         copy_block_to_shared_temp();
         local_prefix_sum(work_group_id.x);
@@ -379,7 +388,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // STAGE 2.
     // Do the actual prefix sum and the filtered data to the final destination array.
-    else if (fmm_prefix_params.stage == 2u) {
+    else if (pc.phase == 2u) {
 
       if (local_index == 0u) {
           stream_compaction_count = 0u;

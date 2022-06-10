@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use crate::render_object::ComputeObject;
 use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
-use crate::fmm_things::FmmParamsBuffer;
+use crate::fmm_things::{FmmParamsBuffer, PointCloud};
 
 
 #[repr(C)]
@@ -66,7 +66,7 @@ const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
 // *  
 
 /// Struct for parallel fast marching method. 
-struct FastMarchingMethod {
+pub struct FastMarchingMethod {
 
     /// The fmm compute object. 
     #[allow(dead_code)]
@@ -96,7 +96,7 @@ impl FastMarchingMethod {
                 ComputeObject::init(
                     &device,
                     &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-                        label: Some("fmm_value_fixer.wgsl"),
+                        label: Some("fast_marching_method.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/fast_marching_method.wgsl"))),
 
@@ -151,9 +151,10 @@ impl FastMarchingMethod {
         }
     }
 
-    /// Create the initial interface from given data.
+    /// Create the initial interface using point cloud data.
+    /// TODO: point sampling method.
     #[allow(dead_code)]
-    pub fn initialize_interface(&self) {
+    pub fn initialize_interface_pc(&self, _pc: &PointCloud) {
 
     }
 

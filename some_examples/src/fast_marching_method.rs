@@ -35,6 +35,7 @@ use jaankaup_core::texture::Texture;
 // use jaankaup_core::aabb::Triangle_vvvvnnnn;
 // use jaankaup_core::common_functions::encode_rgba_u32;
 use jaankaup_core::fmm_things::{PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
+use jaankaup_core::fast_marching_method::FastMarchingMethod;
 use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
@@ -147,6 +148,7 @@ struct FmmApp {
     app_render_params: AppRenderParams,
     _render_params_point_cloud: RenderParamBuffer,
     _fmm_value_fixer: FmmValueFixer,
+    fmm: FastMarchingMethod,
 }
 
 impl Application for FmmApp {
@@ -236,6 +238,9 @@ impl Application for FmmApp {
                     wgpu::PrimitiveTopology::PointList
         );
 
+        let global_dimension = [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32];
+        let local_dimension = [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32];
+        let total_cell_count = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z;
         let render_params = RenderParamBuffer::create(
                     &configuration.device,
                     4.0
@@ -265,7 +270,7 @@ impl Application for FmmApp {
                     value: 10000000,
                     color: 0,
                     // padding: 0,
-                } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
+                } ; total_cell_count],
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None)
             );
@@ -288,8 +293,8 @@ impl Application for FmmApp {
 
         let point_cloud_handler = PointCloudHandler::init(
                 &configuration.device,
-                [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32],
-                [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32],
+                global_dimension,
+                local_dimension,
                 point_cloud.get_point_count(),
                 pc_min_coord,
                 pc_max_coord,
@@ -311,6 +316,13 @@ impl Application for FmmApp {
                                               &render_params_point_cloud.get_buffer().as_entire_binding(),
                                          ]
                                      ]
+        );
+
+        // The Fast marching method.
+        //
+        let fmm = FastMarchingMethod::init(&configuration.device,
+                                           global_dimension,
+                                           local_dimension,
         );
 
         // The fmm scene visualizer.
@@ -598,6 +610,7 @@ impl Application for FmmApp {
             app_render_params: app_render_params,
             _render_params_point_cloud: render_params_point_cloud,
             _fmm_value_fixer: fmm_value_fixer,
+            fmm: fmm,
          }
     }
 
