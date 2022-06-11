@@ -23,6 +23,30 @@ struct PushConstants {
     phase: u32,    
 };
 
+// GpuDebugger
+
+struct AABB {
+    min: vec4<f32>, 
+    max: vec4<f32>, 
+};
+
+struct Arrow {
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
+};
+
+struct Char {
+    start_pos: vec3<f32>,
+    font_size: f32,
+    value: vec4<f32>,
+    vec_dim_count: u32,
+    color: u32,
+    decimal_count: u32,
+    auxiliary_data: u32,
+};
+
 struct PrivateData {
     ai: u32,
     bi: u32,
@@ -61,25 +85,18 @@ struct FmmBlock {
     band_points_count: u32,
 };
 
-@group(0)
-@binding(0)
-var<uniform> prefix_params: PrefixParams;
+@group(0) @binding(0) var<uniform>             prefix_params: PrefixParams;
+@group(0) @binding(1) var<uniform>             fmm_params:    FmmParams;
+@group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+@group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+@group(0) @binding(4) var<storage,read_write>  filtered_blocks: array<FmmBlock>;
 
-@group(0)
-@binding(1)
-var<uniform> fmm_params: FmmParams;
-
-@group(0)
-@binding(2)
-var<storage, read_write> fmm_blocks: array<FmmBlock>;
-
-@group(0)
-@binding(3)
-var<storage, read_write> temp_prefix_sum: array<u32>;
-
-@group(0)
-@binding(4)
-var<storage,read_write> filtered_blocks: array<FmmBlock>;
+// GpuDebugger.
+@group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
+@group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
+@group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
+@group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
+@group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
 
 let THREAD_COUNT = 1024u;
 let SCAN_BLOCK_SIZE = 2176u;

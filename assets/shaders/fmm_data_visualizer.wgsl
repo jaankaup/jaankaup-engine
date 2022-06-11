@@ -343,9 +343,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // TODO: spaces!
     let value = vec4<f32>(cell.value, 0.0, 0.0, 0.0);
     let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
-    let element_position = position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.25, 0.0, -AABB_SIZE - 0.001);
+    let element_position = 4.0 * position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.5, 0.0, -AABB_SIZE - 1.01);
+    // let element_position = 4.0 * position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.25, 0.0, -AABB_SIZE - 0.001);
     let renderable_element = Char (
-                    4.0 * element_position,
+                    // element_position,
+                    element_position,
                     FONT_SIZE,
                     value,
                     1u,

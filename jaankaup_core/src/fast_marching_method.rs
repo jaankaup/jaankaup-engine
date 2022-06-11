@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::render_object::ComputeObject;
 use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
 use crate::fmm_things::{FmmParamsBuffer, PointCloud};
-
+use crate::gpu_debugger::GpuDebugger;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -79,15 +79,27 @@ pub struct FastMarchingMethod {
     /// Fast marching method params.
     #[allow(dead_code)]
     fmm_params_buffer: FmmParamsBuffer,
+
+    /// Global dimension for computational domain.
+    #[allow(dead_code)]
+    global_dimension: [u32; 3],
+
+    /// Local dimension for computational domain.
+    #[allow(dead_code)]
+    local_dimension: [u32; 3],
 }
 
 impl FastMarchingMethod {
 
+    /// Creates an instance of FastMarchingMethod.
     #[allow(dead_code)]
     pub fn init(device: &wgpu::Device,
                 global_dimension: [u32; 3],
-                local_dimension: [u32; 3]
+                local_dimension: [u32; 3],
+                gpu_debugger: &Option<&GpuDebugger>,
                 ) -> Self {
+
+        // TODO: assertions for local and global dimension.
 
         // Buffer hash_map.
         let buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
@@ -119,6 +131,24 @@ impl FastMarchingMethod {
                             // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
+                        vec![
+
+                            // @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+
                     ],
                     &"main".to_string(),
                     Some(vec![wgpu::PushConstantRange {
@@ -148,6 +178,8 @@ impl FastMarchingMethod {
             compute_object: compute_object,
             buffers: buffers,
             fmm_params_buffer: fmm_params_buffer, 
+            global_dimension: global_dimension,
+            local_dimension: local_dimension,
         }
     }
 

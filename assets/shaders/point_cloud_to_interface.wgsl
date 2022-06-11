@@ -13,7 +13,9 @@ struct VVVC {
 
 struct FmmParams {
     global_dimension: vec3<u32>,
+    visualization_method: u32,
     local_dimension: vec3<u32>,
+    future_usage: u32,
 };
 
 struct PointCloudParams {

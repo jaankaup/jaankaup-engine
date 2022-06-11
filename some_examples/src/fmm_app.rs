@@ -166,7 +166,6 @@ impl Application for FmmApp {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.1);
 
-
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,
              visualization_method: 0,
@@ -323,6 +322,7 @@ impl Application for FmmApp {
         let fmm = FastMarchingMethod::init(&configuration.device,
                                            global_dimension,
                                            local_dimension,
+                                           &Some(&gpu_debugger),
         );
 
         // The fmm scene visualizer.
