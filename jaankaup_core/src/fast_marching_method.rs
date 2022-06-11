@@ -1,3 +1,6 @@
+use std::convert::TryInto;
+use crate::buffer::buffer_from_data;
+use crate::fmm_things::FmmCellPc;
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -87,6 +90,10 @@ pub struct FastMarchingMethod {
     /// Local dimension for computational domain.
     #[allow(dead_code)]
     local_dimension: [u32; 3],
+
+    /// Fmm cell data.
+    #[allow(dead_code)]
+    fmm_data: wgpu::Buffer,
 }
 
 impl FastMarchingMethod {
@@ -96,7 +103,7 @@ impl FastMarchingMethod {
     pub fn init(device: &wgpu::Device,
                 global_dimension: [u32; 3],
                 local_dimension: [u32; 3],
-                gpu_debugger: &Option<&GpuDebugger>,
+                _gpu_debugger: &Option<&GpuDebugger>,
                 ) -> Self {
 
         // TODO: assertions for local and global dimension.
@@ -158,21 +165,18 @@ impl FastMarchingMethod {
         );
 
         let fmm_params_buffer = FmmParamsBuffer::create(device, global_dimension, local_dimension);
-        // create_buffers(device: &wgpu::Device)
-        // let pc_sample_data = 
-        //     buffers.insert(
-        //         "pc_sample_data".to_string(),
-        //         buffer_from_data::<FmmCellPc>(
-        //         &configuration.device,
-        //         &vec![FmmCellPc {
-        //             tag: 0,
-        //             value: 10000000,
-        //             color: 0,
-        //             // padding: 0,
-        //         } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
-        //         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        //         None)
-        //     );
+                                                
+        let fmm_data = buffer_from_data::<FmmCellPc>(
+                &device,
+                &vec![FmmCellPc {
+                    tag: 0,
+                    value: 10000000,
+                    color: 0,
+                    // padding: 0,
+                } ; (global_dimension[0] * global_dimension[1] * global_dimension[2] * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap() ],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                None
+        );
 
         Self {
             compute_object: compute_object,
@@ -180,6 +184,7 @@ impl FastMarchingMethod {
             fmm_params_buffer: fmm_params_buffer, 
             global_dimension: global_dimension,
             local_dimension: local_dimension,
+            fmm_data: fmm_data,
         }
     }
 

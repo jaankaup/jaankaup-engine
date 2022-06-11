@@ -148,7 +148,7 @@ struct FmmApp {
     app_render_params: AppRenderParams,
     _render_params_point_cloud: RenderParamBuffer,
     _fmm_value_fixer: FmmValueFixer,
-    fmm: FastMarchingMethod,
+    _fmm: FastMarchingMethod,
 }
 
 impl Application for FmmApp {
@@ -610,7 +610,7 @@ impl Application for FmmApp {
             app_render_params: app_render_params,
             _render_params_point_cloud: render_params_point_cloud,
             _fmm_value_fixer: fmm_value_fixer,
-            fmm: fmm,
+            _fmm: fmm,
          }
     }
 

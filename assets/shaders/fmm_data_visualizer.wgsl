@@ -254,7 +254,7 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   var x  = index;
   let wh = dim_x * dim_y;
   let z  = x / wh;
-  x  = x - z * wh; // check
+  x  = x - z * wh;
   let y  = x / dim_x;
   x  = x - y * dim_x;
   return vec3<u32>(x, y, z);
@@ -314,22 +314,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let color = bitcast<f32>(rgba_u32(222u, 0u, 150u, 255u));
 
-    // Visualize the global fmm domain aabb.
-    // if (global_id.x == 0u) {
-    //     output_aabb_wire[global_id.x] =  
-    //           AABB (
-    //               vec4<f32>(0.0, 0.0, 0.0, color),
-    //               vec4<f32>(vec3<f32>(fmm_visualization_params.fmm_global_dimension), 0.1)
-    //           );
-    //     atomicAdd(&counter[3], 1u);
-    // }
-
     let cell = fmm_data[global_id.x];
 
-    //++ let speed = isotropic_data[global_id.x];
-    //++ var position = vec3<f32>(decode3Dmorton32(global_id.x)); // * 0.25;
     var position = vec3<f32>(get_cell_index(global_id.x)); // * 0.25;
-    //let cell = fmm_data[get_cell_mem_location(get_cell_index(global_id.x))];
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
@@ -344,7 +331,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let value = vec4<f32>(cell.value, 0.0, 0.0, 0.0);
     let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
     let element_position = 4.0 * position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.5, 0.0, -AABB_SIZE - 1.01);
-    // let element_position = 4.0 * position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.25, 0.0, -AABB_SIZE - 0.001);
     let renderable_element = Char (
                     // element_position,
                     element_position,
