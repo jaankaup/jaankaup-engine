@@ -1,10 +1,14 @@
+use crate::common_functions::udiv_up_safe32;
+use crate::fmm_things::FmmValueFixer;
+use crate::fmm_things::PointCloudParamsBuffer;
+// use crate::fmm_things::PointCloudParams;
 use std::convert::TryInto;
 use crate::buffer::buffer_from_data;
 use crate::fmm_things::FmmCellPc;
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use crate::render_object::ComputeObject;
+use crate::render_object::{ComputeObject, create_bind_groups};
 use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
 use crate::fmm_things::{FmmParamsBuffer, PointCloud};
 use crate::gpu_debugger::GpuDebugger;
@@ -94,6 +98,18 @@ pub struct FastMarchingMethod {
     /// Fmm cell data.
     #[allow(dead_code)]
     fmm_data: wgpu::Buffer,
+
+    /// Point data to fmm interface compute object.
+    #[allow(dead_code)]
+    pc_to_interface_compute_object: ComputeObject,
+
+    /// Point data to fmm interface bing groups.
+    #[allow(dead_code)]
+    point_to_interface_bind_groups: Option<Vec<wgpu::BindGroup>>,
+
+    /// Preprocessor for fmm values.
+    #[allow(dead_code)]
+    fmm_value_fixer: FmmValueFixer,
 }
 
 impl FastMarchingMethod {
@@ -178,6 +194,55 @@ impl FastMarchingMethod {
                 None
         );
 
+        let pc_to_interface_compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("pc_to_interface_fmm.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/pc_to_interface_fmm.wgsl"))),
+
+                    }),
+                    Some("Cloud data to fmm Compute object fmm"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+ 
+                            // @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+ 
+                            // @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+ 
+                            // @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+ 
+                            // // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
+                            // create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+ 
+                            // // @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
+                            // create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+ 
+                            // // @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
+                            // create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+ 
+                            // // @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
+                            // create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+ 
+                            // // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            // create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None
+        );
+
+        let fmm_value_fixer = FmmValueFixer::init(&device,
+                                                  &fmm_params_buffer.get_buffer(),
+                                                  &fmm_data,
+        );
+
         Self {
             compute_object: compute_object,
             buffers: buffers,
@@ -185,13 +250,52 @@ impl FastMarchingMethod {
             global_dimension: global_dimension,
             local_dimension: local_dimension,
             fmm_data: fmm_data,
+            pc_to_interface_compute_object: pc_to_interface_compute_object,
+            point_to_interface_bind_groups: None,
+            fmm_value_fixer: fmm_value_fixer,
         }
     }
 
     /// Create the initial interface using point cloud data.
     /// TODO: point sampling method.
     #[allow(dead_code)]
-    pub fn initialize_interface_pc(&self, _pc: &PointCloud) {
+    pub fn initialize_interface_pc(&self, encoder: &mut wgpu::CommandEncoder, pc: &PointCloud) {
+
+        assert!(!self.point_to_interface_bind_groups.is_none(), "Consider calling add_point_cloud_data before this function."); 
+
+         self.pc_to_interface_compute_object.dispatch(
+             &self.point_to_interface_bind_groups.as_ref().unwrap(),
+             encoder,
+             1, 1, 1, Some("Point data to interface dispatch")
+         );
+
+        self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(pc.get_point_count(), 1024) + 1, 1, 1]);
+    }
+
+    pub fn add_point_cloud_data(&mut self,
+                                device: &wgpu::Device,
+                                pc_data: &wgpu::Buffer,
+                                point_cloud_params_buffer: &PointCloudParamsBuffer) {
+
+        let point_to_interface_bind_groups = create_bind_groups(
+                &device,
+                &self.pc_to_interface_compute_object.bind_group_layout_entries,
+                &self.pc_to_interface_compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                    &self.fmm_params_buffer.get_buffer().as_entire_binding(),
+                    &point_cloud_params_buffer.get_buffer().as_entire_binding(),
+                    &self.fmm_data.as_entire_binding(),
+                    &pc_data.as_entire_binding(),
+                    // &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
+        );
+        self.point_to_interface_bind_groups = Some(point_to_interface_bind_groups);
 
     }
 
@@ -216,6 +320,10 @@ impl FastMarchingMethod {
     #[allow(dead_code)]
     pub fn expand_interface(&self) {
 
+    }
+
+    pub fn get_fmm_data_buffer(&self) -> &wgpu::Buffer {
+        &self.fmm_data
     }
 
     // /// From each active fmm block, find smallest band point and change the tag to known. 

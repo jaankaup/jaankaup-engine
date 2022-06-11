@@ -1,6 +1,7 @@
 //use rand::Rng;
 //use jaankaup_core::radix::{KeyMemoryIndex, Bucket, LocalSortBlock, RadixSort};
 // use std::mem::size_of;
+use jaankaup_core::fmm_things::PointCloudParamsBuffer;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -13,7 +14,7 @@ use jaankaup_core::template::{
         Spawner,
 };
 use jaankaup_core::common_functions::{
-    udiv_up_safe32,
+    // udiv_up_safe32,
     create_buffer_bindgroup_layout,
     create_uniform_bindgroup_layout,
     set_bit_to,
@@ -32,9 +33,7 @@ use jaankaup_core::shaders::{RenderVvvvnnnnCamera};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::render_object::{draw, RenderObject, ComputeObject, create_bind_groups};
 use jaankaup_core::texture::Texture;
-// use jaankaup_core::aabb::Triangle_vvvvnnnn;
-// use jaankaup_core::common_functions::encode_rgba_u32;
-use jaankaup_core::fmm_things::{PointCloud, FmmCellPc, PointCloudHandler, FmmValueFixer};
+use jaankaup_core::fmm_things::{PointCloud, FmmCellPc};
 use jaankaup_core::fast_marching_method::FastMarchingMethod;
 use bytemuck::{Pod, Zeroable};
 
@@ -73,16 +72,6 @@ const FMM_GLOBAL_Z: usize = 32;
 const FMM_INNER_X: usize = 4; 
 const FMM_INNER_Y: usize = 4; 
 const FMM_INNER_Z: usize = 4; 
-
-// const MC_OUTPUT_BUFFER_SIZE: u32 = (FMM_GLOBAL_X *
-//                                     FMM_GLOBAL_Y *
-//                                     FMM_GLOBAL_Z *
-//                                     FMM_INNER_X *
-//                                     FMM_INNER_Y *
-//                                     FMM_INNER_Z *
-//                                     size_of::<f32>()) as u32 * 16;
-//
-
 
 struct AppRenderParams {
     draw_point_cloud: bool,
@@ -146,9 +135,10 @@ struct FmmApp {
     render_object_vvvc: RenderObject,
     render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     app_render_params: AppRenderParams,
-    _render_params_point_cloud: RenderParamBuffer,
-    _fmm_value_fixer: FmmValueFixer,
+    // _render_params_point_cloud: RenderParamBuffer,
+    // _fmm_value_fixer: FmmValueFixer,
     _fmm: FastMarchingMethod,
+    _pc_params: PointCloudParamsBuffer,
 }
 
 impl Application for FmmApp {
@@ -259,7 +249,7 @@ impl Application for FmmApp {
         let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
         // Store point data.
-        let _pc_sample_data = 
+        let _pc_sample_data =
             buffers.insert(
                 "pc_sample_data".to_string(),
                 buffer_from_data::<FmmCellPc>(
@@ -274,7 +264,6 @@ impl Application for FmmApp {
                 None)
             );
 
-        let pc_min_coord = point_cloud.get_min_coord();
         let pc_max_coord = point_cloud.get_max_coord();
 
         // Create scale factor for point data so it fits under computation domain ranges.
@@ -284,25 +273,18 @@ impl Application for FmmApp {
 
         let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
 
+        let pc_params = PointCloudParamsBuffer::create(
+            &configuration.device,
+            point_cloud.get_point_count(),
+            point_cloud.get_min_coord(),
+            point_cloud.get_max_coord(),
+            pc_scale_factor,
+            123, // useless
+            false); // useless
+
         let render_params_point_cloud = RenderParamBuffer::create(
                     &configuration.device,
                     pc_scale_factor
-        );
-
-
-        let point_cloud_handler = PointCloudHandler::init(
-                &configuration.device,
-                global_dimension,
-                local_dimension,
-                point_cloud.get_point_count(),
-                pc_min_coord,
-                pc_max_coord,
-                pc_scale_factor, // scale_factor
-                0, //point_cloud_draw_iterator,
-                false, //show_numbers,
-                &buffers.get("pc_sample_data").unwrap(),
-                point_cloud.get_buffer(),
-                &gpu_debugger
         );
 
         let render_bind_groups_vvvc = create_bind_groups(
@@ -319,11 +301,15 @@ impl Application for FmmApp {
 
         // The Fast marching method.
         //
-        let fmm = FastMarchingMethod::init(&configuration.device,
+        let mut fmm = FastMarchingMethod::init(&configuration.device,
                                            global_dimension,
                                            local_dimension,
                                            &Some(&gpu_debugger),
         );
+
+        fmm.add_point_cloud_data(&configuration.device,
+                                 &point_cloud.get_buffer(),
+                                 &pc_params);
 
         // The fmm scene visualizer.
         let compute_object_fmm_visualizer =
@@ -391,11 +377,6 @@ impl Application for FmmApp {
             None)
         );
 
-        let fmm_value_fixer = FmmValueFixer::init(&configuration.device,
-                                                  &buffers.get(&"fmm_visualization_params".to_string()).unwrap(),
-                                                  &buffers.get(&"pc_sample_data".to_string()).unwrap()
-        );
-
         let compute_bind_groups_fmm_visualizer =
             create_bind_groups(
                 &configuration.device,
@@ -404,9 +385,7 @@ impl Application for FmmApp {
                 &vec![
                     vec![
                          &buffers.get(&"fmm_visualization_params".to_string()).unwrap().as_entire_binding(),
-                         &buffers.get(&"pc_sample_data".to_string()).unwrap().as_entire_binding(),
-                         // &buffers.get(&"fmm_blocks".to_string()).unwrap().as_entire_binding(),
-                         // &buffers.get(&"isotropic_data".to_string()).unwrap().as_entire_binding(),
+                         &fmm.get_fmm_data_buffer().as_entire_binding(),
                          &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
@@ -418,11 +397,10 @@ impl Application for FmmApp {
 
         let mut encoder = configuration.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
-                label: Some("Domain tester encoder"),
+                label: Some("Fmm initial interface encoder"),
         });
 
-        point_cloud_handler.point_data_to_interface(&mut encoder);
-        fmm_value_fixer.dispatch(&mut encoder, [udiv_up_safe32(point_cloud.get_point_count(), 1024) + 1, 1, 1]);
+        fmm.initialize_interface_pc(&mut encoder, &point_cloud);
 
         configuration.queue.submit(Some(encoder.finish())); 
 
@@ -608,9 +586,8 @@ impl Application for FmmApp {
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             app_render_params: app_render_params,
-            _render_params_point_cloud: render_params_point_cloud,
-            _fmm_value_fixer: fmm_value_fixer,
             _fmm: fmm,
+            _pc_params: pc_params,
          }
     }
 
