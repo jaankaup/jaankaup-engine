@@ -85,11 +85,16 @@ struct FmmBlock {
     number_of_band_points: u32,
 };
 
+struct TempData {
+    data0: u32,
+    data1: u32,
+};
+
 @group(0) @binding(0) var<uniform>             prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>             fmm_params:    FmmParams;
 @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
 @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-@group(0) @binding(4) var<storage,read_write>  filtered_blocks: array<FmmBlock>;
+@group(0) @binding(4) var<storage,read_write>  temp_data: array<TempData>;
 
 // GpuDebugger.
 @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
@@ -301,12 +306,14 @@ fn gather_data() {
         let a = fmm_blocks[index_a];
         let a_offset = temp_prefix_sum[index_a];
         let predicate_a = index_a < data_count && a.number_of_band_points > 0u;
-        if (predicate_a) { filtered_blocks[a_offset] = a; }
+        if (predicate_a) { temp_data[a_offset] = TempData(a.index, a.number_of_band_points); }
+        // if (predicate_a) { filtered_blocks[a_offset] = a; }
 
         let b = fmm_blocks[index_b];
         let b_offset = temp_prefix_sum[index_b];
         let predicate_b = index_b < data_count && b.number_of_band_points > 0u;
-        if (predicate_b) { filtered_blocks[b_offset] = b; }
+        if (predicate_b) { temp_data[b_offset] = TempData(b.index, b.number_of_band_points); }
+        // if (predicate_b) { filtered_blocks[b_offset] = b; }
     }
 }
 
@@ -396,7 +403,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // STAGE 1.
     // Create scan data and store it to global memory.
-    if (pc.phase == 1u) {
+    if (pc.phase == 0u) {
 
         copy_block_to_shared_temp();
         local_prefix_sum(work_group_id.x);
@@ -405,7 +412,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // STAGE 2.
     // Do the actual prefix sum and the filtered data to the final destination array.
-    else if (pc.phase == 2u) {
+    else if (pc.phase == 1u) {
 
       if (local_index == 0u) {
           stream_compaction_count = 0u;
@@ -423,6 +430,5 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
       workgroupBarrier();
 
       gather_data();
-
     }
 }

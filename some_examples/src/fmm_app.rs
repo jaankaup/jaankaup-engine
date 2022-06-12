@@ -1,3 +1,5 @@
+use std::mem::size_of;
+use jaankaup_core::fmm_things::FmmBlock;
 use jaankaup_core::fmm_things::PointCloudParamsBuffer;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -20,7 +22,7 @@ use jaankaup_core::common_functions::{
 };
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
-use jaankaup_core::buffer::{buffer_from_data}; //, to_vec};
+use jaankaup_core::buffer::{buffer_from_data, to_vec};
 use jaankaup_core::model_loader::{TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
@@ -394,8 +396,22 @@ impl Application for FmmApp {
         });
 
         fmm.initialize_interface_pc(&mut encoder, &point_cloud);
+        fmm.filter_active_blocks(&mut encoder);
 
         configuration.queue.submit(Some(encoder.finish())); 
+
+        let filtered_blocks = to_vec::<FmmBlock>(
+            &configuration.device,
+            &configuration.queue,
+            fmm.get_fmm_temp_buffer(),
+            0,
+            (size_of::<FmmBlock>()) as wgpu::BufferAddress * 1024
+        );
+
+        for (i, elem) in filtered_blocks.iter().enumerate() {
+            println!("{:?} :: {:?}", i, elem);
+        }
+
 
         Self {
             camera: camera,

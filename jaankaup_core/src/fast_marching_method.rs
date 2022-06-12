@@ -215,9 +215,18 @@ impl FastMarchingMethod {
 
         // Fast marching method cell data.
         let mut fmm_blocks_vec: Vec<FmmBlock> = Vec::with_capacity(number_of_fmm_blocks);
+
+        // println!("number_of_fmm_blocks == {:?}", number_of_fmm_blocks);
         
+        // Create the initial fmm_blocks.
         for i in 0..number_of_fmm_blocks {
-            fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
+            if i % 113 == 0 {
+                fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 123, });
+                // fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: i as u32, });
+            }
+            else {
+                fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
+            }
         }
 
         let fmm_blocks = buffer_from_data::<FmmBlock>(
@@ -227,6 +236,7 @@ impl FastMarchingMethod {
                 None
         );
 
+        // Create temp data buffer.
         let temporary_fmm_data = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Fmm temporary data buffer"),
             size: 8192 * size_of::<FmmBlock>() as u64,
@@ -247,9 +257,9 @@ impl FastMarchingMethod {
                 &device,
                 &vec![FmmPrefixParams {
                      data_start_index: 0,
-                     data_end_index: number_of_fmm_cells as u32 - 1,
-                     exclusive_parts_start_index: number_of_fmm_cells as u32,
-                     exclusive_parts_end_index: number_of_fmm_cells as u32 + 1024
+                     data_end_index: number_of_fmm_blocks as u32 - 1,
+                     exclusive_parts_start_index: number_of_fmm_blocks as u32,
+                     exclusive_parts_end_index: number_of_fmm_blocks as u32 + 1024
                  }],
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 None
@@ -264,7 +274,7 @@ impl FastMarchingMethod {
                     vec![
                         &fmm_prefix_params.as_entire_binding(),
                         &fmm_params_buffer.get_buffer().as_entire_binding(),
-                        &fmm_data.as_entire_binding(),
+                        &fmm_blocks.as_entire_binding(),
                         &prefix_temp_array.as_entire_binding(),
                         &temporary_fmm_data.as_entire_binding(),
                     ],
@@ -408,6 +418,36 @@ impl FastMarchingMethod {
         self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2] * self.local_dimension[0]  * self.local_dimension[1]  * self.local_dimension[2] 
     }
 
+    pub fn filter_active_blocks(&self, encoder: &mut wgpu::CommandEncoder) {
+                
+        let number_of_dispatches = (self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32 / (1024 * 2); 
+
+        self.compute_object.dispatch_push_constants::<u32>(
+            &self.compute_object_bind_groups,
+            encoder,
+            number_of_dispatches, 1, 1,
+            0,
+            0, // phase
+            Some("Fmm phase 0.")
+        );
+
+        self.compute_object.dispatch_push_constants::<u32>(
+            &self.compute_object_bind_groups,
+            encoder,
+            1, 1, 1,
+            0,
+            1, // phase
+            Some("Fmm phase 1.")
+        );
+
+        // self.compute_object_fmm_prefix_scan.dispatch(
+        //     &self.compute_bind_groups_fmm_prefix_scan,
+        //     &mut encoder_command,
+        //     1, 1, 1,
+        //     Some("fmm prefix scan dispatch 2")
+        // );
+    }
+
     /// Update all band point counts from global computational domain. 
     #[allow(dead_code)]
     pub fn calculate_band_point_counts(&self) {
@@ -427,6 +467,10 @@ impl FastMarchingMethod {
 
     pub fn get_fmm_data_buffer(&self) -> &wgpu::Buffer {
         &self.fmm_data
+    }
+
+    pub fn get_fmm_temp_buffer(&self) -> &wgpu::Buffer {
+        &self.temporary_fmm_data
     }
 }
 
