@@ -82,7 +82,7 @@ struct FmmParams {
 
 struct FmmBlock {
     index: u32,
-    band_points_count: u32,
+    number_of_band_points: u32,
 };
 
 @group(0) @binding(0) var<uniform>             prefix_params: PrefixParams;
@@ -141,8 +141,8 @@ fn copy_block_to_shared_temp() {
     let b = fmm_blocks[private_data.global_bi];
 
     // Add prediates here.
-    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < prefix_params.data_end_index && a.band_points_count > 0u);
-    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < prefix_params.data_end_index && b.band_points_count > 0u);
+    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < prefix_params.data_end_index && a.number_of_band_points > 0u);
+    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < prefix_params.data_end_index && b.number_of_band_points > 0u);
 }
 
 fn copy_exclusive_data_to_shared_aux() {
@@ -300,12 +300,12 @@ fn gather_data() {
 
         let a = fmm_blocks[index_a];
         let a_offset = temp_prefix_sum[index_a];
-        let predicate_a = index_a < data_count && a.band_points_count > 0u;
+        let predicate_a = index_a < data_count && a.number_of_band_points > 0u;
         if (predicate_a) { filtered_blocks[a_offset] = a; }
 
         let b = fmm_blocks[index_b];
         let b_offset = temp_prefix_sum[index_b];
-        let predicate_b = index_b < data_count && b.band_points_count > 0u;
+        let predicate_b = index_b < data_count && b.number_of_band_points > 0u;
         if (predicate_b) { filtered_blocks[b_offset] = b; }
     }
 }

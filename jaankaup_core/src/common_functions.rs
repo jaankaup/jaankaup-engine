@@ -76,6 +76,16 @@ fn rotate_left(x: u32, amount: u32) -> u32 {
     !(std::u32::MAX<<N) & (x << i) ^ (x >> (N-i))
 }
 
+pub fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> [u32; 3] {
+  let mut x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh;
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  [x, y, z]
+}
+
 /* HILBERT INDEXING. */
 
 /// Calculate the gray code.

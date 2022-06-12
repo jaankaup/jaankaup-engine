@@ -36,11 +36,11 @@ const OUTSIDE: u32  = 4;
 /// TODO: remove from fmm.rs.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct FmmPrefixParams {
-    data_start_index: u32,
-    data_end_index: u32,
-    exclusive_parts_start_index: u32,
-    exclusive_parts_end_index: u32,
+pub struct FmmPrefixParams {
+    pub data_start_index: u32,
+    pub data_end_index: u32,
+    pub exclusive_parts_start_index: u32,
+    pub exclusive_parts_end_index: u32,
 }
 
 /// Basic data for the fast marching method.
@@ -61,6 +61,14 @@ struct FMMCell {
     value: f32,
 }
 
+/// Block that holds information about a sub computational domain.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct FmmBlock {
+    pub index: u32,
+    pub number_of_band_points: u32,
+}
+
 /// A struct for 3d grid general information.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -75,6 +83,7 @@ pub struct ComputationalDomain {
 }
 
 impl_convert!{FMMCell}
+impl_convert!{FmmBlock}
 impl_convert!{ComputationalDomain}
 
 /// A struct for FmmParams.

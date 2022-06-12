@@ -1,10 +1,10 @@
+use std::mem::size_of;
+use crate::fmm_things::{FmmPrefixParams, FmmCellPc, FmmBlock};
 use crate::common_functions::udiv_up_safe32;
 use crate::fmm_things::FmmValueFixer;
 use crate::fmm_things::PointCloudParamsBuffer;
-// use crate::fmm_things::PointCloudParams;
 use std::convert::TryInto;
 use crate::buffer::buffer_from_data;
-use crate::fmm_things::FmmCellPc;
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -79,6 +79,10 @@ pub struct FastMarchingMethod {
     #[allow(dead_code)]
     compute_object: ComputeObject,
 
+    ///fmm compute object bindgroups. 
+    #[allow(dead_code)]
+    compute_object_bind_groups: Vec<wgpu::BindGroup>,
+
     /// Store general buffers here.
     #[allow(dead_code)]
     buffers: HashMap<String, wgpu::Buffer>,
@@ -99,6 +103,14 @@ pub struct FastMarchingMethod {
     #[allow(dead_code)]
     fmm_data: wgpu::Buffer,
 
+    /// Temporary data for prefix sum.
+    #[allow(dead_code)]
+    fmm_blocks: wgpu::Buffer,
+
+    /// Temporary data for prefix sum.
+    #[allow(dead_code)]
+    temporary_fmm_data: wgpu::Buffer,
+
     /// Point data to fmm interface compute object.
     #[allow(dead_code)]
     pc_to_interface_compute_object: ComputeObject,
@@ -110,6 +122,14 @@ pub struct FastMarchingMethod {
     /// Preprocessor for fmm values.
     #[allow(dead_code)]
     fmm_value_fixer: FmmValueFixer,
+
+    /// Prefix params.
+    #[allow(dead_code)]
+    fmm_prefix_params: wgpu::Buffer,
+
+    /// Temporary data for prefix sum.
+    #[allow(dead_code)]
+    prefix_temp_array: wgpu::Buffer,
 }
 
 impl FastMarchingMethod {
@@ -119,7 +139,7 @@ impl FastMarchingMethod {
     pub fn init(device: &wgpu::Device,
                 global_dimension: [u32; 3],
                 local_dimension: [u32; 3],
-                _gpu_debugger: &Option<&GpuDebugger>,
+                gpu_debugger: &Option<&GpuDebugger>,
                 ) -> Self {
 
         // TODO: assertions for local and global dimension.
@@ -181,17 +201,81 @@ impl FastMarchingMethod {
         );
 
         let fmm_params_buffer = FmmParamsBuffer::create(device, global_dimension, local_dimension);
+
+        let number_of_fmm_blocks = (global_dimension[0] * global_dimension[1] * global_dimension[2]).try_into().unwrap();
+        let number_of_fmm_cells = (number_of_fmm_blocks as u32 * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap();
                                                 
+        // Fast marching method cell data.
         let fmm_data = buffer_from_data::<FmmCellPc>(
                 &device,
-                &vec![FmmCellPc {
-                    tag: 0,
-                    value: 10000000,
-                    color: 0,
-                    // padding: 0,
-                } ; (global_dimension[0] * global_dimension[1] * global_dimension[2] * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap() ],
+                &vec![FmmCellPc { tag: 0, value: 10000000, color: 0, } ; number_of_fmm_cells],
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
+        );
+
+        // Fast marching method cell data.
+        let mut fmm_blocks_vec: Vec<FmmBlock> = Vec::with_capacity(number_of_fmm_blocks);
+        
+        for i in 0..number_of_fmm_blocks {
+            fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
+        }
+
+        let fmm_blocks = buffer_from_data::<FmmBlock>(
+                &device,
+                &fmm_blocks_vec,
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                None
+        );
+
+        let temporary_fmm_data = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Fmm temporary data buffer"),
+            size: 8192 * size_of::<FmmBlock>() as u64,
+            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Prefix temp array.
+        let prefix_temp_array = buffer_from_data::<u32>(
+                &device,
+                &vec![0 ; number_of_fmm_cells],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                None
+        );
+
+        // Prefix sum params.
+        let fmm_prefix_params = buffer_from_data::<FmmPrefixParams>(
+                &device,
+                &vec![FmmPrefixParams {
+                     data_start_index: 0,
+                     data_end_index: number_of_fmm_cells as u32 - 1,
+                     exclusive_parts_start_index: number_of_fmm_cells as u32,
+                     exclusive_parts_end_index: number_of_fmm_cells as u32 + 1024
+                 }],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                None
+        );
+
+        // TODOOO: finish.
+        let compute_object_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_prefix_params.as_entire_binding(),
+                        &fmm_params_buffer.get_buffer().as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &prefix_temp_array.as_entire_binding(),
+                        &temporary_fmm_data.as_entire_binding(),
+                    ],
+                    vec![
+                        &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
         );
 
         let pc_to_interface_compute_object =
@@ -245,14 +329,19 @@ impl FastMarchingMethod {
 
         Self {
             compute_object: compute_object,
+            compute_object_bind_groups: compute_object_bind_groups,
             buffers: buffers,
             fmm_params_buffer: fmm_params_buffer, 
             global_dimension: global_dimension,
             local_dimension: local_dimension,
             fmm_data: fmm_data,
+            fmm_blocks: fmm_blocks,
+            temporary_fmm_data: temporary_fmm_data,
             pc_to_interface_compute_object: pc_to_interface_compute_object,
             point_to_interface_bind_groups: None,
             fmm_value_fixer: fmm_value_fixer,
+            fmm_prefix_params: fmm_prefix_params,
+            prefix_temp_array: prefix_temp_array,
         }
     }
 
@@ -301,8 +390,22 @@ impl FastMarchingMethod {
 
     /// Define the initial band cells and update the band values.
     #[allow(dead_code)]
-    pub fn create_initial_band_cells(&self) {
+    pub fn create_initial_band_cells(&self, _encoder: &mut wgpu::CommandEncoder) {
 
+        // self.compute_object.dispatch_push_constants::<u32>(
+        //     &self.compute_object_bind_groups,
+        //     encoder,
+        //     udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
+        //     0,
+        //     0, // phase
+        //     Some("Create initial band cells dispatch.")
+        // );
+    }
+
+    #[allow(dead_code)]
+    fn calculate_cell_count(&self) -> u32 {
+
+        self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2] * self.local_dimension[0]  * self.local_dimension[1]  * self.local_dimension[2] 
     }
 
     /// Update all band point counts from global computational domain. 
@@ -325,6 +428,7 @@ impl FastMarchingMethod {
     pub fn get_fmm_data_buffer(&self) -> &wgpu::Buffer {
         &self.fmm_data
     }
+}
 
     // /// From each active fmm block, find smallest band point and change the tag to known. 
     // /// Add the known cells to update list.
@@ -349,4 +453,3 @@ impl FastMarchingMethod {
     //     //         None)
     //     //     );
     // }
-}
