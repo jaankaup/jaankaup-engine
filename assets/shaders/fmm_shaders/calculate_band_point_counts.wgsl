@@ -184,7 +184,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	                   fmm_params.local_dimension.z) { return; } 
 
         let fmm_cell = fmm_data[local_index + workgroup_id.x * 64u];    
-        if (fmm_cell.tag == KNOWN) {
+        if (fmm_cell.tag == BAND) {
             atomicAdd(&fmm_blocks[workgroup_id.x].number_of_band_points, 1u);
 	}
 	storageBarrier();

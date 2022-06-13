@@ -1,5 +1,5 @@
-use std::mem::size_of;
-use jaankaup_core::fmm_things::FmmBlock;
+//use std::mem::size_of;
+// use jaankaup_core::fmm_things::FmmBlock;
 use jaankaup_core::fmm_things::PointCloudParamsBuffer;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -22,7 +22,7 @@ use jaankaup_core::common_functions::{
 };
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
-use jaankaup_core::buffer::{buffer_from_data, to_vec};
+use jaankaup_core::buffer::{buffer_from_data};//, to_vec};
 use jaankaup_core::model_loader::{TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
@@ -251,7 +251,7 @@ impl Application for FmmApp {
                 &configuration.device,
                 &vec![FmmCellPc {
                     tag: 0,
-                    value: 10000000,
+                    value: 100000.0,
                     color: 0,
                     // padding: 0,
                 } ; total_cell_count],
@@ -574,8 +574,11 @@ impl Application for FmmApp {
 
         //++ queue.submit(Some(encoder_command.finish()));
 
-        self.fmm.update_band_point_counts(&mut encoder);
-        self.fmm.filter_active_blocks(&mut encoder);
+        // self.fmm.update_band_point_counts(&mut encoder);
+        // self.fmm.filter_active_blocks(&mut encoder);
+        self.fmm.collect_known_cells(&mut encoder);
+        self.fmm.create_initial_band(&mut encoder);
+        self.fmm.collect_band_cells(&mut encoder);
 
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(

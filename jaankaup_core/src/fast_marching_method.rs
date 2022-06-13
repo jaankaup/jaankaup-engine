@@ -12,6 +12,7 @@ use crate::render_object::{ComputeObject, create_bind_groups};
 use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
 use crate::fmm_things::{FmmParamsBuffer, PointCloud};
 use crate::gpu_debugger::GpuDebugger;
+use crate::histogram::Histogram;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -138,6 +139,10 @@ pub struct FastMarchingMethod {
     /// Temporary data for prefix sum.
     #[allow(dead_code)]
     update_band_counts_compute_object_bind_groups: Vec<wgpu::BindGroup>,
+
+    /// A histogram for fmm purposes.
+    #[allow(dead_code)]
+    fmm_histogram: Histogram,
 }
 
 impl FastMarchingMethod {
@@ -152,8 +157,11 @@ impl FastMarchingMethod {
 
         // TODO: assertions for local and global dimension.
 
-        // Buffer hash_map.
+        // Buffer hash_map. DO we need this?
         let buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
+
+        // Fmm histogram.
+        let fmm_histogram = Histogram::init(&device, &vec![0; 5]);
 
         let compute_object =
                 ComputeObject::init(
@@ -184,6 +192,9 @@ impl FastMarchingMethod {
 
                             // @group(0) @binding(5) var<storage,read_write>  fmm_data: array<TempData>;
                             create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
                         ],
                         vec![
 
@@ -215,11 +226,16 @@ impl FastMarchingMethod {
 
         let number_of_fmm_blocks = (global_dimension[0] * global_dimension[1] * global_dimension[2]).try_into().unwrap();
         let number_of_fmm_cells = (number_of_fmm_blocks as u32 * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap();
+
+        let mut fmm_data = vec![FmmCellPc { tag: 0, value: 100000.0, color: 0, } ; number_of_fmm_cells + 1];
+
+        // The outside value.
+        fmm_data[number_of_fmm_cells] = FmmCellPc { tag: 4, value: 100000.0, color: 0, };
                                                 
         // Fast marching method cell data.
         let fmm_data = buffer_from_data::<FmmCellPc>(
                 &device,
-                &vec![FmmCellPc { tag: 0, value: 10000000, color: 0, } ; number_of_fmm_cells],
+                &fmm_data,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
         );
@@ -232,13 +248,6 @@ impl FastMarchingMethod {
         // Create the initial fmm_blocks.
         for i in 0..number_of_fmm_blocks {
             fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
-            // if i == 13 {
-            //     fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 123, });
-            //     // fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: i as u32, });
-            // }
-            // else {
-            //     fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
-            // }
         }
 
         let fmm_blocks = buffer_from_data::<FmmBlock>(
@@ -251,7 +260,7 @@ impl FastMarchingMethod {
         // Create temp data buffer.
         let temporary_fmm_data = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Fmm temporary data buffer"),
-            size: 8192 * size_of::<FmmBlock>() as u64,
+            size: 131072 * size_of::<FmmBlock>() as u64,
             usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -277,7 +286,6 @@ impl FastMarchingMethod {
                 None
         );
 
-        // TODOOO: .
         let compute_object_bind_groups = create_bind_groups(
                 &device,
                 &compute_object.bind_group_layout_entries,
@@ -290,6 +298,7 @@ impl FastMarchingMethod {
                         &prefix_temp_array.as_entire_binding(),
                         &temporary_fmm_data.as_entire_binding(),
                         &fmm_data.as_entire_binding(),
+                        &fmm_histogram.get_histogram_buffer().as_entire_binding(),
                     ],
                     vec![
                         &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
@@ -431,6 +440,7 @@ impl FastMarchingMethod {
             prefix_temp_array: prefix_temp_array,
             update_band_counts_compute_object: update_band_counts_compute_object,
             update_band_counts_compute_object_bind_groups: update_band_counts_compute_object_bind_groups,
+            fmm_histogram: fmm_histogram,
         }
     }
 
@@ -477,18 +487,32 @@ impl FastMarchingMethod {
 
     }
 
-    /// Define the initial band cells and update the band values.
+    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[2].
     #[allow(dead_code)]
-    pub fn create_initial_band_cells(&self, _encoder: &mut wgpu::CommandEncoder) {
+    pub fn collect_known_cells(&self, encoder: &mut wgpu::CommandEncoder) {
 
-        // self.compute_object.dispatch_push_constants::<u32>(
-        //     &self.compute_object_bind_groups,
-        //     encoder,
-        //     udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
-        //     0,
-        //     0, // phase
-        //     Some("Create initial band cells dispatch.")
-        // );
+        self.compute_object.dispatch_push_constants::<u32>(
+            &self.compute_object_bind_groups,
+            encoder,
+            udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
+            0,
+            2, // phase
+            Some("Fmm phase 2.")
+        );
+    }
+
+    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[3].
+    #[allow(dead_code)]
+    pub fn collect_band_cells(&self, encoder: &mut wgpu::CommandEncoder) {
+
+        self.compute_object.dispatch_push_constants::<u32>(
+            &self.compute_object_bind_groups,
+            encoder,
+            udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
+            0,
+            4, // phase
+            Some("Fmm phase 4.")
+        );
     }
 
     #[allow(dead_code)]
@@ -520,6 +544,7 @@ impl FastMarchingMethod {
         );
     }
 
+    /// Update all band point counts from global computational domain. 
     pub fn update_band_point_counts(&self, encoder: &mut wgpu::CommandEncoder) {
 
         let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count() , 64);
@@ -532,10 +557,30 @@ impl FastMarchingMethod {
         );
     }
 
-    /// Update all band point counts from global computational domain. 
+    /// Gather the indexes from knwon points to fmm_temp array. 
     #[allow(dead_code)]
-    pub fn calculate_band_point_counts(&self) {
+    pub fn gather_all_known_points(&self, encoder: &mut wgpu::CommandEncoder) {
+        self.compute_object.dispatch_push_constants::<u32>(
+            &self.compute_object_bind_groups,
+            encoder,
+            1, 1, 1,
+            0,
+            2, // phase
+            Some("Fmm phase 2.")
+        );
+    }
 
+    /// Gather the indexes from knwon points to fmm_temp array. 
+    #[allow(dead_code)]
+    pub fn create_initial_band(&self, encoder: &mut wgpu::CommandEncoder) {
+        self.compute_object.dispatch_push_constants::<u32>(
+            &self.compute_object_bind_groups,
+            encoder,
+            1, 1, 1,
+            0,
+            3, // phase
+            Some("Fmm phase 3.")
+        );
     }
 
     // 

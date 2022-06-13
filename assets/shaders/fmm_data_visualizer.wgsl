@@ -322,6 +322,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
     let color_known = rgba_u32(0u, 255u, 0u, 255u);
     let color_text = rgba_u32(255u, 255u, 255u, 255u);
+    //var colors: array<u32, 5> = array<u32, 5>(color_far, color_band, color_band, color_known, color_band);
     var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_band, color_known, 0u);
     //let colors_ptr = &colors;
 

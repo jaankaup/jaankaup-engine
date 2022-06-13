@@ -84,8 +84,9 @@ struct FmmParams {
 };
 
 struct FmmCellPc {
+    //tag: atomic<u32>,
     tag: u32,
-    value: u32,
+    value: f32,
     color: u32,
 };
 
@@ -111,6 +112,7 @@ let OUTSIDE  = 4u;
 @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
 @group(0) @binding(4) var<storage,read_write>  temp_data: array<TempData>;
 @group(0) @binding(5) var<storage,read_write>  fmm_data: array<FmmCellPc>;
+@group(0) @binding(6) var<storage,read_write>  fmm_counter: array<atomic<u32>>; // 5 placeholders
 
 // GpuDebugger.
 @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
@@ -128,6 +130,7 @@ var<push_constant> pc: PushConstants;
 // The output of global active fmm block scan.
 var<workgroup> shared_prefix_sum: array<u32, SCAN_BLOCK_SIZE>; 
 var<workgroup> shared_aux: array<u32, SCAN_BLOCK_SIZE>;
+var<workgroup> shared_counter: atomic<u32>; //, SCAN_BLOCK_SIZE>;
 
 // The counter for active fmm blocks.
 var<workgroup> stream_compaction_count: u32;
@@ -388,14 +391,124 @@ fn load_block_fmm_cells_to_wg() {
 
 /// Harvest the initial active blocks.
 fn update_initial_interface() {
-   
+}
+
+fn gather_cells_to_temp_data(tag: u32, thread_index: u32) {
+
+    let fmm_cell = fmm_data[thread_index];    
+
+    if (fmm_cell.tag == tag) {
+
+        let index = atomicAdd(&shared_counter, 1u);
+
+	// Save the cell index to temp_data.
+        temp_data[index] = TempData(thread_index, 0u); 
+    }
+}
+
+fn total_cell_count() -> u32 {
+
+    let total_cell_count = fmm_params.global_dimension.x * 
+                           fmm_params.global_dimension.y * 
+                           fmm_params.global_dimension.z * 
+                           fmm_params.local_dimension.x * 
+                           fmm_params.local_dimension.y * 
+                           fmm_params.local_dimension.z; 
+
+    return total_cell_count;
+};
+
+/// A function that checks if a given coordinate is within the global computational domain. 
+fn isInside(coord: vec3<i32>) -> bool {
+    return (coord.x >= 0 && coord.x < i32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
+           (coord.y >= 0 && coord.y < i32(fmm_params.local_dimension.y * fmm_params.global_dimension.y)) &&
+           (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z)); 
+}
+
+/// Get group coordinate based on cell memory index.
+fn get_group_coordinate(global_index: u32) -> vec3<u32> {
+
+    let stride = fmm_params.local_dimension.x * fmm_params.local_dimension.y * fmm_params.local_dimension.z;
+    let block_index = global_index / stride;
+
+    return index_to_uvec3(block_index, fmm_params.global_dimension.x, fmm_params.global_dimension.y);
+}
+
+/// Get memory index from given cell coordinate.
+fn get_cell_mem_location(v: vec3<u32>) -> u32 {
+
+    let stride = fmm_params.local_dimension.x * fmm_params.local_dimension.y * fmm_params.local_dimension.z;
+
+    let xOffset = 1u;
+    let yOffset = fmm_params.global_dimension.x;
+    let zOffset = yOffset * fmm_params.global_dimension.y;
+
+    let global_coordinate = vec3<u32>(v) / fmm_params.local_dimension;
+
+    let global_index = (global_coordinate.x * xOffset +
+                        global_coordinate.y * yOffset +
+                        global_coordinate.z * zOffset) * stride;
+
+    let local_coordinate = vec3<u32>(v) - global_coordinate * fmm_params.local_dimension;
+
+    let local_index = encode3Dmorton32(local_coordinate.x, local_coordinate.y, local_coordinate.z);
+
+    return global_index + local_index;
+}
+
+/// Get cell index based on domain dimension.
+fn get_cell_index(global_index: u32) -> vec3<u32> {
+
+    let stride = fmm_params.local_dimension.x * fmm_params.local_dimension.y * fmm_params.local_dimension.z;
+    let block_index = global_index / stride;
+    let block_position = index_to_uvec3(block_index, fmm_params.global_dimension.x, fmm_params.global_dimension.y) * fmm_params.local_dimension;
+
+    // Calculate local position.
+    let local_index = global_index - block_index * stride;
+
+    let local_position = decode3Dmorton32(local_index);
+
+    let cell_position = block_position + local_position;
+
+    return cell_position; 
+}
+
+fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
+
+    var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
+        vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
+        vec3<i32>(coord) + vec3<i32>(1,   0,  0),
+        vec3<i32>(coord) + vec3<i32>(0,   1,  0),
+        vec3<i32>(coord) + vec3<i32>(0,  -1,  0),
+        vec3<i32>(coord) + vec3<i32>(0,   0,  1),
+        vec3<i32>(coord) + vec3<i32>(0,   0, -1)
+    );
+
+    let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
+    let i1 = get_cell_mem_location(vec3<u32>(neighbors[1]));
+    let i2 = get_cell_mem_location(vec3<u32>(neighbors[2]));
+    let i3 = get_cell_mem_location(vec3<u32>(neighbors[3]));
+    let i4 = get_cell_mem_location(vec3<u32>(neighbors[4]));
+    let i5 = get_cell_mem_location(vec3<u32>(neighbors[5]));
+
+    // The index of the "outside" cell.
+    let tcc = total_cell_count();
+
+    return array<u32, 6>(
+        select(tcc ,i0, isInside(neighbors[0])),
+        select(tcc ,i1, isInside(neighbors[1])),
+        select(tcc ,i2, isInside(neighbors[2])),
+        select(tcc ,i3, isInside(neighbors[3])),
+        select(tcc ,i4, isInside(neighbors[4])),
+        select(tcc ,i5, isInside(neighbors[5])) 
+    );
 }
 
 @compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
-        @builtin(workgroup_id) work_group_id: vec3<u32>,
+        @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
 
@@ -405,8 +518,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let bi = ai + THREAD_COUNT;
     let ai_bcf = ai + (ai >> 4u); 
     let bi_bcf = bi + (bi >> 4u);
-    let global_ai = ai + work_group_id.x * (THREAD_COUNT * 2u);
-    let global_bi = bi + work_group_id.x * (THREAD_COUNT * 2u);
+    let global_ai = ai + workgroup_id.x * (THREAD_COUNT * 2u);
+    let global_bi = bi + workgroup_id.x * (THREAD_COUNT * 2u);
 
     private_data = PrivateData (
         ai,
@@ -422,7 +535,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if (pc.phase == 0u) {
 
         copy_block_to_shared_temp();
-        local_prefix_sum(work_group_id.x);
+        local_prefix_sum(workgroup_id.x);
         store_block_to_global_temp();
     }
 
@@ -446,5 +559,74 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
       workgroupBarrier();
 
       gather_data();
+    }
+
+    else if (pc.phase == 2u || pc.phase == 4u) {
+
+        // Initialize shader_counter;
+	if (local_index == 0u) { shared_counter = 0u; }
+        workgroupBarrier();
+
+        let cell_count = total_cell_count();
+        let chuncks = udiv_up_safe32(cell_count, 1024u);
+
+        for (var i: u32 = 0u; i < chuncks; i = i + 1u) {
+
+            let actual_index = local_index + 1024u * i;
+
+            if (actual_index < cell_count) {
+                gather_cells_to_temp_data(select(BAND,KNOWN, pc.phase == 2u) , actual_index);
+	    }
+        }
+        workgroupBarrier();
+
+	if (local_index == 0u) {
+	    fmm_counter[select(3,2, pc.phase == 2u)] = shared_counter;
+            // workgroupBarrier();
+        }
+    }
+
+    else if (pc.phase == 3u) {
+
+        // Get the number of known points;
+	let known_point_count = fmm_counter[2];
+        let chuncks = udiv_up_safe32(known_point_count, 1024u);
+
+        for (var i: u32 = 0u; i < chuncks; i = i + 1u) {
+
+            let actual_index = local_index + 1024u * i;
+
+	    if (actual_index < known_point_count) {
+
+                // Get the cell index.
+	        let t = temp_data[actual_index];  
+		// fmm_data[t.data0].tag = BAND;
+
+		// Load the actual cell. DO we need this?
+	        // let fmm_cell = fmm_data[t.data0];
+
+	        // get_neighbors.
+		var this_coord = get_cell_index(t.data0);
+
+                var memory_locations: array<u32, 6> = load_neighbors_6(this_coord);
+
+		// Neighbors.
+		var n0 = fmm_data[memory_locations[0]];
+		var n1 = fmm_data[memory_locations[1]];
+		var n2 = fmm_data[memory_locations[2]];
+		var n3 = fmm_data[memory_locations[3]];
+		var n4 = fmm_data[memory_locations[4]];
+		var n5 = fmm_data[memory_locations[5]];
+		if (n0.tag == FAR) { fmm_data[memory_locations[0]].tag = BAND; } // fmm_data[memory_locations[0]].value = f32(memory_locations[0]);}
+		if (n1.tag == FAR) { fmm_data[memory_locations[1]].tag = BAND; } // fmm_data[memory_locations[1]].value = f32(memory_locations[1]);}
+		if (n2.tag == FAR) { fmm_data[memory_locations[2]].tag = BAND; } // fmm_data[memory_locations[2]].value = f32(memory_locations[2]);}
+		if (n3.tag == FAR) { fmm_data[memory_locations[3]].tag = BAND; } // fmm_data[memory_locations[3]].value = f32(memory_locations[3]);}
+		if (n4.tag == FAR) { fmm_data[memory_locations[4]].tag = BAND; } // fmm_data[memory_locations[4]].value = f32(memory_locations[4]);}
+		if (n5.tag == FAR) { fmm_data[memory_locations[5]].tag = BAND; } // fmm_data[memory_locations[5]].value = f32(memory_locations[5]);}
+	    }
+        }
+	// if (local_index == 0u) { shared_counter = 0u; }
+        // workgroupBarrier();
+         
     }
 }

@@ -353,7 +353,7 @@ fn load_pc_data(device: &wgpu::Device, src_file: &String) -> (u32, [f32; 3], [f3
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct FmmCellPc {
     pub tag: u32,
-    pub value: u32,
+    pub value: f32,
     pub color: u32,
 }
 
@@ -702,7 +702,7 @@ impl FastMarchingMethod {
                 device,
                 &vec![FmmCellPc {
                     tag: 0,
-                    value: 10000000,
+                    value: 100000.0,
                     color: 0,
                 } ; (global_dimension[0] * global_dimension[1] * global_dimension[2] * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap()],
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,

@@ -248,7 +248,7 @@ fn get_cell_mem_location(v: vec3<u32>) -> u32 {
 
     let local_index = encode3Dmorton32(local_coordinate.x, local_coordinate.y, local_coordinate.z);
 
-    return global_index + local_index; 
+    return global_index + local_index;
 }
 
 /// Get cell index based on domain dimension.
