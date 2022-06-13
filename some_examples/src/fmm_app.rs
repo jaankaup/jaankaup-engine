@@ -579,6 +579,7 @@ impl Application for FmmApp {
         self.fmm.collect_known_cells(&mut encoder);
         self.fmm.create_initial_band(&mut encoder);
         self.fmm.collect_band_cells(&mut encoder);
+        self.fmm.fmm(&mut encoder);
 
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(

@@ -487,7 +487,7 @@ impl FastMarchingMethod {
 
     }
 
-    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[2].
+    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[0].
     #[allow(dead_code)]
     pub fn collect_known_cells(&self, encoder: &mut wgpu::CommandEncoder) {
 
@@ -501,7 +501,7 @@ impl FastMarchingMethod {
         );
     }
 
-    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[3].
+    /// Collect all band cells to temp_data array. The known cell count is saved to fmm_histogram[0].
     #[allow(dead_code)]
     pub fn collect_band_cells(&self, encoder: &mut wgpu::CommandEncoder) {
 
@@ -512,6 +512,20 @@ impl FastMarchingMethod {
             0,
             4, // phase
             Some("Fmm phase 4.")
+        );
+    }
+
+    /// Fmm for all selected band cells.
+    #[allow(dead_code)]
+    pub fn fmm(&self, encoder: &mut wgpu::CommandEncoder) {
+
+        self.compute_object.dispatch_push_constants::<u32>(
+            &self.compute_object_bind_groups,
+            encoder,
+            udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
+            0,
+            5, // phase
+            Some("Fmm phase 5.")
         );
     }
 

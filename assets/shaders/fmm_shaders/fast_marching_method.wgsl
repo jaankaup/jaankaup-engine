@@ -504,6 +504,69 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
     );
 }
 
+fn solve_quadratic(coord: vec3<u32>) -> f32 {
+
+    var memory_locations = load_neighbors_6(coord);
+
+    var n0 = fmm_data[memory_locations[0]];
+    var n1 = fmm_data[memory_locations[1]];
+    var n2 = fmm_data[memory_locations[2]];
+    var n3 = fmm_data[memory_locations[3]];
+    var n4 = fmm_data[memory_locations[4]];
+    var n5 = fmm_data[memory_locations[5]];
+
+    var phis: array<f32, 6> = array<f32, 6>(
+                                  select(1000000.0, n0.value, n0.tag == KNOWN),
+                                  select(1000000.0, n1.value, n1.tag == KNOWN),
+                                  select(1000000.0, n2.value, n2.tag == KNOWN),
+                                  select(1000000.0, n3.value, n3.tag == KNOWN),
+                                  select(1000000.0, n4.value, n4.tag == KNOWN),
+                                  select(1000000.0, n5.value, n5.tag == KNOWN) 
+    );
+
+
+    var p = vec3<f32>(min(phis[0], phis[1]), min(phis[2], phis[3]), min(phis[4], phis[5]));
+    var p_sorted: vec3<f32>;
+
+    var tmp: f32;
+
+    if p[1] < p[0] {
+        tmp = p[1];
+        p[1] = p[0];
+        p[0] = tmp;
+    }
+    if p[2] < p[0] {
+        tmp = p[2];
+        p[2] = p[0];
+        p[0] = tmp;
+    }
+    if p[2] < p[1] {
+        tmp = p[2];
+        p[2] = p[1];
+        p[1] = tmp;
+    }
+
+    var result = 777.0;
+
+    if (abs(p[0] - p[2]) < 1.0) {
+        var phi_sum = p[0] + p[1] + p[2];
+        var phi_sum_pow2 = pow(phi_sum, 2.0);
+        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum_pow2 - 1.0))); 
+        // result = 123.0;
+    }
+
+    else if (abs(p[0] - p[1]) < 1.0) {
+        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
+        // result = 555.0;
+    }
+ 
+    else {
+        result = p[0] + 1.0;
+    }
+
+    return result;
+}
+
 @compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -564,7 +627,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     else if (pc.phase == 2u || pc.phase == 4u) {
 
         // Initialize shader_counter;
-	if (local_index == 0u) { shared_counter = 0u; }
+	//if (local_index == 0u) { shared_counter = 0u; fmm_counter[select(3,2, pc.phase == 2u)] = 0u; }
+	if (local_index == 0u) { shared_counter = 0u; fmm_counter[0] = 0u; }
         workgroupBarrier();
 
         let cell_count = total_cell_count();
@@ -581,15 +645,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         workgroupBarrier();
 
 	if (local_index == 0u) {
-	    fmm_counter[select(3,2, pc.phase == 2u)] = shared_counter;
-            // workgroupBarrier();
+	    fmm_counter[0] = shared_counter;
+	    // fmm_counter[select(3,2, pc.phase == 2u)] = shared_counter;
         }
     }
 
     else if (pc.phase == 3u) {
 
         // Get the number of known points;
-	let known_point_count = fmm_counter[2];
+	let known_point_count = fmm_counter[0];
         let chuncks = udiv_up_safe32(known_point_count, 1024u);
 
         for (var i: u32 = 0u; i < chuncks; i = i + 1u) {
@@ -625,8 +689,24 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		if (n5.tag == FAR) { fmm_data[memory_locations[5]].tag = BAND; } // fmm_data[memory_locations[5]].value = f32(memory_locations[5]);}
 	    }
         }
-	// if (local_index == 0u) { shared_counter = 0u; }
-        // workgroupBarrier();
-         
+    }
+    else if (pc.phase == 5u) {
+
+	let band_point_count = fmm_counter[0];
+        let chuncks = udiv_up_safe32(band_point_count, 1024u);
+
+        for (var i: u32 = 0u; i < chuncks; i = i + 1u) {
+
+            let actual_index = local_index + 1024u * i;
+
+	    if (actual_index < band_point_count) {
+
+                // Get the cell index.
+	        let t = temp_data[actual_index];  
+		var this_coord = get_cell_index(t.data0);
+                let fmm_value = solve_quadratic(this_coord);
+		fmm_data[t.data0].value = fmm_value;
+	    }
+	}
     }
 }
