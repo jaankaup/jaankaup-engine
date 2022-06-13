@@ -19,6 +19,9 @@
 
 // Algorithm states.
 
+// Phase 0 -> Prefix Sum for active blocks part 1 
+// Phase 1 -> Prefix Sum for active blocks part 2
+
 struct PushConstants {
     phase: u32,    
 };
@@ -80,6 +83,12 @@ struct FmmParams {
     future_usage2: u32,
 };
 
+struct FmmCellPc {
+    tag: u32,
+    value: u32,
+    color: u32,
+};
+
 struct FmmBlock {
     index: u32,
     number_of_band_points: u32,
@@ -90,11 +99,18 @@ struct TempData {
     data1: u32,
 };
 
+let FAR      = 0u;
+let BAND_NEW = 1u;
+let BAND     = 2u;
+let KNOWN    = 3u;
+let OUTSIDE  = 4u;
+
 @group(0) @binding(0) var<uniform>             prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>             fmm_params:    FmmParams;
 @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
 @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
 @group(0) @binding(4) var<storage,read_write>  temp_data: array<TempData>;
+@group(0) @binding(5) var<storage,read_write>  fmm_data: array<FmmCellPc>;
 
 // GpuDebugger.
 @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;

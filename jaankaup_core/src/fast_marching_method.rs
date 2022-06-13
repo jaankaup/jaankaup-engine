@@ -130,6 +130,14 @@ pub struct FastMarchingMethod {
     /// Temporary data for prefix sum.
     #[allow(dead_code)]
     prefix_temp_array: wgpu::Buffer,
+
+    /// Temporary data for prefix sum.
+    #[allow(dead_code)]
+    update_band_counts_compute_object: ComputeObject,
+
+    /// Temporary data for prefix sum.
+    #[allow(dead_code)]
+    update_band_counts_compute_object_bind_groups: Vec<wgpu::BindGroup>,
 }
 
 impl FastMarchingMethod {
@@ -173,6 +181,9 @@ impl FastMarchingMethod {
                               
                             // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write>  fmm_data: array<TempData>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
                         ],
                         vec![
 
@@ -220,13 +231,14 @@ impl FastMarchingMethod {
         
         // Create the initial fmm_blocks.
         for i in 0..number_of_fmm_blocks {
-            if i % 113 == 0 {
-                fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 123, });
-                // fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: i as u32, });
-            }
-            else {
-                fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
-            }
+            fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
+            // if i == 13 {
+            //     fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 123, });
+            //     // fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: i as u32, });
+            // }
+            // else {
+            //     fmm_blocks_vec.push(FmmBlock { index: i as u32, number_of_band_points: 0, });
+            // }
         }
 
         let fmm_blocks = buffer_from_data::<FmmBlock>(
@@ -265,7 +277,7 @@ impl FastMarchingMethod {
                 None
         );
 
-        // TODOOO: finish.
+        // TODOOO: .
         let compute_object_bind_groups = create_bind_groups(
                 &device,
                 &compute_object.bind_group_layout_entries,
@@ -277,6 +289,7 @@ impl FastMarchingMethod {
                         &fmm_blocks.as_entire_binding(),
                         &prefix_temp_array.as_entire_binding(),
                         &temporary_fmm_data.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
                     ],
                     vec![
                         &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
@@ -337,6 +350,70 @@ impl FastMarchingMethod {
                                                   &fmm_data,
         );
 
+        // Update band counts shader.
+
+        let update_band_counts_compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("calculate_band_point_counts.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/calculate_band_point_counts.wgsl"))),
+
+                    }),
+                    Some("calculate_band_point_counts Compute objec"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+ 
+                            // @group(0) @binding(1) var<storage,read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+ 
+                            // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                        vec![
+                            // @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None
+        );
+
+        let update_band_counts_compute_object_bind_groups = create_bind_groups(
+                &device,
+                &update_band_counts_compute_object.bind_group_layout_entries,
+                &update_band_counts_compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_params_buffer.get_buffer().as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &fmm_blocks.as_entire_binding(),
+                    ],
+                    vec![
+                        &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
+        );
+
         Self {
             compute_object: compute_object,
             compute_object_bind_groups: compute_object_bind_groups,
@@ -352,6 +429,8 @@ impl FastMarchingMethod {
             fmm_value_fixer: fmm_value_fixer,
             fmm_prefix_params: fmm_prefix_params,
             prefix_temp_array: prefix_temp_array,
+            update_band_counts_compute_object: update_band_counts_compute_object,
+            update_band_counts_compute_object_bind_groups: update_band_counts_compute_object_bind_groups,
         }
     }
 
@@ -420,7 +499,7 @@ impl FastMarchingMethod {
 
     pub fn filter_active_blocks(&self, encoder: &mut wgpu::CommandEncoder) {
                 
-        let number_of_dispatches = (self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32 / (1024 * 2); 
+        let number_of_dispatches = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);
 
         self.compute_object.dispatch_push_constants::<u32>(
             &self.compute_object_bind_groups,
@@ -439,13 +518,18 @@ impl FastMarchingMethod {
             1, // phase
             Some("Fmm phase 1.")
         );
+    }
 
-        // self.compute_object_fmm_prefix_scan.dispatch(
-        //     &self.compute_bind_groups_fmm_prefix_scan,
-        //     &mut encoder_command,
-        //     1, 1, 1,
-        //     Some("fmm prefix scan dispatch 2")
-        // );
+    pub fn update_band_point_counts(&self, encoder: &mut wgpu::CommandEncoder) {
+
+        let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count() , 64);
+
+        self.update_band_counts_compute_object.dispatch(
+            &self.update_band_counts_compute_object_bind_groups,
+            encoder,
+            number_of_dispatches, 1, 1,
+            Some("Update band point counts dispatch.")
+        );
     }
 
     /// Update all band point counts from global computational domain. 

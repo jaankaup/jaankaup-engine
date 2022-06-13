@@ -285,7 +285,7 @@ fn create_aabb(aabb: AABB, offset: u32, local_index: u32, color: f32, start_inde
     }
 }
  
-fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32, start_index: u32) {
+fn create_aabb_wire(aabb: AABB, t: f32, col: f32, offset: u32, local_index: u32, start_index: u32) {
 
     var aabbs = array<AABB, 12>(
         AABB(aabb.min, vec4<f32>(aabb.max.x, aabb.min.y + t, aabb.min.z + t, 1.0)),
@@ -315,14 +315,14 @@ fn create_aabb_wire(aabb: AABB, t: f32, col: u32, offset: u32, local_index: u32,
         
         let delta = aabbs[i].max - aabbs[i].min;
         var positions = array<vec4<f32>, 8>(
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)),
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
-        	vec4<f32>(aabbs[i].min.xyz, bitcast<f32>(col)) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
+        	vec4<f32>(aabbs[i].min.xyz, col),
+        	vec4<f32>(aabbs[i].min.xyz, col) + vec4<f32>(delta.x , 0.0     , 0.0, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, col) + vec4<f32>(delta.x , delta.y , 0.0, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, col) + vec4<f32>(0.0     , delta.y , 0.0, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, col) + vec4<f32>(0.0     , 0.0     , delta.z, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, col) + vec4<f32>(delta.x , 0.0     , delta.z, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, col) + vec4<f32>(delta.x , delta.y , delta.z, 0.0),
+        	vec4<f32>(aabbs[i].min.xyz, col) + vec4<f32>(0.0     , delta.y , delta.z, 0.0)
         );
 
     	var j: u32 = 0u;
@@ -556,6 +556,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
     else if (arrow_aabb_params.element_type == 2u) {
         let aabb = aabb_wires[actual_index];
-        create_aabb_wire(aabb, aabb.max.w, bitcast<u32>(aabb.min.w), u32(delta), local_index, THREAD_COUNT * work_group_id.x * 144u);
+        create_aabb_wire(aabb, aabb.max.w, aabb.min.w, u32(delta), local_index, THREAD_COUNT * work_group_id.x * 144u);
     }
 }

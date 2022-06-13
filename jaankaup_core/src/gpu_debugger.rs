@@ -571,6 +571,7 @@ impl GpuDebugger {
         let total_number_of_arrows = elem_counter[1];
         let total_number_of_aabbs = elem_counter[2];
         let total_number_of_aabb_wires = elem_counter[3];
+        println!("total_number_of_aabb_wires == {}", total_number_of_aabb_wires);
 
         let vertices_per_element_arrow = 72;
         let vertices_per_element_aabb = 36;
@@ -607,6 +608,9 @@ impl GpuDebugger {
             self.arrow_aabb_params.iterator_end_index = std::cmp::min(*e_size, safe_number_of_dispatches * v_per_dispatch);
             self.arrow_aabb_params.element_type = *e_type;
 
+            println!("{:?}", self.arrow_aabb_params);
+            //println!("safe_number_of_dispatches {:?}", safe_number_of_dispatches);
+
             queue.write_buffer(
                 &self.buffers.get(&"arrow_aabb_params".to_string()).unwrap(),
                 0,
@@ -616,9 +620,13 @@ impl GpuDebugger {
             // Continue process until all element are rendered.
             while items_to_process > 0 {
 
+                println!("{}", items_to_process);
+
                 // The number of remaining dispatches to complete the triangle mesh creation and
                 // rendering.
                 let total_number_of_dispatches = udiv_up_safe32(items_to_process, self.thread_count);
+
+                println!("total_number_of_dispatches == {}", total_number_of_dispatches);
 
                 // Calculate the number of dispatches for this run.
                 let local_dispatch = std::cmp::min(total_number_of_dispatches, safe_number_of_dispatches);
@@ -644,7 +652,10 @@ impl GpuDebugger {
 
                 queue.submit(Some(encoder_arrow_aabb.finish()));
 
+
                 let draw_count = number_of_elements * vertices_per_elem;
+
+                println!("draw_count == {}, e_type == {}, e_size == {}", draw_count, *e_type, *e_size); 
 
                 let mut encoder_arrow_rendering = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("arrow rendering ... ") });
 

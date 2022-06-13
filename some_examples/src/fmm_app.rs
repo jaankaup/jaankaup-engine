@@ -133,7 +133,7 @@ struct FmmApp {
     render_object_vvvc: RenderObject,
     render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     app_render_params: AppRenderParams,
-    _fmm: FastMarchingMethod,
+    fmm: FastMarchingMethod,
     _pc_params: PointCloudParamsBuffer,
 }
 
@@ -396,21 +396,22 @@ impl Application for FmmApp {
         });
 
         fmm.initialize_interface_pc(&mut encoder, &point_cloud);
-        fmm.filter_active_blocks(&mut encoder);
+        // fmm.update_band_point_counts(&mut encoder);
+        // fmm.filter_active_blocks(&mut encoder);
 
         configuration.queue.submit(Some(encoder.finish())); 
 
-        let filtered_blocks = to_vec::<FmmBlock>(
-            &configuration.device,
-            &configuration.queue,
-            fmm.get_fmm_temp_buffer(),
-            0,
-            (size_of::<FmmBlock>()) as wgpu::BufferAddress * 1024
-        );
+        // let filtered_blocks = to_vec::<FmmBlock>(
+        //     &configuration.device,
+        //     &configuration.queue,
+        //     fmm.get_fmm_temp_buffer(),
+        //     0,
+        //     (size_of::<FmmBlock>()) as wgpu::BufferAddress * 1024
+        // );
 
-        for (i, elem) in filtered_blocks.iter().enumerate() {
-            println!("{:?} :: {:?}", i, elem);
-        }
+        // for (i, elem) in filtered_blocks.iter().enumerate() {
+        //     println!("{:?} :: {:?}", i, elem);
+        // }
 
 
         Self {
@@ -433,7 +434,7 @@ impl Application for FmmApp {
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             app_render_params: app_render_params,
-            _fmm: fmm,
+            fmm: fmm,
             _pc_params: pc_params,
          }
     }
@@ -572,6 +573,9 @@ impl Application for FmmApp {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm visualizer encoder.") });
 
         //++ queue.submit(Some(encoder_command.finish()));
+
+        self.fmm.update_band_point_counts(&mut encoder);
+        self.fmm.filter_active_blocks(&mut encoder);
 
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(
