@@ -574,12 +574,12 @@ impl Application for FmmApp {
 
         //++ queue.submit(Some(encoder_command.finish()));
 
-        // self.fmm.update_band_point_counts(&mut encoder);
-        // self.fmm.filter_active_blocks(&mut encoder);
         self.fmm.collect_known_cells(&mut encoder);
         self.fmm.create_initial_band(&mut encoder);
         self.fmm.collect_band_cells(&mut encoder);
         self.fmm.fmm(&mut encoder);
+        self.fmm.update_band_point_counts(&mut encoder);
+        self.fmm.filter_active_blocks(&mut encoder);
 
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(
