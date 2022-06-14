@@ -567,22 +567,14 @@ fn solve_quadratic(coord: vec3<u32>) -> f32 {
     return result;
 }
 
-@compute
-@workgroup_size(1024,1,1)
-fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
-        @builtin(local_invocation_index) local_index: u32,
-        @builtin(workgroup_id) workgroup_id: vec3<u32>,
-        @builtin(global_invocation_id)   global_id: vec3<u32>) {
-
-
-    // Build the private prefix data.
+fn create_prefix_sum_private_data(local_index: u32, workgroup_index: u32) {
 
     let ai = local_index; 
     let bi = ai + THREAD_COUNT;
     let ai_bcf = ai + (ai >> 4u); 
     let bi_bcf = bi + (bi >> 4u);
-    let global_ai = ai + workgroup_id.x * (THREAD_COUNT * 2u);
-    let global_bi = bi + workgroup_id.x * (THREAD_COUNT * 2u);
+    let global_ai = ai + workgroup_index * (THREAD_COUNT * 2u);
+    let global_bi = bi + workgroup_index * (THREAD_COUNT * 2u);
 
     private_data = PrivateData (
         ai,
@@ -592,11 +584,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         global_ai,
         global_bi
     );
+}
+
+@compute
+@workgroup_size(1024,1,1)
+fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
+        @builtin(local_invocation_index) local_index: u32,
+        @builtin(workgroup_id) workgroup_id: vec3<u32>,
+        @builtin(global_invocation_id)   global_id: vec3<u32>) {
+
 
     // STAGE 1.
     // Create scan data and store it to global memory.
     if (pc.phase == 0u) {
 
+        create_prefix_sum_private_data(local_index, workgroup_id.x);
         copy_block_to_shared_temp();
         local_prefix_sum(workgroup_id.x);
         store_block_to_global_temp();
@@ -606,28 +608,28 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // Do the actual prefix sum and the filtered data to the final destination array.
     else if (pc.phase == 1u) {
 
-      if (local_index == 0u) {
-          stream_compaction_count = 0u;
-      }
-      workgroupBarrier();
+        create_prefix_sum_private_data(local_index, workgroup_id.x);
+        if (local_index == 0u) {
+            stream_compaction_count = 0u;
+        }
+        workgroupBarrier();
 
-      // 2a. Load the exclusive data to the shared_aux. 
-      copy_exclusive_data_to_shared_aux();
+        // 2a. Load the exclusive data to the shared_aux. 
+        copy_exclusive_data_to_shared_aux();
 
-      // 2b. Perform prefix sum on shared_aux data.  
-      local_prefix_sum_aux();
-      workgroupBarrier();
+        // 2b. Perform prefix sum on shared_aux data.  
+        local_prefix_sum_aux();
+        workgroupBarrier();
 
-      sum_auxiliar();
-      workgroupBarrier();
+        sum_auxiliar();
+        workgroupBarrier();
 
-      gather_data();
+        gather_data();
     }
 
     else if (pc.phase == 2u || pc.phase == 4u) {
 
         // Initialize shader_counter;
-	//if (local_index == 0u) { shared_counter = 0u; fmm_counter[select(3,2, pc.phase == 2u)] = 0u; }
 	if (local_index == 0u) { shared_counter = 0u; fmm_counter[0] = 0u; }
         workgroupBarrier();
 
@@ -646,10 +648,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 	if (local_index == 0u) {
 	    fmm_counter[0] = shared_counter;
-	    // fmm_counter[select(3,2, pc.phase == 2u)] = shared_counter;
         }
     }
 
+    // Expand interface from "known" cells. Add new band points to fmm_temp.
     else if (pc.phase == 3u) {
 
         // Get the number of known points;
@@ -664,10 +666,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
                 // Get the cell index.
 	        let t = temp_data[actual_index];  
-		// fmm_data[t.data0].tag = BAND;
-
-		// Load the actual cell. DO we need this?
-	        // let fmm_cell = fmm_data[t.data0];
 
 	        // get_neighbors.
 		var this_coord = get_cell_index(t.data0);
@@ -681,15 +679,17 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		var n3 = fmm_data[memory_locations[3]];
 		var n4 = fmm_data[memory_locations[4]];
 		var n5 = fmm_data[memory_locations[5]];
-		if (n0.tag == FAR) { fmm_data[memory_locations[0]].tag = BAND; } // fmm_data[memory_locations[0]].value = f32(memory_locations[0]);}
-		if (n1.tag == FAR) { fmm_data[memory_locations[1]].tag = BAND; } // fmm_data[memory_locations[1]].value = f32(memory_locations[1]);}
-		if (n2.tag == FAR) { fmm_data[memory_locations[2]].tag = BAND; } // fmm_data[memory_locations[2]].value = f32(memory_locations[2]);}
-		if (n3.tag == FAR) { fmm_data[memory_locations[3]].tag = BAND; } // fmm_data[memory_locations[3]].value = f32(memory_locations[3]);}
-		if (n4.tag == FAR) { fmm_data[memory_locations[4]].tag = BAND; } // fmm_data[memory_locations[4]].value = f32(memory_locations[4]);}
-		if (n5.tag == FAR) { fmm_data[memory_locations[5]].tag = BAND; } // fmm_data[memory_locations[5]].value = f32(memory_locations[5]);}
+		if (n0.tag == FAR) { fmm_data[memory_locations[0]].tag = BAND; }
+		if (n1.tag == FAR) { fmm_data[memory_locations[1]].tag = BAND; }
+		if (n2.tag == FAR) { fmm_data[memory_locations[2]].tag = BAND; }
+		if (n3.tag == FAR) { fmm_data[memory_locations[3]].tag = BAND; }
+		if (n4.tag == FAR) { fmm_data[memory_locations[4]].tag = BAND; }
+		if (n5.tag == FAR) { fmm_data[memory_locations[5]].tag = BAND; }
 	    }
         }
     }
+
+    // Solve quadratic.
     else if (pc.phase == 5u) {
 
 	let band_point_count = fmm_counter[0];

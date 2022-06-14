@@ -572,8 +572,6 @@ impl Application for FmmApp {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm visualizer encoder.") });
 
-        //++ queue.submit(Some(encoder_command.finish()));
-
         self.fmm.collect_known_cells(&mut encoder);
         self.fmm.create_initial_band(&mut encoder);
         self.fmm.collect_band_cells(&mut encoder);

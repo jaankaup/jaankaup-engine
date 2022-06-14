@@ -164,8 +164,8 @@ fn visualize_cell(position: vec3<f32>, color: u32) {
           AABB (
               //vec4<f32>(position, bitcast<f32>(color)),
               //vec4<f32>(12.0 * position,  2.5)
-              4.0 * vec4<f32>(position, 0.0) + vec4<f32>((-1.0) * vec3<f32>(0.0), bitcast<f32>(color)),
-              4.0 * vec4<f32>(position, 0.0) + vec4<f32>(vec3<f32>(AABB_SIZE), 0.2)
+              4.0 * vec4<f32>(position, 0.0) + vec4<f32>(vec3<f32>(0.002), bitcast<f32>(color)),
+              4.0 * vec4<f32>(position, 0.0) + vec4<f32>(vec3<f32>(AABB_SIZE - 0.002), 0.2)
           );
 }
 
