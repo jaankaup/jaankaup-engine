@@ -460,6 +460,18 @@ impl FastMarchingMethod {
         self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(pc.get_point_count(), 1024) + 1, 1, 1]);
     }
 
+    pub fn create_compute_pass_fmm<'a>(&'a self, encoder: &'a mut wgpu::CommandEncoder) -> wgpu::ComputePass<'a> {
+
+        let mut pass = encoder.begin_compute_pass(
+            &wgpu::ComputePassDescriptor { label: Some("Fmm compute pass.")}
+        );
+        pass.set_pipeline(&self.compute_object.pipeline);
+        for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
+            pass.set_bind_group(e as u32, &bgs, &[]);
+        }
+        pass
+    }
+
     pub fn add_point_cloud_data(&mut self,
                                 device: &wgpu::Device,
                                 pc_data: &wgpu::Buffer,
@@ -487,114 +499,62 @@ impl FastMarchingMethod {
 
     }
 
-    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[0].
-    #[allow(dead_code)]
-    pub fn collect_known_cells(&self, encoder: &mut wgpu::CommandEncoder) {
-
-        self.compute_object.dispatch_push_constants::<u32>(
-            &self.compute_object_bind_groups,
-            encoder,
-            udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
-            0,
-            2, // phase
-            Some("Fmm phase 2.")
-        );
-    }
-
-    /// Collect all band cells to temp_data array. The known cell count is saved to fmm_histogram[0].
-    #[allow(dead_code)]
-    pub fn collect_band_cells(&self, encoder: &mut wgpu::CommandEncoder) {
-
-        self.compute_object.dispatch_push_constants::<u32>(
-            &self.compute_object_bind_groups,
-            encoder,
-            udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
-            0,
-            4, // phase
-            Some("Fmm phase 4.")
-        );
-    }
-
-    /// Fmm for all selected band cells.
-    #[allow(dead_code)]
-    pub fn fmm(&self, encoder: &mut wgpu::CommandEncoder) {
-
-        self.compute_object.dispatch_push_constants::<u32>(
-            &self.compute_object_bind_groups,
-            encoder,
-            udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1,
-            0,
-            5, // phase
-            Some("Fmm phase 5.")
-        );
-    }
-
-    #[allow(dead_code)]
     fn calculate_cell_count(&self) -> u32 {
-
         self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2] * self.local_dimension[0]  * self.local_dimension[1]  * self.local_dimension[2] 
     }
 
-    pub fn filter_active_blocks(&self, encoder: &mut wgpu::CommandEncoder) {
+
+    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[0].
+    pub fn collect_known_cells(&self, pass: &mut wgpu::ComputePass) {
+
+        pass.set_push_constants(0, bytemuck::cast_slice(&[2]));
+        pass.dispatch_workgroups(udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1);
+    }
+
+    /// Collect all band cells to temp_data array. The known cell count is saved to fmm_histogram[0].
+    pub fn collect_band_cells(&self, pass: &mut wgpu::ComputePass) {
+
+        pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
+        pass.dispatch_workgroups(1, 1, 1);
+    }
+
+    /// Fmm for all selected band cells.
+    pub fn fmm(&self, pass: &mut wgpu::ComputePass) {
+        pass.set_push_constants(0, bytemuck::cast_slice(&[5]));
+        pass.dispatch_workgroups(udiv_up_safe32(self.calculate_cell_count(), 1024), 1, 1);
+    }
+
+    pub fn filter_active_blocks(&self, pass: &mut wgpu::ComputePass) {
                 
         let number_of_dispatches = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);
 
-        self.compute_object.dispatch_push_constants::<u32>(
-            &self.compute_object_bind_groups,
-            encoder,
-            number_of_dispatches, 1, 1,
-            0,
-            0, // phase
-            Some("Fmm phase 0.")
-        );
+        pass.set_push_constants(0, bytemuck::cast_slice(&[0]));
+        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
 
-        self.compute_object.dispatch_push_constants::<u32>(
-            &self.compute_object_bind_groups,
-            encoder,
-            1, 1, 1,
-            0,
-            1, // phase
-            Some("Fmm phase 1.")
-        );
+        pass.set_push_constants(0, bytemuck::cast_slice(&[1]));
+        pass.dispatch_workgroups(1, 1, 1);
     }
 
     /// Update all band point counts from global computational domain. 
-    pub fn update_band_point_counts(&self, encoder: &mut wgpu::CommandEncoder) {
+    pub fn update_band_point_counts(&self, pass: &mut wgpu::ComputePass) {
 
         let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count() , 64);
 
-        self.update_band_counts_compute_object.dispatch(
-            &self.update_band_counts_compute_object_bind_groups,
-            encoder,
-            number_of_dispatches, 1, 1,
-            Some("Update band point counts dispatch.")
-        );
+        pass.set_push_constants(0, bytemuck::cast_slice(&[6]));
+        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
     }
 
     /// Gather the indexes from knwon points to fmm_temp array. 
-    #[allow(dead_code)]
-    pub fn gather_all_known_points(&self, encoder: &mut wgpu::CommandEncoder) {
-        self.compute_object.dispatch_push_constants::<u32>(
-            &self.compute_object_bind_groups,
-            encoder,
-            1, 1, 1,
-            0,
-            2, // phase
-            Some("Fmm phase 2.")
-        );
+    pub fn gather_all_known_points(&self, pass: &mut wgpu::ComputePass) {
+        pass.set_push_constants(0, bytemuck::cast_slice(&[2]));
+        pass.dispatch_workgroups(1, 1, 1);
     }
 
-    /// Gather the indexes from knwon points to fmm_temp array. 
-    #[allow(dead_code)]
-    pub fn create_initial_band(&self, encoder: &mut wgpu::CommandEncoder) {
-        self.compute_object.dispatch_push_constants::<u32>(
-            &self.compute_object_bind_groups,
-            encoder,
-            1, 1, 1,
-            0,
-            3, // phase
-            Some("Fmm phase 3.")
-        );
+    /// 
+    pub fn create_initial_band(&self, pass: &mut wgpu::ComputePass) {
+
+        pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
+        pass.dispatch_workgroups(1, 1, 1);
     }
 
     // 

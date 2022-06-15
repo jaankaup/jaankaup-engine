@@ -188,21 +188,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             atomicAdd(&fmm_blocks[workgroup_id.x].number_of_band_points, 1u);
 	}
 	storageBarrier();
-	// workgroupBarrier();
 
 	if (local_index == 0u && fmm_blocks[workgroup_id.x].number_of_band_points > 0u) {
-	//if (local_index == 0u) {
-
-            //output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
-            //      AABB (
-            //          4.0 * vec4<f32>(point_cloud_params.min_point, 0.0) + vec4<f32>(0.0, 0.0, 0.0, scene_aabb_color),
-            //          4.0 * vec4<f32>(vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension), 0.3)
-            //      );
-            //output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
-            //      AABB (
-            //          4.0 * vec4<f32>(point_cloud_params.min_point, 0.0) + vec4<f32>(0.0, 0.0, 0.0, point_cloud_aabb_color),
-            //          4.0 * vec4<f32>(point_cloud_params.max_point * point_cloud_params.pc_scale_factor, 0.1)
-            //      );
             var position = vec3<f32>(get_group_coordinate(global_id.x)) * 4.0;
             let color_band = rgba_u32(222u, 55u, 150u, 255u);
             visualize_cell(position, color_band);

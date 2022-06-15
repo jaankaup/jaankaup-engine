@@ -85,14 +85,14 @@ struct FmmParams {
 
 struct FmmCellPc {
     //tag: atomic<u32>,
-    tag: u32,
+    tag: atomic<u32>,
     value: f32,
     color: u32,
 };
 
 struct FmmBlock {
     index: u32,
-    number_of_band_points: u32,
+    number_of_band_points: atomic<u32>,
 };
 
 struct TempData {
@@ -130,6 +130,7 @@ var<push_constant> pc: PushConstants;
 // The output of global active fmm block scan.
 var<workgroup> shared_prefix_sum: array<u32, SCAN_BLOCK_SIZE>; 
 var<workgroup> shared_aux: array<u32, SCAN_BLOCK_SIZE>;
+var<workgroup> workgroup_cells: array<FmmCellPc, 1024u>;
 var<workgroup> shared_counter: atomic<u32>; //, SCAN_BLOCK_SIZE>;
 
 // The counter for active fmm blocks.
@@ -148,6 +149,33 @@ fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
 
+fn total_block_count() -> u32 {
+
+    return fmm_params.global_dimension.x * 
+           fmm_params.global_dimension.y * 
+           fmm_params.global_dimension.z; 
+
+}
+
+fn total_local_block_size() -> u32 {
+
+    return fmm_params.local_dimension.x * 
+           fmm_params.local_dimension.y * 
+           fmm_params.local_dimension.z; 
+
+}
+
+fn total_cell_count() -> u32 {
+
+    return fmm_params.global_dimension.x * 
+           fmm_params.global_dimension.y * 
+           fmm_params.global_dimension.z * 
+           fmm_params.local_dimension.x * 
+           fmm_params.local_dimension.y * 
+           fmm_params.local_dimension.z; 
+};
+
+
 ///////////////////////////
 ////// Prefix scan   //////
 ///////////////////////////
@@ -161,12 +189,12 @@ fn store_block_to_global_temp() {
 // Copies FMM_Block to shared_prefix_sum {0,1}. "Add padding 0 if necessery." not implemented.
 fn copy_block_to_shared_temp() {
 
-    let a = fmm_blocks[private_data.global_ai];
-    let b = fmm_blocks[private_data.global_bi];
+    var a = fmm_blocks[private_data.global_ai];
+    var b = fmm_blocks[private_data.global_bi];
 
     // Add prediates here.
-    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < prefix_params.data_end_index && a.number_of_band_points > 0u);
-    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < prefix_params.data_end_index && b.number_of_band_points > 0u);
+    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < prefix_params.data_end_index && atomicLoad(&a.number_of_band_points) > 0u);
+    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < prefix_params.data_end_index && atomicLoad(&b.number_of_band_points) > 0u);
 }
 
 fn copy_exclusive_data_to_shared_aux() {
@@ -297,23 +325,26 @@ fn sum_auxiliar() {
     if (private_data.ai == 0u) {
         let last_index = chunks + 1u;
         stream_compaction_count = shared_aux[last_index + (last_index >> 4u)];
+
+	// Store total number of filtered objects to fmm_counter[1].
+	atomicStore(&fmm_counter[1], stream_compaction_count);
     } 
     workgroupBarrier();
 
     for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
 
-        let a = temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u];
+        var a = temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u];
         temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u] = a + shared_aux[i + (i >> 4u)];
 
-        let b = temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u];
+        var b = temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u];
         temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u] = b + shared_aux[i + (i >> 4u)];
      }
 };
 
 fn gather_data() {
 
-    let data_count = prefix_params.data_end_index -
-                     prefix_params.data_start_index;
+    let data_count = total_block_count(); // prefix_params.data_end_index -
+                                          // prefix_params.data_start_index;
 
     let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
 
@@ -322,15 +353,15 @@ fn gather_data() {
         let index_a = private_data.ai + i * THREAD_COUNT * 2u;
         let index_b = private_data.bi + i * THREAD_COUNT * 2u;
 
-        let a = fmm_blocks[index_a];
+        var a = fmm_blocks[index_a];
         let a_offset = temp_prefix_sum[index_a];
-        let predicate_a = index_a < data_count && a.number_of_band_points > 0u;
+        let predicate_a = index_a < data_count && atomicLoad(&a.number_of_band_points) > 0u;
         if (predicate_a) { temp_data[a_offset] = TempData(a.index, a.number_of_band_points); }
         // if (predicate_a) { filtered_blocks[a_offset] = a; }
 
-        let b = fmm_blocks[index_b];
+        var b = fmm_blocks[index_b];
         let b_offset = temp_prefix_sum[index_b];
-        let predicate_b = index_b < data_count && b.number_of_band_points > 0u;
+        let predicate_b = index_b < data_count && atomicLoad(&b.number_of_band_points) > 0u;
         if (predicate_b) { temp_data[b_offset] = TempData(b.index, b.number_of_band_points); }
         // if (predicate_b) { filtered_blocks[b_offset] = b; }
     }
@@ -384,39 +415,18 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
   return vec3<u32>(x, y, z);
 }
 
-/// Load block cells to workgroup memory .
-fn load_block_fmm_cells_to_wg() {
-
-}
-
-/// Harvest the initial active blocks.
-fn update_initial_interface() {
-}
-
 fn gather_cells_to_temp_data(tag: u32, thread_index: u32) {
 
-    let fmm_cell = fmm_data[thread_index];    
+    var fmm_cell = fmm_data[thread_index];    
 
-    if (fmm_cell.tag == tag) {
+    if (atomicLoad(&fmm_cell.tag) == tag) {
 
         let index = atomicAdd(&shared_counter, 1u);
 
-	// Save the cell index to temp_data.
+        // Save the cell index to temp_data.
         temp_data[index] = TempData(thread_index, 0u); 
     }
 }
-
-fn total_cell_count() -> u32 {
-
-    let total_cell_count = fmm_params.global_dimension.x * 
-                           fmm_params.global_dimension.y * 
-                           fmm_params.global_dimension.z * 
-                           fmm_params.local_dimension.x * 
-                           fmm_params.local_dimension.y * 
-                           fmm_params.local_dimension.z; 
-
-    return total_cell_count;
-};
 
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside(coord: vec3<i32>) -> bool {
@@ -439,15 +449,14 @@ fn get_cell_mem_location(v: vec3<u32>) -> u32 {
 
     let stride = fmm_params.local_dimension.x * fmm_params.local_dimension.y * fmm_params.local_dimension.z;
 
-    let xOffset = 1u;
-    let yOffset = fmm_params.global_dimension.x;
-    let zOffset = yOffset * fmm_params.global_dimension.y;
+    // let yOffset = fmm_params.global_dimension.x;
+    // let zOffset = fmm_params.global_dimension.x * fmm_params.global_dimension.y;
 
     let global_coordinate = vec3<u32>(v) / fmm_params.local_dimension;
 
-    let global_index = (global_coordinate.x * xOffset +
-                        global_coordinate.y * yOffset +
-                        global_coordinate.z * zOffset) * stride;
+    let global_index = (global_coordinate.x +
+                        global_coordinate.y * fmm_params.global_dimension.x +
+                        global_coordinate.z * fmm_params.global_dimension.x * fmm_params.global_dimension.y) * stride;
 
     let local_coordinate = vec3<u32>(v) - global_coordinate * fmm_params.local_dimension;
 
@@ -679,12 +688,35 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		var n3 = fmm_data[memory_locations[3]];
 		var n4 = fmm_data[memory_locations[4]];
 		var n5 = fmm_data[memory_locations[5]];
-		if (n0.tag == FAR) { fmm_data[memory_locations[0]].tag = BAND; }
-		if (n1.tag == FAR) { fmm_data[memory_locations[1]].tag = BAND; }
-		if (n2.tag == FAR) { fmm_data[memory_locations[2]].tag = BAND; }
-		if (n3.tag == FAR) { fmm_data[memory_locations[3]].tag = BAND; }
-		if (n4.tag == FAR) { fmm_data[memory_locations[4]].tag = BAND; }
-		if (n5.tag == FAR) { fmm_data[memory_locations[5]].tag = BAND; }
+		if (n0.tag == FAR) {
+		    let old_tag = atomicExchange(&fmm_data[memory_locations[0]].tag, BAND);
+		    if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[0] / 64u].number_of_band_points, 1u); }
+	        }
+		if (n1.tag == FAR) {
+		    let old_tag = atomicExchange(&fmm_data[memory_locations[1]].tag, BAND);
+		    if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[1] / 64u].number_of_band_points, 1u); }
+	        }
+		if (n2.tag == FAR) {
+		    let old_tag = atomicExchange(&fmm_data[memory_locations[2]].tag, BAND);
+		    if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[2] / 64u].number_of_band_points, 1u); }
+	        }
+		if (n3.tag == FAR) {
+		    let old_tag = atomicExchange(&fmm_data[memory_locations[3]].tag, BAND);
+		    if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[3] / 64u].number_of_band_points, 1u); }
+	        }
+		if (n4.tag == FAR) {
+		    let old_tag = atomicExchange(&fmm_data[memory_locations[4]].tag, BAND);
+		    if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[4] / 64u].number_of_band_points, 1u); }
+	        }
+		if (n5.tag == FAR) {
+		    let old_tag = atomicExchange(&fmm_data[memory_locations[5]].tag, BAND);
+		    if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[5] / 64u].number_of_band_points, 1u); }
+	        }
+		// if (n1.tag == FAR) { fmm_data[memory_locations[1]].tag = BAND; }
+		// if (n2.tag == FAR) { fmm_data[memory_locations[2]].tag = BAND; }
+		// if (n3.tag == FAR) { fmm_data[memory_locations[3]].tag = BAND; }
+		// if (n4.tag == FAR) { fmm_data[memory_locations[4]].tag = BAND; }
+		// if (n5.tag == FAR) { fmm_data[memory_locations[5]].tag = BAND; }
 	    }
         }
     }
@@ -708,5 +740,41 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		fmm_data[t.data0].value = fmm_value;
 	    }
 	}
+    }
+    else if (pc.phase == 6u) {
+
+        // let block_count = total_block_count();
+        // let stride = total_local_block_size();
+	// let blocks_per_thread_group = 1024u / stride; 
+        // let chuncks = udiv_up_safe32(block_count, 1024u);
+
+        // for (var i: u32 = 0u; i < chunks; i = i + 1u) {
+
+        //     // Load max 1024 cells to shared memory.
+	//     let index = local_index + i * 1024u;
+	//     let block_index = index / stride;
+	//     let fmm_cell = fmm_data[index];
+	//     if (fmm_cell.tag == BAND) {
+        //         atomicAdd(&fmm_blocks[block_index].number_of_band_points, 1u);
+	//     }
+	//     // workgroup_cells[local_index] = fmm_data[index];
+	//     // workgroupBarier();
+
+	//     // let actual_index = local_index + stride * chunks; // & (stride - 1); 
+
+        //     // let block = fmm_blocks[local_index
+        // }
+
+        //++ let fmm_cell = fmm_data[local_index + workgroup_id.x * 64u];    
+        //++ if (fmm_cell.tag == BAND) {
+        //++     atomicAdd(&fmm_blocks[workgroup_id.x].number_of_band_points, 1u);
+	//++ }
+	//++ storageBarrier();
+
+	//++ if (local_index == 0u && fmm_blocks[workgroup_id.x].number_of_band_points > 0u) {
+        //++     var position = vec3<f32>(get_group_coordinate(global_id.x)) * 4.0;
+        //++     let color_band = rgba_u32(222u, 55u, 150u, 255u);
+        //++     visualize_cell(position, color_band);
+	//++ }
     }
 }
