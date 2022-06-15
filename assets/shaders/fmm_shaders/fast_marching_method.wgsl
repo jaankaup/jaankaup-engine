@@ -22,6 +22,8 @@
 // Phase 0 -> Prefix Sum for active blocks part 1 
 // Phase 1 -> Prefix Sum for active blocks part 2
 
+let AABB_SIZE = 16.00;
+
 struct PushConstants {
     phase: u32,    
 };
@@ -296,6 +298,7 @@ fn local_prefix_sum_aux() {
 
         // Update stream compaction count.
         stream_compaction_count = stream_compaction_count + shared_aux[last_index];
+	fmm_counter[1] = stream_compaction_count; 
 
         shared_aux[last_index] = 0u;
     }
@@ -360,17 +363,12 @@ fn gather_data() {
         var a = fmm_blocks[index_a];
         let a_offset = temp_prefix_sum[index_a];
         var predicate_a = index_a < data_count && a.number_of_band_points > 0u;
-        //if (predicate_a) { temp_data[a_offset] = TempData(a.index, index_a); }
         if (predicate_a) { temp_data[a_offset] = TempData(a.index, a.number_of_band_points); }
-        // if (predicate_a) { filtered_blocks[a_offset] = a; }
 
         var b = fmm_blocks[index_b];
         let b_offset = temp_prefix_sum[index_b];
         var predicate_b = index_b < data_count && b.number_of_band_points > 0u;
-        //let predicate_b = index_b < data_count && atomicLoad(&b.number_of_band_points) > 0u;
-        //if (predicate_b) { temp_data[b_offset] = TempData(b.index, index_b); }
         if (predicate_b) { temp_data[b_offset] = TempData(b.index, b.number_of_band_points); }
-        // if (predicate_b) { filtered_blocks[b_offset] = b; }
     }
 }
 
@@ -424,14 +422,14 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
 
 fn gather_cells_to_temp_data(tag: u32, thread_index: u32) {
 
-    var fmm_cell = fmm_data[thread_index];    
+    var fmm_cell = fmm_data[thread_index];
 
     if (fmm_cell.tag == tag) {
 
         let index = atomicAdd(&shared_counter, 1u);
 
         // Save the cell index to temp_data.
-        temp_data[index] = TempData(thread_index, 777u); 
+        temp_data[index] = TempData(thread_index, 777u);
     }
 }
 
@@ -602,6 +600,16 @@ fn create_prefix_sum_private_data(local_index: u32, workgroup_index: u32) {
     );
 }
 
+fn visualize_block(position: vec3<f32>, color: u32) {
+    output_aabb_wire[atomicAdd(&counter[3], 1u)] =
+          AABB (
+              //vec4<f32>(position, bitcast<f32>(color)),
+              //vec4<f32>(12.0 * position,  2.5)
+              4.0 * vec4<f32>(position, 0.0) + vec4<f32>(vec3<f32>(0.002), bitcast<f32>(color)),
+              4.0 * vec4<f32>(position, 0.0) + vec4<f32>(vec3<f32>(AABB_SIZE - 0.002), 0.2)
+          );
+}
+
 @compute
 @workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -653,6 +661,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         let cell_count = total_cell_count();
         let chuncks = udiv_up_safe32(cell_count, 1024u);
 
+        // if (global_id.x < cell_count) {
+        //     gather_cells_to_temp_data(select(BAND,KNOWN, pc.phase == 2u) , global_id.x);
+	// }
+
         for (var i: u32 = 0u; i < chuncks; i = i + 1u) {
 
             let actual_index = local_index + 1024u * i;
@@ -661,10 +673,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                 gather_cells_to_temp_data(select(BAND,KNOWN, pc.phase == 2u) , actual_index);
 	    }
         }
-        workgroupBarrier();
+        //workgroupBarrier();
+        //storageBarrier();
 
 	if (local_index == 0u) {
-	    fmm_counter[0] = shared_counter;
+	    atomicStore(&fmm_counter[0], shared_counter);
         }
     }
 
@@ -749,8 +762,28 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	    }
 	}
     }
-    else if (pc.phase == 6u) {
+    // Visualize block
+    else if (pc.phase == 15u) {
 
+        // Initialize shared_counter;
+	if (local_index == 0u) { shared_counter = 0u; }
+        workgroupBarrier();
+
+	let known_point_count = fmm_counter[0];
+        let chuncks = udiv_up_safe32(known_point_count, 1024u);
+
+        for (var i: u32 = 0u; i < chuncks; i = i + 1u) {
+
+            let actual_index = local_index + 1024u * i;
+
+	    if (actual_index < known_point_count) {
+
+            }
+	}
+    }
+
+
+        
         // let block_count = total_block_count();
         // let stride = total_local_block_size();
 	// let blocks_per_thread_group = 1024u / stride; 
@@ -784,5 +817,4 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         //++     let color_band = rgba_u32(222u, 55u, 150u, 255u);
         //++     visualize_cell(position, color_band);
 	//++ }
-    }
 }

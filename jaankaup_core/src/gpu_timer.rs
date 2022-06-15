@@ -83,6 +83,29 @@ impl GpuTimer {
     }
 
     /// Add start. For each start there must be end counter part.
+    pub fn start_pass(&mut self, pass: &mut wgpu::ComputePass) {
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(self.start_count < self.max_number_of_time_stamps, "{} < {}", self.start_count, self.max_number_of_time_stamps);
+            debug_assert!(self.start_count - self.end_count < 2, "{} - {} < 2", self.start_count, self.end_count);
+        }
+        pass.write_timestamp(&self.timestamp, self.start_count * 2);
+        self.start_count = self.start_count + 1;
+    }
+
+    /// Add end. For each end there must be end counter part.
+    pub fn end_pass(&mut self, pass: &mut wgpu::ComputePass) {
+
+        self.end_count = self.end_count + 1;
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(self.start_count == self.end_count , "{} == {}", self.start_count, self.end_count);
+            debug_assert!(self.end_count < self.max_number_of_time_stamps, "{} < {}", self.end_count, self.max_number_of_time_stamps);
+        }
+        pass.write_timestamp(&self.timestamp, (self.end_count - 1) * 2 + 1);
+    }
+
+    /// Add start. For each start there must be end counter part.
     pub fn start(&mut self, encoder: &mut wgpu::CommandEncoder) {
         #[cfg(debug_assertions)]
         {
@@ -148,6 +171,7 @@ impl GpuTimer {
             let microseconds = nanoseconds / 1000.0;
             let milli = microseconds / 1000.0;
             println!("{:?} time is {:?} milli seconds.", i, milli);
+            // println!("{:?} time is {:?} micro seconds.", i, microseconds);
         }
     }
 

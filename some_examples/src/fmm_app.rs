@@ -117,7 +117,7 @@ impl WGPUFeatures for FmmAppFeatures {
 struct FmmApp {
     camera: Camera,
     gpu_debugger: GpuDebugger,
-    _gpu_timer: Option<GpuTimer>,
+    gpu_timer: GpuTimer,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
     _light: LightBuffer,
@@ -166,7 +166,7 @@ impl Application for FmmApp {
         let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
 
         // Gpu timer.
-        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
+        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer")).unwrap();
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
         let keyboard_manager = create_keyboard_manager();
@@ -419,7 +419,7 @@ impl Application for FmmApp {
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
-            _gpu_timer: gpu_timer,
+            gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             _light: light,
@@ -577,15 +577,30 @@ impl Application for FmmApp {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm visualizer encoder.") });
 
+        // Fast marching method.
         if self.once {
             let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
+
+            self.gpu_timer.start_pass(&mut pass);
             self.fmm.collect_known_cells(&mut pass);
+            self.gpu_timer.end_pass(&mut pass);
+
+            self.gpu_timer.start_pass(&mut pass);
             self.fmm.create_initial_band(&mut pass);
+            self.gpu_timer.end_pass(&mut pass);
+
+            self.gpu_timer.start_pass(&mut pass);
             self.fmm.fmm(&mut pass);
+            self.gpu_timer.end_pass(&mut pass);
+
+            self.gpu_timer.start_pass(&mut pass);
             self.fmm.filter_active_blocks(&mut pass);
+            self.gpu_timer.end_pass(&mut pass);
+
             drop(pass);
         }
 
+        // Cell visualizer.
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(
                 &self.compute_bind_groups_fmm_visualizer,
@@ -596,9 +611,18 @@ impl Application for FmmApp {
             self.app_render_params.update = false;
         }
 
+        self.gpu_timer.resolve_timestamps(&mut encoder);
+
         queue.submit(Some(encoder.finish())); 
 
+
         if self.once {
+            self.gpu_timer.create_timestamp_data(&device, &queue);
+            self.gpu_timer.print_data();
+
+            //let gpu_timer_result = self.gpu_timer.get_data(); 
+
+            // println!("{:?}", gpu_timer_result);
             let filtered_blocks = to_vec::<FmmBlock>(
                 &device,
                 &queue,

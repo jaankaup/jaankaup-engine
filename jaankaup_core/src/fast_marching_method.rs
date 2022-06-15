@@ -508,7 +508,8 @@ impl FastMarchingMethod {
     pub fn collect_known_cells(&self, pass: &mut wgpu::ComputePass) {
 
         pass.set_push_constants(0, bytemuck::cast_slice(&[2]));
-        pass.dispatch_workgroups(udiv_up_safe32(self.calculate_cell_count(), 1024) + 1, 1, 1);
+        pass.dispatch_workgroups(1, 1, 1);
+        //pass.dispatch_workgroups(udiv_up_safe32(self.calculate_cell_count(), 1024), 1, 1);
     }
 
     /// Collect all band cells to temp_data array. The known cell count is saved to fmm_histogram[0].
