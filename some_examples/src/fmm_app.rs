@@ -475,6 +475,8 @@ impl Application for FmmApp {
              clear
         );
 
+        // clear = false;
+
         if self.app_render_params.draw_point_cloud {
     
             draw(&mut encoder,
@@ -501,7 +503,7 @@ impl Application for FmmApp {
                   spawner
         );
     
-        self.gpu_debugger.reset_element_counters(&queue);
+        // self.gpu_debugger.reset_element_counters(&queue);
 
         self.screen.prepare_for_rendering();
     }
@@ -575,18 +577,14 @@ impl Application for FmmApp {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm visualizer encoder.") });
 
-        let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
         if self.once {
+            let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
             self.fmm.collect_known_cells(&mut pass);
             self.fmm.create_initial_band(&mut pass);
-            self.fmm.collect_band_cells(&mut pass);
             self.fmm.fmm(&mut pass);
-            self.once = false;
             self.fmm.filter_active_blocks(&mut pass);
+            drop(pass);
         }
-        // self.fmm.update_band_point_counts(&mut encoder);
-
-        drop(pass);
 
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(
@@ -600,17 +598,32 @@ impl Application for FmmApp {
 
         queue.submit(Some(encoder.finish())); 
 
-        // let filtered_blocks = to_vec::<FmmBlock>(
-        //     &device,
-        //     &queue,
-        //     self.fmm.get_fmm_temp_buffer(),
-        //     0,
-        //     (size_of::<FmmBlock>()) as wgpu::BufferAddress * 39000
-        // );
+        if self.once {
+            let filtered_blocks = to_vec::<FmmBlock>(
+                &device,
+                &queue,
+                self.fmm.get_fmm_temp_buffer(),
+                0,
+                (size_of::<FmmBlock>()) as wgpu::BufferAddress * 39000
+            );
 
-        // for (i, elem) in filtered_blocks.iter().enumerate() {
-        //     println!("{:?} :: {:?}", i, elem);
-        // }
+            for (i, elem) in filtered_blocks.iter().enumerate() {
+                println!("{:?} :: {:?}", i, elem);
+            }
+
+            let temp_prefix_data = to_vec::<u32>(
+                &device,
+                &queue,
+                self.fmm.get_fmm_prefix_temp_buffer(),
+                0,
+                (size_of::<u32>()) as wgpu::BufferAddress * total_grid_count as u64
+            );
+
+            for (i, elem) in temp_prefix_data.iter().enumerate() {
+                println!("{:?} :: {:?}", i, elem);
+            }
+            self.once = false;
+        }
     }
 }
 

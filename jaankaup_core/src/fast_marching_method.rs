@@ -575,6 +575,10 @@ impl FastMarchingMethod {
     pub fn get_fmm_temp_buffer(&self) -> &wgpu::Buffer {
         &self.temporary_fmm_data
     }
+
+    pub fn get_fmm_prefix_temp_buffer(&self) -> &wgpu::Buffer {
+        &self.prefix_temp_array
+    }
 }
 
     // /// From each active fmm block, find smallest band point and change the tag to known. 

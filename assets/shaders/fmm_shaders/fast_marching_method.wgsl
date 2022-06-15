@@ -106,20 +106,20 @@ let BAND     = 2u;
 let KNOWN    = 3u;
 let OUTSIDE  = 4u;
 
-@group(0) @binding(0) var<uniform>             prefix_params: PrefixParams;
-@group(0) @binding(1) var<uniform>             fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
-@group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-@group(0) @binding(4) var<storage,read_write>  temp_data: array<TempData>;
-@group(0) @binding(5) var<storage,read_write>  fmm_data: array<FmmCellPc>;
-@group(0) @binding(6) var<storage,read_write>  fmm_counter: array<atomic<u32>>; // 5 placeholders
+@group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
+@group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
+@group(0) @binding(2) var<storage,read_write> fmm_blocks: array<FmmBlock>;
+@group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
+@group(0) @binding(4) var<storage,read_write> temp_data: array<TempData>;
+@group(0) @binding(5) var<storage,read_write> fmm_data: array<FmmCellPc>;
+@group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>; // 5 placeholders
 
 // GpuDebugger.
-@group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
-@group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
-@group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
-@group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
-@group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
+@group(1) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;
+@group(1) @binding(1) var<storage,read_write> output_char: array<Char>;
+@group(1) @binding(2) var<storage,read_write> output_arrow: array<Arrow>;
+@group(1) @binding(3) var<storage,read_write> output_aabb: array<AABB>;
+@group(1) @binding(4) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 let THREAD_COUNT = 1024u;
 let SCAN_BLOCK_SIZE = 2176u;
@@ -192,9 +192,11 @@ fn copy_block_to_shared_temp() {
     var a = fmm_blocks[private_data.global_ai];
     var b = fmm_blocks[private_data.global_bi];
 
-    // Add prediates here.
-    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < prefix_params.data_end_index && atomicLoad(&a.number_of_band_points) > 0u);
-    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < prefix_params.data_end_index && atomicLoad(&b.number_of_band_points) > 0u);
+    let end_index = total_cell_count();
+
+    // Add prediates here {0 :: false, 1 :: true).
+    shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < end_index && a.number_of_band_points > 0u);
+    shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < end_index && b.number_of_band_points > 0u);
 }
 
 fn copy_exclusive_data_to_shared_aux() {
@@ -242,8 +244,9 @@ fn local_prefix_sum(workgroup_index: u32) {
         let last_index = (THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u);
         temp_prefix_sum[prefix_params.exclusive_parts_start_index + workgroup_index] = shared_prefix_sum[last_index];
         shared_prefix_sum[last_index] = 0u;
-
     }
+
+    // storageBarrier(); // ???
     
     // Down sweep.
     for (var d = 1u; d < n ; d = d * 2u) {
@@ -317,8 +320,8 @@ fn local_prefix_sum_aux() {
 
 fn sum_auxiliar() {
 
-    let data_count = prefix_params.data_end_index -
-                     prefix_params.data_start_index;
+    let data_count = total_cell_count(); //  prefix_params.data_end_index -
+                                         // prefix_params.data_start_index;
 
     let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
 
@@ -329,7 +332,8 @@ fn sum_auxiliar() {
 	// Store total number of filtered objects to fmm_counter[1].
 	atomicStore(&fmm_counter[1], stream_compaction_count);
     } 
-    workgroupBarrier();
+    storageBarrier();
+    //workgroupBarrier();
 
     for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
 
@@ -343,8 +347,8 @@ fn sum_auxiliar() {
 
 fn gather_data() {
 
-    let data_count = total_block_count(); // prefix_params.data_end_index -
-                                          // prefix_params.data_start_index;
+    let data_count = total_cell_count(); // prefix_params.data_end_index -
+                                         // prefix_params.data_start_index;
 
     let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
 
@@ -355,13 +359,16 @@ fn gather_data() {
 
         var a = fmm_blocks[index_a];
         let a_offset = temp_prefix_sum[index_a];
-        let predicate_a = index_a < data_count && atomicLoad(&a.number_of_band_points) > 0u;
+        var predicate_a = index_a < data_count && a.number_of_band_points > 0u;
+        //if (predicate_a) { temp_data[a_offset] = TempData(a.index, index_a); }
         if (predicate_a) { temp_data[a_offset] = TempData(a.index, a.number_of_band_points); }
         // if (predicate_a) { filtered_blocks[a_offset] = a; }
 
         var b = fmm_blocks[index_b];
         let b_offset = temp_prefix_sum[index_b];
-        let predicate_b = index_b < data_count && atomicLoad(&b.number_of_band_points) > 0u;
+        var predicate_b = index_b < data_count && b.number_of_band_points > 0u;
+        //let predicate_b = index_b < data_count && atomicLoad(&b.number_of_band_points) > 0u;
+        //if (predicate_b) { temp_data[b_offset] = TempData(b.index, index_b); }
         if (predicate_b) { temp_data[b_offset] = TempData(b.index, b.number_of_band_points); }
         // if (predicate_b) { filtered_blocks[b_offset] = b; }
     }
@@ -419,12 +426,12 @@ fn gather_cells_to_temp_data(tag: u32, thread_index: u32) {
 
     var fmm_cell = fmm_data[thread_index];    
 
-    if (atomicLoad(&fmm_cell.tag) == tag) {
+    if (fmm_cell.tag == tag) {
 
         let index = atomicAdd(&shared_counter, 1u);
 
         // Save the cell index to temp_data.
-        temp_data[index] = TempData(thread_index, 0u); 
+        temp_data[index] = TempData(thread_index, 777u); 
     }
 }
 
@@ -610,6 +617,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         create_prefix_sum_private_data(local_index, workgroup_id.x);
         copy_block_to_shared_temp();
         local_prefix_sum(workgroup_id.x);
+	workgroupBarrier();
         store_block_to_global_temp();
     }
 
