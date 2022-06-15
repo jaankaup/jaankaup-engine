@@ -28,7 +28,7 @@ impl Histogram {
     }
 
     /// TODO: implement wasm version! 
-    pub fn get_values(&self, device: &wgpu::Device, queue: &wgpu::Queue, _spawner: &Spawner) -> Vec<u32> {
+    pub fn get_values(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Vec<u32> {
 
         let result = to_vec::<u32>(&device,
                                    &queue,

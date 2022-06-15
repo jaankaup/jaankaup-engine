@@ -86,7 +86,6 @@ struct FmmParams {
 };
 
 struct FmmCellPc {
-    //tag: atomic<u32>,
     tag: atomic<u32>,
     value: f32,
     color: u32,
@@ -766,22 +765,25 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     else if (pc.phase == 15u) {
 
         // Initialize shared_counter;
-	if (local_index == 0u) { shared_counter = 0u; }
-        workgroupBarrier();
+	// if (local_index == 0u) { shared_counter = 0u; }
+        // workgroupBarrier();
 
-	let known_point_count = fmm_counter[0];
-        let chuncks = udiv_up_safe32(known_point_count, 1024u);
+	let block_count = fmm_counter[0];
+        let chuncks = udiv_up_safe32(block_count, 1024u);
 
         for (var i: u32 = 0u; i < chuncks; i = i + 1u) {
 
             let actual_index = local_index + 1024u * i;
 
-	    if (actual_index < known_point_count) {
+	    if (actual_index < block_count) {
+                let color_band = rgba_u32(222u, 55u, 150u, 255u);
+		let block_index = temp_data[actual_index].data0;
 
+                let block_position = index_to_uvec3(block_index, fmm_params.global_dimension.x, fmm_params.global_dimension.y) * fmm_params.local_dimension;
+                visualize_block(vec3<f32>(block_position), color_band); 
             }
 	}
     }
-
 
         
         // let block_count = total_block_count();

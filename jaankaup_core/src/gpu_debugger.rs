@@ -552,6 +552,30 @@ impl GpuDebugger {
         self.histogram_element_counter.reset_all_cpu_version(queue, 0);
     }
 
+    pub fn reset_chars(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let mut values = self.histogram_element_counter.get_values(&device, queue);
+        values[0] = 0;
+        self.histogram_element_counter.set_values_cpu_version(queue, &values);
+    }
+
+    pub fn reset_arrows(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let mut values = self.histogram_element_counter.get_values(&device, queue);
+        values[1] = 0;
+        self.histogram_element_counter.set_values_cpu_version(queue, &values);
+    }
+
+    pub fn reset_aabbs(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let mut values = self.histogram_element_counter.get_values(&device, queue);
+        values[2] = 0;
+        self.histogram_element_counter.set_values_cpu_version(queue, &values);
+    }
+
+    pub fn reset_aabb_wires(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let mut values = self.histogram_element_counter.get_values(&device, queue);
+        values[3] = 0;
+        self.histogram_element_counter.set_values_cpu_version(queue, &values);
+    }
+
     pub fn get_element_counter_buffer(&self) -> &wgpu::Buffer {
         &self.histogram_element_counter.get_histogram_buffer()
     }
@@ -566,7 +590,7 @@ impl GpuDebugger {
                   spawner: &Spawner) {
 
         // Get the total number of elements.
-        let elem_counter = self.histogram_element_counter.get_values(device, queue, spawner);
+        let elem_counter = self.histogram_element_counter.get_values(device, queue);
 
         let total_number_of_arrows = elem_counter[1];
         let total_number_of_aabbs = elem_counter[2];

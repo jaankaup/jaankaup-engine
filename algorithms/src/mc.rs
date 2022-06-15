@@ -34,7 +34,7 @@ pub struct MarchingCubes {
 impl MarchingCubes {
 
     pub fn get_counter_value(&self, device:&wgpu::Device, queue: &wgpu::Queue, spawner: &Spawner) -> u32 {
-        self.buffer_counter.get_values(device, queue, spawner)[0]
+        self.buffer_counter.get_values(device, queue)[0]
     }
     pub fn get_draw_indirect_buffer(&self) -> &wgpu::Buffer {
         &self.indirect_buffer

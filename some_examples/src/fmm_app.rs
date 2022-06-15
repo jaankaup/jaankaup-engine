@@ -503,7 +503,11 @@ impl Application for FmmApp {
                   spawner
         );
     
-        // self.gpu_debugger.reset_element_counters(&queue);
+        //self.gpu_debugger.reset_element_counters(&queue);
+        self.gpu_debugger.reset_chars(&device, &queue);
+        self.gpu_debugger.reset_arrows(&device, &queue);
+        self.gpu_debugger.reset_aabbs(&device, &queue);
+        // self.gpu_debugger.reset_aabb_wires(&device, &queue);
 
         self.screen.prepare_for_rendering();
     }
@@ -575,29 +579,43 @@ impl Application for FmmApp {
                                FMM_INNER_Y *
                                FMM_INNER_Z;
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm visualizer encoder.") });
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm encoder.") });
 
         // Fast marching method.
         if self.once {
-            let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
+            self.fmm.fmm_iteration(&mut encoder, &mut self.gpu_timer);
+            // let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
 
-            self.gpu_timer.start_pass(&mut pass);
-            self.fmm.collect_known_cells(&mut pass);
-            self.gpu_timer.end_pass(&mut pass);
+            // self.gpu_timer.start_pass(&mut pass);
+            // self.fmm.collect_known_cells(&mut pass);
+            // self.gpu_timer.end_pass(&mut pass);
 
-            self.gpu_timer.start_pass(&mut pass);
-            self.fmm.create_initial_band(&mut pass);
-            self.gpu_timer.end_pass(&mut pass);
+            // self.gpu_timer.start_pass(&mut pass);
+            // self.fmm.create_initial_band(&mut pass);
+            // self.gpu_timer.end_pass(&mut pass);
 
-            self.gpu_timer.start_pass(&mut pass);
-            self.fmm.fmm(&mut pass);
-            self.gpu_timer.end_pass(&mut pass);
+            // self.gpu_timer.start_pass(&mut pass);
+            // self.fmm.fmm(&mut pass);
+            // self.gpu_timer.end_pass(&mut pass);
 
-            self.gpu_timer.start_pass(&mut pass);
-            self.fmm.filter_active_blocks(&mut pass);
-            self.gpu_timer.end_pass(&mut pass);
+            // self.gpu_timer.start_pass(&mut pass);
+            // self.fmm.filter_active_blocks(&mut pass);
+            // self.gpu_timer.end_pass(&mut pass);
 
-            drop(pass);
+            // self.gpu_timer.start_pass(&mut pass);
+            // pass.set_pipeline(&self.fmm.get_pipeline1());
+            // self.gpu_timer.end_pass(&mut pass);
+
+            // self.gpu_timer.start_pass(&mut pass);
+            // pass.set_pipeline(&self.fmm.get_pipeline2());
+            // self.gpu_timer.end_pass(&mut pass);
+
+            // self.gpu_timer.start_pass(&mut pass);
+            // self.fmm.switch_pipeline2(&mut pass);
+            // self.gpu_timer.end_pass(&mut pass);
+
+            // self.fmm.visualize_active_blocs(&mut pass);
+            //drop(pass);
         }
 
         // Cell visualizer.
@@ -611,7 +629,7 @@ impl Application for FmmApp {
             self.app_render_params.update = false;
         }
 
-        self.gpu_timer.resolve_timestamps(&mut encoder);
+        // self.gpu_timer.resolve_timestamps(&mut encoder);
 
         queue.submit(Some(encoder.finish())); 
 
