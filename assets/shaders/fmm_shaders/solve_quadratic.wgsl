@@ -241,7 +241,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	let band_point_count = fmm_counter[BAND];
 
         if (global_id.x < band_point_count) {
-	    let t = temp_prefix_sum[global_id.x];  
+	    let t = temp_prefix_sum[global_id.x];
 	    var this_coord = get_cell_index(t);
             let fmm_value = solve_quadratic(this_coord);
 	    fmm_data[t].value = fmm_value;

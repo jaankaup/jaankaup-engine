@@ -150,6 +150,8 @@ pub struct FastMarchingMethod {
     create_init_band: ComputeObject,
     _create_init_band_gb: Vec<wgpu::BindGroup>,
     solve_quadratic: ComputeObject,
+    prefix1: ComputeObject,
+    prefix2: ComputeObject,
 }
 
 impl FastMarchingMethod {
@@ -452,7 +454,29 @@ impl FastMarchingMethod {
                                         &fmm_histogram.get_histogram_buffer()
         );
 
-        let (solve_quadratic, create_init_band_gb) = Self::create_solve_quadratic_co(
+        let (solve_quadratic, _) = Self::create_solve_quadratic_co(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &fmm_blocks,
+                                        &prefix_temp_array,
+                                        &temporary_fmm_data,
+                                        &fmm_data,
+                                        &fmm_histogram.get_histogram_buffer()
+        );
+
+        let (prefix1, _) = Self::create_prefix_sum_1(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &fmm_blocks,
+                                        &prefix_temp_array,
+                                        &temporary_fmm_data,
+                                        &fmm_data,
+                                        &fmm_histogram.get_histogram_buffer()
+        );
+
+        let (prefix2, _) = Self::create_prefix_sum_2(
                                         &device,
                                         &fmm_prefix_params,
                                         &fmm_params_buffer.get_buffer(),
@@ -486,6 +510,8 @@ impl FastMarchingMethod {
             create_init_band: create_init_band,
             _create_init_band_gb: create_init_band_gb,
             solve_quadratic: solve_quadratic,
+            prefix1: prefix1,
+            prefix2: prefix2,
         }
     }
 
@@ -520,6 +546,8 @@ impl FastMarchingMethod {
     pub fn fmm_iteration(&self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut GpuTimer) {
 
         let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count(), 1024);
+        let number_of_dispatches_prefix = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);
+        // let number_of_dispatches_prefix = udiv_up_safe32(self.calculate_cell_count(), 1024 * 2);
         // pass.set_pipeline(&self.count_cells.pipeline);
 
         let mut pass = encoder.begin_compute_pass(
@@ -533,23 +561,33 @@ impl FastMarchingMethod {
 
         gpu_timer.start_pass(&mut pass);
         pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
-        pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
+        pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1); // TODO: create dispatch_indirect
         gpu_timer.end_pass(&mut pass);
 
         gpu_timer.start_pass(&mut pass);
         pass.set_pipeline(&self.create_init_band.pipeline);
-        pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
+        pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1); // TODO: dispatch_indirect
         gpu_timer.end_pass(&mut pass);
 
         gpu_timer.start_pass(&mut pass);
         pass.set_pipeline(&self.count_cells.pipeline);
-        pass.set_push_constants(0, bytemuck::cast_slice(&[2]));
+        pass.set_push_constants(0, bytemuck::cast_slice(&[2])); // TODO: create dispatch_indirect
         pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
         gpu_timer.end_pass(&mut pass);
 
         gpu_timer.start_pass(&mut pass);
         pass.set_pipeline(&self.solve_quadratic.pipeline);
-        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
+        pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
+        gpu_timer.end_pass(&mut pass);
+
+        gpu_timer.start_pass(&mut pass);
+        pass.set_pipeline(&self.prefix1.pipeline);
+        pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
+        gpu_timer.end_pass(&mut pass);
+
+        gpu_timer.start_pass(&mut pass);
+        pass.set_pipeline(&self.prefix2.pipeline);
+        pass.dispatch_workgroups(1, 1, 1);
         gpu_timer.end_pass(&mut pass);
 
         drop(pass);
@@ -874,6 +912,136 @@ impl FastMarchingMethod {
                     //     stages: wgpu::ShaderStages::COMPUTE,
                     //     range: 0..4,
                     // }]),
+        );
+        let bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &prefix_params.as_entire_binding(),
+                        &fmm_params.as_entire_binding(),
+                        &fmm_blocks.as_entire_binding(),
+                        &temp_prefix_sum.as_entire_binding(),
+                        &filtered_blocks.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &fmm_counter.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, bind_groups)
+    }
+
+    fn create_prefix_sum_1(device: &wgpu::Device,
+                           prefix_params: &wgpu::Buffer,
+                           fmm_params: &wgpu::Buffer,
+                           fmm_blocks: &wgpu::Buffer,
+                           temp_prefix_sum: &wgpu::Buffer,
+                           filtered_blocks: &wgpu::Buffer,
+                           fmm_data: &wgpu::Buffer,
+                           fmm_counter: &wgpu::Buffer) -> (ComputeObject, Vec<wgpu::BindGroup>) {
+
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("filter_active_blocks.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/filter_active_blocks.wgsl"))),
+
+                    }),
+                    Some("Filter active blocks part 1 ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write>  fmm_data: array<TempData>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None,
+        );
+        let bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &prefix_params.as_entire_binding(),
+                        &fmm_params.as_entire_binding(),
+                        &fmm_blocks.as_entire_binding(),
+                        &temp_prefix_sum.as_entire_binding(),
+                        &filtered_blocks.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &fmm_counter.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, bind_groups)
+    }
+
+    fn create_prefix_sum_2(device: &wgpu::Device,
+                           prefix_params: &wgpu::Buffer,
+                           fmm_params: &wgpu::Buffer,
+                           fmm_blocks: &wgpu::Buffer,
+                           temp_prefix_sum: &wgpu::Buffer,
+                           filtered_blocks: &wgpu::Buffer,
+                           fmm_data: &wgpu::Buffer,
+                           fmm_counter: &wgpu::Buffer) -> (ComputeObject, Vec<wgpu::BindGroup>) {
+
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("filter_active_blocks2.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/filter_active_blocks2.wgsl"))),
+
+                    }),
+                    Some("Filter active blocks part 2 ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write>  fmm_data: array<TempData>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None,
         );
         let bind_groups = create_bind_groups(
                 &device,
