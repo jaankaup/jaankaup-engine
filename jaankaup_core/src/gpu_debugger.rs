@@ -587,7 +587,7 @@ impl GpuDebugger {
                   view: &wgpu::TextureView,
                   depth_texture: &Texture,
                   clear: &mut bool,
-                  spawner: &Spawner) {
+                  _spawner: &Spawner) {
 
         // Get the total number of elements.
         let elem_counter = self.histogram_element_counter.get_values(device, queue);

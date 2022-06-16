@@ -1,5 +1,4 @@
 use jaankaup_core::wgpu;
-use jaankaup_core::template::Spawner;
 use bytemuck::{Zeroable, Pod};
 use jaankaup_core::buffer::buffer_from_data;
 use jaankaup_core::render_object::{ComputeObject, create_bind_groups, DrawIndirect};
@@ -33,7 +32,7 @@ pub struct MarchingCubes {
 
 impl MarchingCubes {
 
-    pub fn get_counter_value(&self, device:&wgpu::Device, queue: &wgpu::Queue, spawner: &Spawner) -> u32 {
+    pub fn get_counter_value(&self, device:&wgpu::Device, queue: &wgpu::Queue) -> u32 {
         self.buffer_counter.get_values(device, queue)[0]
     }
     pub fn get_draw_indirect_buffer(&self) -> &wgpu::Buffer {

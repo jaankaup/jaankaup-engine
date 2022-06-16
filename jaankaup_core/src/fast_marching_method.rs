@@ -146,9 +146,9 @@ pub struct FastMarchingMethod {
     fmm_histogram: Histogram,
 
     count_cells: ComputeObject,
-    count_cells_bg: Vec<wgpu::BindGroup>,
+    _count_cells_bg: Vec<wgpu::BindGroup>,
     create_init_band: ComputeObject,
-    create_init_band_gb: Vec<wgpu::BindGroup>,
+    _create_init_band_gb: Vec<wgpu::BindGroup>,
 }
 
 impl FastMarchingMethod {
@@ -469,10 +469,10 @@ impl FastMarchingMethod {
             update_band_counts_compute_object: update_band_counts_compute_object,
             update_band_counts_compute_object_bind_groups: update_band_counts_compute_object_bind_groups,
             fmm_histogram: fmm_histogram,
-            count_cells,
-            count_cells_bg,
+            count_cells: count_cells,
+            _count_cells_bg: count_cells_bg,
             create_init_band: create_init_band,
-            create_init_band_gb: create_init_band_gb,
+            _create_init_band_gb: create_init_band_gb,
         }
     }
 

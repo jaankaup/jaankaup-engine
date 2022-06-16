@@ -116,7 +116,7 @@ impl ComputeObject {
             z: u32,
             push_constant_offset: u32,
             push_constant_data: T,
-            label: wgpu::Label) {
+            _label: wgpu::Label) {
 
         pass.set_push_constants(push_constant_offset, bytemuck::cast_slice(&[push_constant_data]));
         pass.dispatch_workgroups(x, y, z);
