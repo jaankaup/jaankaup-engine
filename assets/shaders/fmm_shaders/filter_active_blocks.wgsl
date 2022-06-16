@@ -300,6 +300,13 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
+		
+        
+	// Clear the counters from previous steps.
+	if (global_id.x == 0u) {
+            fmm_counter[2] = 0u;
+            fmm_counter[3] = 0u;
+        }
 
         create_prefix_sum_private_data(local_index, workgroup_id.x);
         copy_block_to_shared_temp();

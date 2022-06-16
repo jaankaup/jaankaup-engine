@@ -1,3 +1,5 @@
+// Update band count to fmm_counter[BAND]
+// Save output to temp_data[fmm_counter[KNOWN] + band_counter_index].
 let FAR      = 0u;
 let BAND_NEW = 1u;
 let BAND     = 2u;
@@ -29,11 +31,6 @@ struct FmmParams {
     future_usage2: u32,
 };
 
-// Binding id from where to load data.
-struct PushConstants {
-    buffer_id: u32,    
-};
-
 @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
 @group(0) @binding(2) var<storage,read_write> fmm_blocks: array<FmmBlock>;
@@ -41,9 +38,6 @@ struct PushConstants {
 @group(0) @binding(4) var<storage,read_write> temp_data: array<u32>;
 @group(0) @binding(5) var<storage,read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>; // 5 placeholders
-
-// Push constants.
-var<push_constant> pc: PushConstants;
 
 fn total_cell_count() -> u32 {
 
@@ -159,69 +153,6 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
     );
 }
 
-fn solve_quadratic(coord: vec3<u32>) -> f32 {
-
-    var memory_locations = load_neighbors_6(coord);
-
-    var n0 = fmm_data[memory_locations[0]];
-    var n1 = fmm_data[memory_locations[1]];
-    var n2 = fmm_data[memory_locations[2]];
-    var n3 = fmm_data[memory_locations[3]];
-    var n4 = fmm_data[memory_locations[4]];
-    var n5 = fmm_data[memory_locations[5]];
-
-    var phis: array<f32, 6> = array<f32, 6>(
-                                  select(1000000.0, n0.value, n0.tag == KNOWN),
-                                  select(1000000.0, n1.value, n1.tag == KNOWN),
-                                  select(1000000.0, n2.value, n2.tag == KNOWN),
-                                  select(1000000.0, n3.value, n3.tag == KNOWN),
-                                  select(1000000.0, n4.value, n4.tag == KNOWN),
-                                  select(1000000.0, n5.value, n5.tag == KNOWN) 
-    );
-
-
-    var p = vec3<f32>(min(phis[0], phis[1]), min(phis[2], phis[3]), min(phis[4], phis[5]));
-    var p_sorted: vec3<f32>;
-
-    var tmp: f32;
-
-    if p[1] < p[0] {
-        tmp = p[1];
-        p[1] = p[0];
-        p[0] = tmp;
-    }
-    if p[2] < p[0] {
-        tmp = p[2];
-        p[2] = p[0];
-        p[0] = tmp;
-    }
-    if p[2] < p[1] {
-        tmp = p[2];
-        p[2] = p[1];
-        p[1] = tmp;
-    }
-
-    var result = 777.0;
-
-    if (abs(p[0] - p[2]) < 1.0) {
-        var phi_sum = p[0] + p[1] + p[2];
-        var phi_sum_pow2 = pow(phi_sum, 2.0);
-        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum_pow2 - 1.0))); 
-        // result = 123.0;
-    }
-
-    else if (abs(p[0] - p[1]) < 1.0) {
-        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
-        // result = 555.0;
-    }
- 
-    else {
-        result = p[0] + 1.0;
-    }
-
-    return result;
-}
-
 /// Get cell index based on domain dimension.
 fn get_cell_index(global_index: u32) -> vec3<u32> {
 
@@ -240,27 +171,61 @@ fn get_cell_index(global_index: u32) -> vec3<u32> {
 }
 
 @compute
-@workgroup_size(1024,1,1)
+@workgroup_size(128,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-	let band_point_count = fmm_counter[BAND];
+	if (global_id.x == 0u) {
+            fmm_counter[1] = 0u;
+        }
 
-        if (global_id.x < band_point_count) {
-	    var t: u32;
+	let known_point_count = fmm_counter[KNOWN];
 
-	    // TODO: Something better.
-	    if (pc.buffer_id == 3u) {
-                t = temp_prefix_sum[global_id.x];
-	    }
-	    else {
-                t = temp_data[global_id.x];
-	    }
-	    // let t = temp_prefix_sum[global_id.x];
+        if (global_id.x < known_point_count) {
+	    let t = temp_prefix_sum[global_id.x];
 	    var this_coord = get_cell_index(t);
-            let fmm_value = solve_quadratic(this_coord);
-	    fmm_data[t].value = fmm_value;
+
+            var memory_locations = load_neighbors_6(this_coord);
+
+            var n0 = fmm_data[memory_locations[0]];
+            var n1 = fmm_data[memory_locations[1]];
+            var n2 = fmm_data[memory_locations[2]];
+            var n3 = fmm_data[memory_locations[3]];
+            var n4 = fmm_data[memory_locations[4]];
+            var n5 = fmm_data[memory_locations[5]];
+
+            // How about BAND_NEW
+            if (n0.tag == FAR || n0.tag == BAND) {
+                atomicExchange(&fmm_data[memory_locations[0]].tag, BAND);
+		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		temp_data[ind] = t;
+            }
+            if (n1.tag == FAR || n1.tag == BAND) {
+                atomicExchange(&fmm_data[memory_locations[1]].tag, BAND);
+		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		temp_data[ind] = t;
+            }
+            if (n2.tag == FAR || n2.tag == BAND) {
+                atomicExchange(&fmm_data[memory_locations[2]].tag, BAND);
+		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		temp_data[ind] = t;
+            }
+            if (n3.tag == FAR || n3.tag == BAND) {
+                atomicExchange(&fmm_data[memory_locations[3]].tag, BAND);
+		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		temp_data[ind] = t;
+            }
+            if (n4.tag == FAR || n4.tag == BAND) {
+                atomicExchange(&fmm_data[memory_locations[4]].tag, BAND);
+		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		temp_data[ind] = t;
+            }
+            if (n5.tag == FAR || n5.tag == BAND) {
+                atomicExchange(&fmm_data[memory_locations[5]].tag, BAND);
+		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		temp_data[ind] = t;
+            }
 	}
 }

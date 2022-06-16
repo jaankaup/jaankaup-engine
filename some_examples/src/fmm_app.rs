@@ -635,11 +635,12 @@ impl Application for FmmApp {
 
 
         if self.once {
-            self.gpu_timer.create_timestamp_data(&device, &queue);
-            self.gpu_timer.print_data();
+            // self.gpu_timer.create_timestamp_data(&device, &queue);
+            // self.gpu_timer.print_data();
 
             //let gpu_timer_result = self.gpu_timer.get_data(); 
 
+            self.fmm.print_fmm_histogram(&device, &queue);
             // println!("{:?}", gpu_timer_result);
             let filtered_blocks = to_vec::<FmmBlock>(
                 &device,

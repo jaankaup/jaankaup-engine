@@ -1,3 +1,5 @@
+/// Store filter count to fmm_count[0]
+/// Store blocks to temp_data. 
 let FAR      = 0u;
 let BAND_NEW = 1u;
 let BAND     = 2u;
@@ -224,8 +226,10 @@ fn local_prefix_sum_aux() {
         let last_index = (THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u);
 
         // Update stream compaction count.
-        stream_compaction_count = stream_compaction_count + shared_aux[last_index];
-	fmm_counter[1] = stream_compaction_count; 
+        //stream_compaction_count = stream_compaction_count + shared_aux[last_index];
+        stream_compaction_count = shared_aux[last_index];
+        //stream_compaction_count = stream_compaction_count + shared_aux[last_index];
+	//fmm_counter[0] = stream_compaction_count; 
 
         shared_aux[last_index] = 0u;
     }
@@ -259,11 +263,13 @@ fn sum_auxiliar() {
         let last_index = chunks + 1u;
         stream_compaction_count = shared_aux[last_index + (last_index >> 4u)];
 
-	// Store total number of filtered objects to fmm_counter[1].
-	atomicStore(&fmm_counter[1], stream_compaction_count);
+	// Store total number of filtered objects to fmm_counter[0].
+	// atomicStore(&fmm_counter[1], 666u); // stream_compaction_count);
+	fmm_counter[1] = stream_compaction_count;
+	//atomicStore(&fmm_counter[1], stream_compaction_count);
     } 
-    storageBarrier();
-    //workgroupBarrier();
+    // storageBarrier();
+    workgroupBarrier();
 
     for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
 
@@ -307,6 +313,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
         create_prefix_sum_private_data(local_index, workgroup_id.x);
+
+	// shared_aux[private_data.ai_bcf] = 0u;
+	// shared_aux[private_data.bi_bcf] = 0u;
+
         if (local_index == 0u) {
             stream_compaction_count = 0u;
         }
@@ -323,4 +333,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         workgroupBarrier();
 
         gather_data();
+        create_prefix_sum_private_data(local_index, workgroup_id.x);
+        // if (local_index == 0u) {
+        //     fmm_counter[4] = shared_aux[2];
+        // }
 }

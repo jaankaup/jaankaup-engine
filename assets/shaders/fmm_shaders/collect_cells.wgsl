@@ -1,5 +1,5 @@
 /// Kernel that finds all cells of given tag. 
-/// The number of found cells is stored to fmm_fmm_counter[0]. The fmm_counter[pc.tag] must be equal to zero. 
+/// The number of found cells is stored to fmm_fmm_counter[pc.tag]. The fmm_counter[pc.tag] must be equal to zero. 
 /// The output (cell indices) are saved to temp_prefix_sum array.
 
 let FAR      = 0u;
