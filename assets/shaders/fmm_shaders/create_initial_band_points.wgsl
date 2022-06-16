@@ -142,9 +142,6 @@ fn get_cell_mem_location(v: vec3<u32>) -> u32 {
 
     let stride = fmm_params.local_dimension.x * fmm_params.local_dimension.y * fmm_params.local_dimension.z;
 
-    // let yOffset = fmm_params.global_dimension.x;
-    // let zOffset = fmm_params.global_dimension.x * fmm_params.global_dimension.y;
-
     let global_coordinate = vec3<u32>(v) / fmm_params.local_dimension;
 
     let global_index = (global_coordinate.x +
@@ -203,7 +200,7 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
 // }
 
 @compute
-@workgroup_size(1024,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
@@ -232,7 +229,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         // Get the number of known points;
 
 	//let known_point_count = atomicLoad(&fmm_counter[0]);
-	let known_point_count = fmm_counter[0];
+	let known_point_count = fmm_counter[KNOWN];
 
         if (global_id.x < known_point_count) {
 	    let t = temp_prefix_sum[global_id.x];
@@ -246,29 +243,30 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             var n4 = fmm_data[memory_locations[4]];
             var n5 = fmm_data[memory_locations[5]];
 
+            // TODO: atomic counters to workgroup counter and so on.
             if (n0.tag == FAR) {
                 let old_tag = atomicExchange(&fmm_data[memory_locations[0]].tag, BAND);
-                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[0] / 64u].number_of_band_points, 1u); }
+                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[0] / 64u].number_of_band_points, 1u); } // atomicAdd(&fmm_counter[1], 1u); }
             }
             if (n1.tag == FAR) {
                 let old_tag = atomicExchange(&fmm_data[memory_locations[1]].tag, BAND);
-                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[1] / 64u].number_of_band_points, 1u); }
+                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[1] / 64u].number_of_band_points, 1u); } // atomicAdd(&fmm_counter[1], 1u); }
             }
             if (n2.tag == FAR) {
                 let old_tag = atomicExchange(&fmm_data[memory_locations[2]].tag, BAND);
-                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[2] / 64u].number_of_band_points, 1u); }
+                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[2] / 64u].number_of_band_points, 1u); } // atomicAdd(&fmm_counter[1], 1u); }
             }
             if (n3.tag == FAR) {
                 let old_tag = atomicExchange(&fmm_data[memory_locations[3]].tag, BAND);
-                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[3] / 64u].number_of_band_points, 1u); }
+                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[3] / 64u].number_of_band_points, 1u); } // atomicAdd(&fmm_counter[1], 1u); }
             }
             if (n4.tag == FAR) {
                 let old_tag = atomicExchange(&fmm_data[memory_locations[4]].tag, BAND);
-                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[4] / 64u].number_of_band_points, 1u); }
+                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[4] / 64u].number_of_band_points, 1u); } // atomicAdd(&fmm_counter[1], 1u); }
             }
             if (n5.tag == FAR) {
                 let old_tag = atomicExchange(&fmm_data[memory_locations[5]].tag, BAND);
-                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[5] / 64u].number_of_band_points, 1u); }
+                if (old_tag == FAR) { atomicAdd(&fmm_blocks[memory_locations[5] / 64u].number_of_band_points, 1u); } // atomicAdd(&fmm_counter[1], 1u); }
             }
 	}
 }

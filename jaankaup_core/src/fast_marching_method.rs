@@ -149,6 +149,7 @@ pub struct FastMarchingMethod {
     _count_cells_bg: Vec<wgpu::BindGroup>,
     create_init_band: ComputeObject,
     _create_init_band_gb: Vec<wgpu::BindGroup>,
+    solve_quadratic: ComputeObject,
 }
 
 impl FastMarchingMethod {
@@ -451,6 +452,17 @@ impl FastMarchingMethod {
                                         &fmm_histogram.get_histogram_buffer()
         );
 
+        let (solve_quadratic, create_init_band_gb) = Self::create_solve_quadratic_co(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &fmm_blocks,
+                                        &prefix_temp_array,
+                                        &temporary_fmm_data,
+                                        &fmm_data,
+                                        &fmm_histogram.get_histogram_buffer()
+        );
+
         Self {
             compute_object: compute_object,
             compute_object_bind_groups: compute_object_bind_groups,
@@ -473,6 +485,7 @@ impl FastMarchingMethod {
             _count_cells_bg: count_cells_bg,
             create_init_band: create_init_band,
             _create_init_band_gb: create_init_band_gb,
+            solve_quadratic: solve_quadratic,
         }
     }
 
@@ -520,11 +533,22 @@ impl FastMarchingMethod {
 
         gpu_timer.start_pass(&mut pass);
         pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
-        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
+        pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
         gpu_timer.end_pass(&mut pass);
 
-        pass.set_pipeline(&self.create_init_band.pipeline);
         gpu_timer.start_pass(&mut pass);
+        pass.set_pipeline(&self.create_init_band.pipeline);
+        pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
+        gpu_timer.end_pass(&mut pass);
+
+        gpu_timer.start_pass(&mut pass);
+        pass.set_pipeline(&self.count_cells.pipeline);
+        pass.set_push_constants(0, bytemuck::cast_slice(&[2]));
+        pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
+        gpu_timer.end_pass(&mut pass);
+
+        gpu_timer.start_pass(&mut pass);
+        pass.set_pipeline(&self.solve_quadratic.pipeline);
         pass.dispatch_workgroups(number_of_dispatches, 1, 1);
         gpu_timer.end_pass(&mut pass);
 
@@ -752,6 +776,74 @@ impl FastMarchingMethod {
 
                     }),
                     Some("Create initial band points ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write>  fmm_data: array<TempData>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None,
+                    // Some(vec![wgpu::PushConstantRange {
+                    //     stages: wgpu::ShaderStages::COMPUTE,
+                    //     range: 0..4,
+                    // }]),
+        );
+        let bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &prefix_params.as_entire_binding(),
+                        &fmm_params.as_entire_binding(),
+                        &fmm_blocks.as_entire_binding(),
+                        &temp_prefix_sum.as_entire_binding(),
+                        &filtered_blocks.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &fmm_counter.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, bind_groups)
+    }
+
+    fn create_solve_quadratic_co(device: &wgpu::Device,
+                                    prefix_params: &wgpu::Buffer,
+                                    fmm_params: &wgpu::Buffer,
+                                    fmm_blocks: &wgpu::Buffer,
+                                    temp_prefix_sum: &wgpu::Buffer,
+                                    filtered_blocks: &wgpu::Buffer,
+                                    fmm_data: &wgpu::Buffer,
+                                    fmm_counter: &wgpu::Buffer) -> (ComputeObject, Vec<wgpu::BindGroup>) {
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                        label: Some("solve_quadratic.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/solve_quadratic.wgsl"))),
+
+                    }),
+                    Some("Solve quadratic ComputeObject"),
                     &vec![
                         vec![
                             // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;

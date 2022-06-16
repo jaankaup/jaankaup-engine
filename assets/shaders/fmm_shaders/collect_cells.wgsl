@@ -1,5 +1,5 @@
 /// Kernel that finds all cells of given tag. 
-/// The number of found cells is stored to fmm_fmm_counter[0]. The fmm_counter[0] must be equal to zero. 
+/// The number of found cells is stored to fmm_fmm_counter[0]. The fmm_counter[pc.tag] must be equal to zero. 
 /// The output (cell indices) are saved to temp_prefix_sum array.
 
 let FAR      = 0u;
@@ -82,7 +82,7 @@ fn gather_cells_to_temp_data(thread_index: u32) {
 }
 
 @compute
-@workgroup_size(1024,1,1)
+@workgroup_size(128,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
@@ -100,7 +100,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         workgroupBarrier();
 
 	if (local_index == 0u) {
-	    offset = atomicAdd(&fmm_counter[0], shared_counter);
+	    offset = atomicAdd(&fmm_counter[pc.tag], shared_counter);
         }
         storageBarrier();
         //workgroupBarrier();
