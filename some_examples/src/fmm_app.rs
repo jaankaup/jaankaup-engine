@@ -33,7 +33,7 @@ use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::render_object::{draw, RenderObject, ComputeObject, create_bind_groups};
 use jaankaup_core::texture::Texture;
 use jaankaup_core::fmm_things::{PointCloud, FmmCellPc};
-use jaankaup_core::fast_marching_method::FastMarchingMethod;
+use jaankaup_core::fast_marching_method::{FastMarchingMethod, FmmState};
 use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
@@ -572,6 +572,15 @@ impl Application for FmmApp {
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
+        // Step fmm.
+        if self.keyboard_manager.test_key(&Key::B, input) {
+            self.once = true;
+            if self.fmm.get_fmm_state() == FmmState::FilterActiveBlocks {
+                self.gpu_debugger.reset_aabb_wires(&device, &queue);
+                // self.gpu_debugger.reset_chars(&device, &queue);
+            }
+        }
+
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
                                FMM_GLOBAL_Z *
@@ -641,30 +650,30 @@ impl Application for FmmApp {
             //let gpu_timer_result = self.gpu_timer.get_data(); 
 
             self.fmm.print_fmm_histogram(&device, &queue);
-            // println!("{:?}", gpu_timer_result);
-            let filtered_blocks = to_vec::<FmmBlock>(
-                &device,
-                &queue,
-                self.fmm.get_fmm_temp_buffer(),
-                0,
-                (size_of::<FmmBlock>()) as wgpu::BufferAddress * 39000
-            );
+            // // println!("{:?}", gpu_timer_result);
+            // let filtered_blocks = to_vec::<FmmBlock>(
+            //     &device,
+            //     &queue,
+            //     self.fmm.get_fmm_temp_buffer(),
+            //     0,
+            //     (size_of::<FmmBlock>()) as wgpu::BufferAddress * 39000
+            // );
 
-            for (i, elem) in filtered_blocks.iter().enumerate() {
-                println!("{:?} :: {:?}", i, elem);
-            }
+            // for (i, elem) in filtered_blocks.iter().enumerate() {
+            //     println!("{:?} :: {:?}", i, elem);
+            // }
 
-            let temp_prefix_data = to_vec::<u32>(
-                &device,
-                &queue,
-                self.fmm.get_fmm_prefix_temp_buffer(),
-                0,
-                (size_of::<u32>()) as wgpu::BufferAddress * total_grid_count as u64
-            );
+            // let temp_prefix_data = to_vec::<u32>(
+            //     &device,
+            //     &queue,
+            //     self.fmm.get_fmm_prefix_temp_buffer(),
+            //     0,
+            //     (size_of::<u32>()) as wgpu::BufferAddress * total_grid_count as u64
+            // );
 
-            for (i, elem) in temp_prefix_data.iter().enumerate() {
-                println!("{:?} :: {:?}", i, elem);
-            }
+            // for (i, elem) in temp_prefix_data.iter().enumerate() {
+            //     println!("{:?} :: {:?}", i, elem);
+            // }
             self.once = false;
         }
     }
@@ -729,6 +738,7 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Key0, 20.0);
         keys.register_key(Key::N, 200.0);
         keys.register_key(Key::Space, 50.0);
+        keys.register_key(Key::B, 50.0);
         
         keys
 }

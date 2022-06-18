@@ -243,10 +243,24 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 	    if (actual_index < block_count) {
                 let color_band = rgba_u32(222u, 55u, 150u, 255u);
-		let block_index = temp_data[actual_index].index;
+                let color_text = rgba_u32(255u, 255u, 255u, 255u);
+		var b = temp_data[actual_index];
+		var block_index = b.index;
 
                 let block_position = index_to_uvec3(block_index, fmm_params.global_dimension.x, fmm_params.global_dimension.y) * fmm_params.local_dimension;
                 visualize_block(vec3<f32>(block_position), color_band); 
+
+                let renderable_element = Char (
+                                // element_position,
+                                vec3<f32>(block_position) * 4.0 + vec3<f32>(0.5, 0.5, 15.8),
+                                1.0,
+                                vec4<f32>(f32(b.number_of_band_points), 0.0, 0.0, 0.0),
+                                1u,
+                                color_text,
+                                1u,
+                                0u
+                );
+                output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
             }
 	}
 }

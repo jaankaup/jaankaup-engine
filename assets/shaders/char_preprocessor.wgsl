@@ -284,7 +284,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             let dist = max(1.0, distance(camera.pos.xyz, ch.start_pos.xyz));
 
             // Calculate the vertex count per char.
-            let vertex_count_per_char = min(u32(f32(wg_char_params.max_points_per_char) / f32(pow(dist, 1.2))), char_params[0].max_points_per_char);
+            let vertex_count_per_char = min(u32(f32(wg_char_params.max_points_per_char) / f32(pow(dist, 1.7))), char_params[0].max_points_per_char);
             // let vertex_count_per_char = min(u32(f32(wg_char_params.max_points_per_char) / dist), char_params[0].max_points_per_char);
             set_points_per_char(vertex_count_per_char, &ch);
 

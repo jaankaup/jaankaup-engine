@@ -51,7 +51,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         cell.value = bitcast<u32>(f32(cell.value & (!(1u << 31u))) * 0.000001 * the_sign);
     }
     else {
-        cell.value = bitcast<u32>(1.0);
+        cell.value = bitcast<u32>(100000.0);
     }
 
     fmm_data[global_id.x].value = cell.value; 

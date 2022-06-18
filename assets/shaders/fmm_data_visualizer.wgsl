@@ -37,6 +37,7 @@ let BAND_NEW = 1u;
 let BAND     = 2u;
 let KNOWN    = 3u;
 let OUTSIDE  = 4u;
+let KNOWN_NEW = 5u;
 
 struct FmmCellPc {
     tag: u32,
@@ -320,10 +321,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
+    let color_band_new = rgba_u32(255u, 255u, 50u, 255u);
     let color_known = rgba_u32(0u, 255u, 0u, 255u);
     let color_text = rgba_u32(255u, 255u, 255u, 255u);
-    //var colors: array<u32, 5> = array<u32, 5>(color_far, color_band, color_band, color_known, color_band);
-    var colors: array<u32, 5> = array<u32, 5>(color_far, 0u, color_band, color_known, 0u);
+    let color_known_new = rgba_u32(123u, 123u, 50u, 255u);
+    //var colors: array<u32, 5> = array<u32, 5>(color_far, color_band, color_band_new, color_known, color_outside, color_known_new);
+    var colors: array<u32, 6> = array<u32, 6>(color_far, color_band_new, color_band, color_known, 0u, color_known_new);
     //let colors_ptr = &colors;
 
     var col = colors[cell.tag];
@@ -353,7 +356,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         }
     }
 
-    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
+    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND || cell.tag == BAND_NEW) {
         visualize_cell(position, col);
 
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
@@ -362,7 +365,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         }
     }
 
-    if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
+    if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN || cell.tag == KNOWN_NEW) {
                            
         // visualize_cell(position, cell.color);
         visualize_cell(position, col);

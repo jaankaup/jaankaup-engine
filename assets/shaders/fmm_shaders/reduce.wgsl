@@ -7,6 +7,7 @@ let BAND_NEW = 1u;
 let BAND     = 2u;
 let KNOWN    = 3u;
 let OUTSIDE  = 4u;
+let KNOWN_NEW = 5u;
 
 struct FmmCellPc {
     tag: atomic<u32>,
@@ -57,7 +58,7 @@ struct FmmParams {
 var<workgroup> wg_cells: array<TempData, 64>; 
 
 // Push constants.
-var<push_constant> pc: PushConstants;
+//var<push_constant> pc: PushConstants;
 
 fn total_cell_count() -> u32 {
 
@@ -85,14 +86,23 @@ fn total_cell_count() -> u32 {
 fn reduce(local_index: u32) {
 
     for (var s: u32 = 32u; s > 0u; s = s >> 1u) {
+        if (local_index < s) {
 
-        // let ta = wg_cells[local_index];
-        // let tb = wg_cells[local_index + s];
+	    var values: array<TempData, 2> = array<TempData, 2>(wg_cells[local_index], wg_cells[local_index + s]);
+	    var choice = select(0, 1, ((values[0].tag == BAND) && (values[1].tag == BAND) && (values[0].value > values[1].value)) ||
+	                 ((values[0].tag != BAND) && (values[1].tag == BAND)));
+	    // var choice = ((values[0].tag == BAND) && (values[1].tag == BAND) && (values[0].value > values[1].value)) ||
+	    //              ((values[0].tag != BAND) && (values[1].tag == BAND));
+            //wg_cells[local_index] = values[u32(choice)]; 
+            wg_cells[local_index] = values[choice]; 
+	}
+            // if (choice) { wg_cells[local_index] = values[1]; }
+	    // else {
+            //     wg_cells[local_index] = values[0]; 
+	    // }
 
-	var values: array<TempData, 2> = array<TempData, 2>(wg_cells[local_index], wg_cells[local_index + s]);
-	var choice = ((values[0].tag == BAND) && (values[1].tag == BAND) && (values[0].value > values[1].value)) ||
-	             ((values[0].tag != BAND) && (values[1].tag == BAND));
-        wg_cells[local_index] = values[u32(choice)]; 
+            // let ta = wg_cells[local_index];
+            // let tb = wg_cells[local_index + s];
 
 	// var values: array<TempData, 2> = array<TempData, 2>(wg_cells[local_index], wg_cells[local_index + s]);
 	// var choice = ((ta.tag == BAND) && (tb.tag == BAND) && (ta.value > tb.value)) ||
@@ -105,7 +115,7 @@ fn reduce(local_index: u32) {
 	// temp =     select(temp, tb, (ta.tag != BAND) && (tb.tag == BAND));
         
         // wg_cells[local_index] = temp; 
-        // workgroupBarrier();
+        workgroupBarrier();
     }
 
     // for (uint s = LOCAL_X_DIM/2 ; s > 0 ; s >>= 1) {
@@ -153,11 +163,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             //let cell_index = (b.index << 6u) + local_index;
             let cell_index = b.index * 64u + local_index;
 	    var cell = fmm_data[cell_index];
-            wg_cells[local_index] = TempData(cell_index, cell.tag, cell.value);  
+            wg_cells[local_index] = TempData(cell_index, cell.tag, cell.value);
 
-            workgroupBarrier(); // This is safe because all threads, or none comes here.
+            workgroupBarrier(); // This is safe because all threads, or none of thems, comes here.
 
-            reduce(local_index);    
+            reduce(local_index);
 
 	    if (local_index == 0u) {
 
@@ -168,7 +178,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                 fmm_blocks[b.index].number_of_band_points = u32(i32(b.number_of_band_points) - 1);
 
 		// Add new found known point to 
-                let known_index = atomicAdd(&fmm_counter[3], 1u);
+                let known_index = atomicAdd(&fmm_counter[KNOWN], 1u); // TODO: remove.
                 temp_prefix_sum[workgroup_id.x] = wg_cells[0].index;
             }
 	}
