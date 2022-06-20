@@ -2,6 +2,7 @@ use crate::misc::clamp;
 use crate::input::{InputCache, InputState};
 use crate::buffer::buffer_from_data;
 use cgmath::{prelude::*, Vector3, Vector4, Point3};
+use bytemuck::{Pod, Zeroable};
 
 pub use winit::event::VirtualKeyCode as Key;
 pub use winit::event::MouseButton as MouseButton;
@@ -30,18 +31,20 @@ unsafe impl bytemuck::Pod for CameraUniform {}
 
 /// Struct that represent ray tracing camera uniform data in shader.
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct RayCameraUniform {
-    pos: cgmath::Vector4<f32>,
-    view: cgmath::Vector4<f32>,
-    up: cgmath::Vector4<f32>,
-    fov: cgmath::Vector2<f32>,
+    pos: [f32; 3],
     aperture_radius: f32,
+    view: [f32; 3],
     focal_distance: f32,
+    up: [f32; 3],
+    padding: u32,
+    fov: [f32; 2],
+    padding2: [u32; 2],
 }
 
-unsafe impl bytemuck::Zeroable for RayCameraUniform {}
-unsafe impl bytemuck::Pod for RayCameraUniform {}
+// unsafe impl bytemuck::Zeroable for RayCameraUniform {}
+// unsafe impl bytemuck::Pod for RayCameraUniform {}
 
 /// A camera for basic rendering and ray tracing purposes.
 pub struct Camera {
@@ -109,12 +112,14 @@ impl Camera {
 
         // Create ray camera uniform data.
         let ray_camera_uniform = RayCameraUniform {
-            pos: cgmath::Vector4::<f32>::new(self.pos.x, self.pos.y, self.pos.z, 1.0),
-            view: cgmath::Vector4::<f32>::new(self.view.x, self.view.y, self.view.z, 0.0),
-            up: cgmath::Vector4::<f32>::new(self.up.x, self.up.y, self.up.z, 0.0),
-            fov: self.fov,
+            pos: [self.pos.x, self.pos.y, self.pos.z],
             aperture_radius: self.aperture_radius,
+            view: [self.view.x, self.view.y, self.view.z],
             focal_distance: self.focal_distance,
+            up: [self.up.x, self.up.y, self.up.z],
+            padding: 0,
+            fov: [self.fov.x, self.fov.y],
+            padding2: [0, 0],
         };
 
         // The ray camera uniform buffer doesn't exist. Create ray camera buffer.

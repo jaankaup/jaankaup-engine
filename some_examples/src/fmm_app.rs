@@ -573,13 +573,13 @@ impl Application for FmmApp {
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
         // Step fmm.
-        if self.keyboard_manager.test_key(&Key::B, input) {
-            self.once = true;
-            if self.fmm.get_fmm_state() == FmmState::FilterActiveBlocks {
-                self.gpu_debugger.reset_aabb_wires(&device, &queue);
-                // self.gpu_debugger.reset_chars(&device, &queue);
-            }
-        }
+        // if self.keyboard_manager.test_key(&Key::B, input) {
+        //     self.once = true;
+        //     if self.fmm.get_fmm_state() == FmmState::FilterActiveBlocks {
+        //         self.gpu_debugger.reset_aabb_wires(&device, &queue);
+        //         // self.gpu_debugger.reset_chars(&device, &queue);
+        //     }
+        // }
 
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
@@ -644,8 +644,8 @@ impl Application for FmmApp {
 
 
         if self.once {
-            // self.gpu_timer.create_timestamp_data(&device, &queue);
-            // self.gpu_timer.print_data();
+            self.gpu_timer.create_timestamp_data(&device, &queue);
+            self.gpu_timer.print_data();
 
             //let gpu_timer_result = self.gpu_timer.get_data(); 
 

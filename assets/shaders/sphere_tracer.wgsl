@@ -55,7 +55,7 @@ struct RayCamera {
     view: vec3<f32>,
     focalDistance: f32,
     up: vec3<f32>,
-    fov: vec3<f32>,
+    fov: vec2<f32>,
 };
 
 struct SphereTracerParams {
@@ -68,10 +68,6 @@ struct SphereTracerParams {
 @group(0) @binding(2) var<uniform>            camera: RayCamera;
 @group(0) @binding(3) var<storage,read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
-//@group(0) @binding(1) var<storage,read_write> fmm_blocks: array<FmmBlock>;
-// @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-// @group(0) @binding(4) var<storage,read_write> temp_data: array<u32>;
-// @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>; // 5 placeholders
 
 // Push constants.
 var<push_constant> pc: PushConstants;
@@ -260,18 +256,18 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let screen_width = f32(sphere_tracer_params.inner_dim.x * sphere_tracer_params.outer_dim.x);
     let screen_height = f32(sphere_tracer_params.inner_dim.y * sphere_tracer_params.outer_dim.y);
 
-    vec3 right = normalize(cross(camera.view.xyz,camera.up.xyz));
-    vec3 y = normalize(cross(camera.view.xyz, right));
+    vec3 right = normalize(cross(camera.view, camera.up.xyz));
+    vec3 y = normalize(cross(camera.view, right));
 
     float d = camera.focalDistance;
 
     vec3 u = (d * tan(camera.fov.x*0.5)) * right;
     vec3 v = (d * tan(camera.fov.y*0.5)) * y;
 
-    float alpha = 2.0 * (x_coord + 0.5) / global_x_dim - 1.0;
-    float beta  = 1.0 - 2.0 * (y_coord + 0.5) / global_y_dim;
+    let alpha = 2.0 * (x_coord + 0.5) / screen_width - 1.0;
+    let beta  = 1.0 - 2.0 * (y_coord + 0.5) / screen_height;
 
-    vec3 point_on_plane = alpha * u + beta * v;
+    let point_on_plane = alpha * u + beta * v;
 
     Ray ray;
     ray.origin = point_on_plane + camera.position.xyz;
@@ -283,10 +279,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     payload.color = encode_color(vec4(1.0f,0.0f,0.0f,1.0f));
     payload.visibility = 1.0;
 
-    traceRay(ray, payload);
+    // traceRay(ray, payload);
 
-    RayOutput result;
-    result.origin = vec4(ray.origin, 1.0);
-    result.intersection_point = payload.intersection_point;
-    result.normal = payload.normal;
+    // RayOutput result;
+    // result.origin = vec4(ray.origin, 1.0);
+    // result.intersection_point = payload.intersection_point;
+    // result.normal = payload.normal;
 }

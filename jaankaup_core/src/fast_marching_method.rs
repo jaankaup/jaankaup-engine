@@ -167,6 +167,7 @@ pub struct FastMarchingMethod {
     reduce: ComputeObject,
     find_neighbors: ComputeObject,
     fmm_alg_visualizer: ComputeObject, 
+    iteration_counter: u32,
 }
 
 impl FastMarchingMethod {
@@ -181,6 +182,7 @@ impl FastMarchingMethod {
 
         // TODO: assertions for local and global dimension.
 
+        let iteration_counter = 0;
         let fmm_state = FmmState::Reduce;
 
         // Buffer hash_map. DO we need this?
@@ -567,6 +569,7 @@ impl FastMarchingMethod {
             reduce: reduce,
             find_neighbors: find_neighbors,
             fmm_alg_visualizer: fmm_alg_visualizer,
+            iteration_counter: iteration_counter,
         }
     }
 
@@ -613,10 +616,10 @@ impl FastMarchingMethod {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }
 
+        gpu_timer.start_pass(&mut pass);
         if self.first_time {
 
             // Collect all known cells.
-            //timer gpu_timer.start_pass(&mut pass);
             pass.set_pipeline(&self.count_cells.pipeline);
             pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
             pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1); // TODO: create dispatch_indirect
@@ -663,63 +666,86 @@ impl FastMarchingMethod {
 
         }
 
-        // for i in 0..30 {
-        else {
-
-             if self.fmm_state == FmmState::FindNeighbors {
-                 // Collect all band cells.
-                 //timer gpu_timer.start_pass(&mut pass);
+        //for _ in 0..416 {
+        for _ in 0..416 {
+        // else {
+                // let mut pass = encoder.begin_compute_pass(
+                //     &wgpu::ComputePassDescriptor { label: Some("Fmm compute pass.")}
+                // );
+                // // pass.set_pipeline(&self.compute_object.pipeline);
+                // for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
+                //     pass.set_bind_group(e as u32, &bgs, &[]);
+                // }
                  pass.set_pipeline(&self.find_neighbors.pipeline);
                  pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
-                 //timer gpu_timer.end_pass(&mut pass);
-             }
-
-             else if self.fmm_state == FmmState::SolveQuadratic {
-
-                 //++ // Solve quadratic on band cells.
-                 //++ //timer gpu_timer.start_pass(&mut pass);
                  pass.set_pipeline(&self.solve_quadratic.pipeline);
                  pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
                  pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
-                 //++ //timer gpu_timer.end_pass(&mut pass);
-             }
-
-             else if self.fmm_state == FmmState::FilterActiveBlocks {
-                 //++ // Scan active blocks part 1.
-                 //++ //timer gpu_timer.start_pass(&mut pass);
                  pass.set_pipeline(&self.prefix1.pipeline);
                  pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
-                 //++ //timer gpu_timer.end_pass(&mut pass);
-                   
-                 //++ // Scan active blocks part 2.
-                 //++ //timer gpu_timer.start_pass(&mut pass);
                  pass.set_pipeline(&self.prefix2.pipeline);
                  pass.dispatch_workgroups(1, 1, 1);
-                 //++ //timer gpu_timer.end_pass(&mut pass);
-             }
-
-             else if self.fmm_state == FmmState::Reduce {
-
-                 //++ // Recude and add new known point.
-                 //++ //timer gpu_timer.start_pass(&mut pass);
                  pass.set_pipeline(&self.reduce.pipeline);
                  pass.dispatch_workgroups(self.calculate_block_count(), 1, 1);
-                 //++ //timer gpu_timer.end_pass(&mut pass);
-             }
+
+             //++ if self.fmm_state == FmmState::FindNeighbors {
+             //++     // Collect all band cells.
+             //++     //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.find_neighbors.pipeline);
+             //++     pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
+             //++     //timer gpu_timer.end_pass(&mut pass);
+             //++ }
+
+             //++ else if self.fmm_state == FmmState::SolveQuadratic {
+
+             //++     //++ // Solve quadratic on band cells.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.solve_quadratic.pipeline);
+             //++     pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
+             //++     pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++ }
+
+             //++ else if self.fmm_state == FmmState::FilterActiveBlocks {
+             //++     //++ // Scan active blocks part 1.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.prefix1.pipeline);
+             //++     pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++       
+             //++     //++ // Scan active blocks part 2.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.prefix2.pipeline);
+             //++     pass.dispatch_workgroups(1, 1, 1);
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++ }
+
+             //++ else if self.fmm_state == FmmState::Reduce {
+
+             //++     //++ // Recude and add new known point.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.reduce.pipeline);
+             //++     pass.dispatch_workgroups(self.calculate_block_count(), 1, 1);
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++     self.iteration_counter = self.iteration_counter + 1;
+             //++     println!("iteration_counter = {}", self.iteration_counter);
+             //++ }
         }
 
-        if self.fmm_state == FmmState::FilterActiveBlocks {
-            pass.set_pipeline(&self.fmm_alg_visualizer.pipeline);
-            pass.dispatch_workgroups(1, 1, 1);
-        }
+
+        // if self.fmm_state == FmmState::FilterActiveBlocks {
+        //     pass.set_pipeline(&self.fmm_alg_visualizer.pipeline);
+        //     pass.dispatch_workgroups(1, 1, 1);
+        // }
 
         // }
 
+        gpu_timer.end_pass(&mut pass);
         drop(pass);
         self.first_time = false;
-        println!("{:?}", self.fmm_state);
-        self.next_fmm_state();
-        //timer gpu_timer.resolve_timestamps(encoder);
+        // println!("{:?}", self.fmm_state);
+        // self.next_fmm_state();
+        gpu_timer.resolve_timestamps(encoder);
 
     }
 
