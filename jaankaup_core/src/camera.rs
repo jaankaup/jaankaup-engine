@@ -81,14 +81,15 @@ impl Camera {
     /// Get a reference to camera uniform buffer. Creates the buffer is it doens't already exist.
     pub fn get_camera_uniform(&mut self, device: &wgpu::Device) -> &wgpu::Buffer {
 
-        // Create camera uniform data.
-        let camera_uniform = CameraUniform {
-            view_proj: self.build_projection_matrix(),
-            pos: Vector4::new(self.pos.x, self.pos.y, self.pos.z, 1.0),
-        };
 
         // The camera uniform buffer doesn't exist. Create camera buffer.
         if self.camera_buffer.is_none() {
+
+            // Create camera uniform data.
+            let camera_uniform = CameraUniform {
+                view_proj: self.build_projection_matrix(),
+                pos: Vector4::new(self.pos.x, self.pos.y, self.pos.z, 1.0),
+            };
 
             self.camera_buffer = Some(buffer_from_data::<CameraUniform>(
                 &device,
@@ -106,24 +107,24 @@ impl Camera {
         self.aspect = aspect_width / aspect_height as f32;
     }
 
-    /// Get a reference to ray tracing camera uniform buffer. Creates the buffer is it doens't already exist.
+    /// Get a reference to ray tracing camera uniform buffer. Creates the buffer is it doesn't already exist.
     /// TODO: create buffer on init().
     pub fn get_ray_camera_uniform(&mut self, device: &wgpu::Device) -> &wgpu::Buffer {
 
-        // Create ray camera uniform data.
-        let ray_camera_uniform = RayCameraUniform {
-            pos: [self.pos.x, self.pos.y, self.pos.z],
-            aperture_radius: self.aperture_radius,
-            view: [self.view.x, self.view.y, self.view.z],
-            focal_distance: self.focal_distance,
-            up: [self.up.x, self.up.y, self.up.z],
-            padding: 0,
-            fov: [self.fov.x, self.fov.y],
-            padding2: [0, 0],
-        };
-
         // The ray camera uniform buffer doesn't exist. Create ray camera buffer.
         if self.ray_camera_buffer.is_none() {
+
+            // Create ray camera uniform data.
+            let ray_camera_uniform = RayCameraUniform {
+                pos: [self.pos.x, self.pos.y, self.pos.z],
+                aperture_radius: self.aperture_radius,
+                view: [self.view.x, self.view.y, self.view.z],
+                focal_distance: self.focal_distance,
+                up: [self.up.x, self.up.y, self.up.z],
+                padding: 0,
+                fov: [self.fov.x, self.fov.y],
+                padding2: [0, 0],
+            };
 
             self.ray_camera_buffer = Some(buffer_from_data::<RayCameraUniform>(
                 &device,

@@ -21,10 +21,6 @@ struct FmmParams {
 //     buffer_id: u32,    
 // };
 
-struct SphereTracerParams {
-    
-};
-
 struct RayOutput {
     origin: vec3<f32>,
     visibility: f32,
@@ -37,7 +33,7 @@ struct RayOutput {
 struct Ray {
   origin: vec3<f32>,
   rMin: f32,
-  direction;: vec3<f32>,
+  direction: vec3<f32>,
   rMax: f32,
 };
 
@@ -59,8 +55,8 @@ struct RayCamera {
 };
 
 struct SphereTracerParams {
-    inner_dim: vec32<u32>,
-    outer_dim: vec32<u32>,
+    inner_dim: vec2<u32>,
+    outer_dim: vec2<u32>,
 };
 
 @group(0) @binding(0) var<uniform>            fmm_params: FmmParams;
@@ -70,7 +66,7 @@ struct SphereTracerParams {
 @group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
 
 // Push constants.
-var<push_constant> pc: PushConstants;
+// var<push_constant> pc: PushConstants;
 
 fn total_cell_count() -> u32 {
 
@@ -81,6 +77,10 @@ fn total_cell_count() -> u32 {
            fmm_params.local_dimension.y * 
            fmm_params.local_dimension.z; 
 };
+
+fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
+  return (r << 24u) | (g << 16u) | (b  << 8u) | a;
+}
 
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside(coord: vec3<i32>) -> bool {
@@ -211,12 +211,12 @@ fn index_to_2d(index: u32, width: u32) -> vec2<u32> {
 }
 
 fn d2_to_index(x: u32, y: u32, width: u32) -> u32 {
-    x + y * width
+    return x + y * width;
 }
 
 fn inner_coord_d2(index: u32, dim_x: u32, dim_y: u32) -> vec2<u32> {
-    var x = index & (dim_x - 1);
-    let y = (index / dim_x) & (dim_y - 1);
+    var x = index & (dim_x - 1u);
+    let y = (index / dim_x) & (dim_y - 1u);
     return vec2<u32>(x, y);
 }
 
@@ -227,8 +227,8 @@ fn index_to_screen(index: u32, dim_x: u32, dim_y: u32, global_dim_x:u32) -> vec2
         let outer_coord = index_to_2d(block_index, global_dim_x);
 
         // inner coords.
-        let x = index & (dim_x - 1);
-        let y = (index / dim_x) & (dim_y - 1);
+        let x = index & (dim_x - 1u);
+        let y = (index / dim_x) & (dim_y - 1u);
 
         // Global coordinate.
 	return vec2<u32>(outer_coord[0] * dim_x + x, outer_coord[1] * dim_y + y);
@@ -239,6 +239,8 @@ fn index_to_screen(index: u32, dim_x: u32, dim_y: u32, global_dim_x:u32) -> vec2
         // [gx, gy]
 }
 
+// ray intersection aabb
+
 @compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
@@ -246,37 +248,41 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    let screen_coord = vec2<f32)(index_to_screen(global_id.x,
+    let screen_coord = vec2<f32>(index_to_screen(global_id.x,
                                        sphere_tracer_params.inner_dim.x,
 				       sphere_tracer_params.inner_dim.y,
 				       sphere_tracer_params.outer_dim.x));
 
-    let x_coord = f32((local_index.x & 7u) * workgroup_id.x);
-    let y_coord = f32((local_index.x / 4u) * workgroup_id.x);
+    let screen_coord = index_to_screen(
+                       global_id.x,
+		       sphere_tracer_params.inner_dim.x,
+		       sphere_tracer_params.inner_dim.y,
+		       sphere_tracer_params.outer_dim.x
+    );
     let screen_width = f32(sphere_tracer_params.inner_dim.x * sphere_tracer_params.outer_dim.x);
     let screen_height = f32(sphere_tracer_params.inner_dim.y * sphere_tracer_params.outer_dim.y);
 
-    vec3 right = normalize(cross(camera.view, camera.up.xyz));
-    vec3 y = normalize(cross(camera.view, right));
+    let right = normalize(cross(camera.view, camera.up.xyz));
+    let y = normalize(cross(camera.view, right));
 
-    float d = camera.focalDistance;
+    let d = camera.focalDistance;
 
-    vec3 u = (d * tan(camera.fov.x*0.5)) * right;
-    vec3 v = (d * tan(camera.fov.y*0.5)) * y;
+    let u = (d * tan(camera.fov.x*0.5)) * right;
+    let v = (d * tan(camera.fov.y*0.5)) * y;
 
-    let alpha = 2.0 * (x_coord + 0.5) / screen_width - 1.0;
-    let beta  = 1.0 - 2.0 * (y_coord + 0.5) / screen_height;
+    let alpha = 2.0 * (f32(screen_coord.x) + 0.5) / screen_width - 1.0;
+    let beta  = 1.0 - 2.0 * (f32(screen_coord.y) + 0.5) / screen_height;
 
     let point_on_plane = alpha * u + beta * v;
 
-    Ray ray;
-    ray.origin = point_on_plane + camera.position.xyz;
+    var ray: Ray;
+    ray.origin = point_on_plane + camera.pos.xyz;
     ray.direction = normalize(point_on_plane + d*camera.view.xyz);
-    ray.rMin = 0.0f;
-    ray.rMax = 300.0f;
+    ray.rMin = 0.0;
+    ray.rMax = 300.0;
 
-    RayPayload payload;
-    payload.color = encode_color(vec4(1.0f,0.0f,0.0f,1.0f));
+    var payload: RayPayload;
+    payload.color = rgba_u32(255u, 0u, 0u, 255u);
     payload.visibility = 1.0;
 
     // traceRay(ray, payload);

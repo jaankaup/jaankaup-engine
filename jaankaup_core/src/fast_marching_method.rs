@@ -437,16 +437,16 @@ impl FastMarchingMethod {
                 &update_band_counts_compute_object.bind_group_layouts,
                 &vec![
                     vec![
-                        &fmm_params_buffer.get_buffer().as_entire_binding(),
-                        &fmm_data.as_entire_binding(),
-                        &fmm_blocks.as_entire_binding(),
+                    &fmm_params_buffer.get_buffer().as_entire_binding(),
+                    &fmm_data.as_entire_binding(),
+                    &fmm_blocks.as_entire_binding(),
                     ],
                     vec![
-                        &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                    &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
+                    &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
+                    &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
+                    &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                    &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
                     ],
                 ]
         );
@@ -894,6 +894,10 @@ impl FastMarchingMethod {
 
     pub fn get_fmm_prefix_temp_buffer(&self) -> &wgpu::Buffer {
         &self.prefix_temp_array
+    }
+
+    pub fn get_fmm_params_buffer(&self) -> &wgpu::Buffer {
+        &self.fmm_params_buffer.get_buffer()
     }
 
     fn create_gather_known_cells_co(device: &wgpu::Device,

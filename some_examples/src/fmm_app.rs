@@ -34,6 +34,7 @@ use jaankaup_core::render_object::{draw, RenderObject, ComputeObject, create_bin
 use jaankaup_core::texture::Texture;
 use jaankaup_core::fmm_things::{PointCloud, FmmCellPc};
 use jaankaup_core::fast_marching_method::{FastMarchingMethod, FmmState};
+use jaankaup_core::sphere_tracer::SphereTracer;
 use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
@@ -136,6 +137,7 @@ struct FmmApp {
     fmm: FastMarchingMethod,
     _pc_params: PointCloudParamsBuffer,
     once: bool,
+    sphere_tracer: SphereTracer,
 }
 
 impl Application for FmmApp {
@@ -415,6 +417,15 @@ impl Application for FmmApp {
         //     println!("{:?} :: {:?}", i, elem);
         // }
 
+        let sphere_tracer = SphereTracer::init(
+                &configuration.device,
+                [8, 8],
+                [64, 64],
+                fmm.get_fmm_params_buffer(),
+                fmm.get_fmm_data_buffer(),
+                &camera.get_ray_camera_uniform(&configuration.device),
+                &None
+        );
 
         Self {
             camera: camera,
@@ -439,6 +450,7 @@ impl Application for FmmApp {
             fmm: fmm,
             _pc_params: pc_params,
             once: once,
+            sphere_tracer: sphere_tracer,
          }
     }
 

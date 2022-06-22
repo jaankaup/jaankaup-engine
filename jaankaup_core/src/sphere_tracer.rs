@@ -1,32 +1,51 @@
+use std::mem::size_of;
+use bytemuck::{Pod, Zeroable};
+use crate::buffer::buffer_from_data;
 use crate::common_functions::{create_uniform_bindgroup_layout, create_buffer_bindgroup_layout};
 use crate::render_object::{ComputeObject, create_bind_groups};
 use crate::gpu_debugger::GpuDebugger;
 use std::borrow::Cow;
 
-#[allow(dead_code)]
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct SphereTracerParams {
-    inner_dim: [u32; 3],
-    padding: u32,
-    outer_dim: [u32; 3],
-    padding2: u32,
+    inner_dim: [u32; 2],
+    outer_dim: [u32; 2],
 }
 
-struct SphereTracer {
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct RayOutput {
+    origin: [f32; 3],
+    visibility: f32,
+    intersection_point: [f32; 3],
+    opacity: f32,
+    normal: [f32; 3],
+    diffuce_color: u32,
+}
+
+pub struct SphereTracer {
 
     /// Sphere tracer compute object. 
-    st_object: ComputeObject,
+    st_compute_object: ComputeObject,
+    st_bind_groups: Vec<wgpu::BindGroup>,
+    output_buffer: wgpu::Buffer,
+    sphere_tracer_params: SphereTracerParams,
+    sphere_tracer_buffer: wgpu::Buffer,
 }
 
 impl SphereTracer {
 
     pub fn init(device: &wgpu::Device,
-                inner_dimension: [u32; 3],
-                outer_dimension: [u32; 3],
+                inner_dimension: [u32; 2],
+                outer_dimension: [u32; 2],
+                fmm_params: &wgpu::Buffer,
+                fmm_data: &wgpu::Buffer,
+                camera_buffer: &wgpu::Buffer,
                 gpu_debugger: &Option<&GpuDebugger>,
                 ) -> Self {
 
-        let st_object =
+        let st_compute_object =
                 ComputeObject::init(
                     &device,
                     &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
@@ -77,8 +96,54 @@ impl SphereTracer {
                     None,
         );
 
+        let sphere_tracer_params = SphereTracerParams {
+            inner_dim: inner_dimension,
+            outer_dim: outer_dimension,
+        };
+
+        let sphere_tracer_buffer = buffer_from_data::<SphereTracerParams>(
+                &device,
+                &vec![sphere_tracer_params],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                None
+        );
+
+        let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Sphere tracer output"),
+            size: (inner_dimension[0] * inner_dimension[1] * outer_dimension[0] * outer_dimension[1]) as u64 * size_of::<RayOutput>() as u64,
+            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+
+        let st_bind_groups = create_bind_groups(
+                &device,
+                &st_compute_object.bind_group_layout_entries,
+                &st_compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_params.as_entire_binding(),
+                        &sphere_tracer_buffer.as_entire_binding(),
+                        &camera_buffer.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &output_buffer.as_entire_binding(),
+                    ],
+                    // vec![
+                    //     &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
+                    //     &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
+                    //     &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
+                    //     &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                    //     &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                    // ],
+                ]
+        );
+
         Self {
-            st_object: st_object,
+            st_compute_object: st_compute_object,
+            st_bind_groups: st_bind_groups, 
+            output_buffer: output_buffer,
+            sphere_tracer_params: sphere_tracer_params,
+            sphere_tracer_buffer: sphere_tracer_buffer,
         }
     }
 }
