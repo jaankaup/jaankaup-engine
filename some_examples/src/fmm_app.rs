@@ -155,6 +155,9 @@ impl Application for FmmApp {
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 130.0, 480.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.1);
+        camera.set_restriction_area([0.0, 0.0, 0.0],
+                                    [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
+        camera.enable_restriction_area(true);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,

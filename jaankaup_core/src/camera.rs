@@ -1,3 +1,4 @@
+// use cgmath::Vector3;
 use crate::misc::clamp;
 use crate::input::{InputCache, InputState};
 use crate::buffer::buffer_from_data;
@@ -63,6 +64,8 @@ pub struct Camera {
     focal_distance: f32, // For ray tracer camera.
     camera_buffer: Option<wgpu::Buffer>, // A buffer to basic camera uniform buffer.
     ray_camera_buffer: Option<wgpu::Buffer>, // A buffer to ray tracing camear uniform buffer.
+    restriction_area: [cgmath::Vector3<f32> ; 2],
+    restriction_area_enabled: bool,
 }
 
 impl Camera {
@@ -169,7 +172,18 @@ impl Camera {
             focal_distance: 1.0,
             camera_buffer: None,
             ray_camera_buffer: None,
+            restriction_area: [cgmath::Vector3::<f32>::new(0.0, 0.0, 0.0), cgmath::Vector3::<f32>::new(0.0, 0.0, 0.0)],
+            restriction_area_enabled: false,
         }
+    }
+
+    pub fn set_restriction_area(&mut self, min: [f32; 3], max: [f32; 3]) {
+        // TODO: asserts
+        self.restriction_area = [cgmath::Vector3::<f32>::new(min[0], min[1], min[2]), cgmath::Vector3::<f32>::new(max[0], max[1], max[2])];
+    }
+
+    pub fn enable_restriction_area(&mut self, enable: bool) {
+        self.restriction_area_enabled = enable;
     }
 
     /// Update camera from user input. TODO: create a method for 
@@ -209,8 +223,18 @@ impl Camera {
         if !state_up.is_none() { movement += movement_factor * time_delta_milli_f32 * self.up; }
         if !state_down.is_none() { movement -= movement_factor * time_delta_milli_f32 * self.up; }
 
+        let new_pos = self.movement_sensitivity * movement + self.pos;
         // Update the camera position.
-        self.pos += self.movement_sensitivity * movement;
+        if self.restriction_area_enabled &&
+           new_pos.x >= self.restriction_area[0].x &&
+           new_pos.y >= self.restriction_area[0].y &&
+           new_pos.z >= self.restriction_area[0].z &&
+           new_pos.x < self.restriction_area[1].x &&
+           new_pos.y < self.restriction_area[1].y &&
+           new_pos.z < self.restriction_area[1].z {
+
+           self.pos = new_pos;
+        }
 
         // Rotation.
           
