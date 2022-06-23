@@ -1,3 +1,4 @@
+use jaankaup_core::two_triangles::TwoTriangles;
 use std::mem::size_of;
 use jaankaup_core::fmm_things::FmmBlock;
 use jaankaup_core::fmm_things::PointCloudParamsBuffer;
@@ -138,6 +139,7 @@ struct FmmApp {
     _pc_params: PointCloudParamsBuffer,
     once: bool,
     sphere_tracer: SphereTracer,
+    sphere_tracer_renderer: TwoTriangles,
 }
 
 impl Application for FmmApp {
@@ -430,6 +432,9 @@ impl Application for FmmApp {
                 &None
         );
 
+        let sphere_tracer_renderer = TwoTriangles::init(
+                &configuration.device, &configuration.sc_desc, [512,512]);
+
         Self {
             camera: camera,
             gpu_debugger: gpu_debugger,
@@ -454,6 +459,7 @@ impl Application for FmmApp {
             _pc_params: pc_params,
             once: once,
             sphere_tracer: sphere_tracer,
+            sphere_tracer_renderer: sphere_tracer_renderer,
          }
     }
 

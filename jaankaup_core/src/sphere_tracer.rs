@@ -111,10 +111,9 @@ impl SphereTracer {
         let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Sphere tracer output"),
             size: (inner_dimension[0] * inner_dimension[1] * outer_dimension[0] * outer_dimension[1]) as u64 * size_of::<RayOutput>() as u64,
-            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
             mapped_at_creation: false,
         });
-
 
         let st_bind_groups = create_bind_groups(
                 &device,

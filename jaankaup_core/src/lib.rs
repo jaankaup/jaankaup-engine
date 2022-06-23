@@ -19,6 +19,7 @@ pub mod pc_parser;
 pub mod fast_marching_method;
 pub mod radix;
 pub mod sphere_tracer;
+pub mod two_triangles;
 pub use wgpu;
 pub use winit;
 pub use log;
