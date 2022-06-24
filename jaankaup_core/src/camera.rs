@@ -81,9 +81,20 @@ impl Camera {
         self.rotation_sensitivity = sensitivity;
     }
 
+    pub fn set_focal_distance(&mut self, value: f32, queue: &wgpu::Queue) {
+        if value > 0.0 {
+            self.focal_distance = value;
+        }
+        // self.update_camera(&queue);
+        self.update_ray_camera(&queue);
+    }
+
+    pub fn get_focal_distance(&self) -> f32 {
+        self.focal_distance
+    }
+
     /// Get a reference to camera uniform buffer. Creates the buffer is it doens't already exist.
     pub fn get_camera_uniform(&mut self, device: &wgpu::Device) -> &wgpu::Buffer {
-
 
         // The camera uniform buffer doesn't exist. Create camera buffer.
         if self.camera_buffer.is_none() {
@@ -117,6 +128,7 @@ impl Camera {
         // The ray camera uniform buffer doesn't exist. Create ray camera buffer.
         if self.ray_camera_buffer.is_none() {
 
+            println!("Creating ray camera uniform.");
             // Create ray camera uniform data.
             let ray_camera_uniform = RayCameraUniform {
                 pos: [self.pos.x, self.pos.y, self.pos.z],
@@ -235,6 +247,9 @@ impl Camera {
 
            self.pos = new_pos;
         }
+        else {
+           self.pos = new_pos;
+        }
 
         // Rotation.
           
@@ -256,6 +271,45 @@ impl Camera {
         }
 
         // Update the camera uniform and the camera uniform buffer.
+        // TODO: refactor.
+        self.update_camera(&queue);
+        self.update_ray_camera(&queue);
+        // if !self.camera_buffer.is_none() {
+
+        //     // Create camera uniform data. TODO: refactor.
+        //     let camera_uniform = CameraUniform {
+        //         view_proj: self.build_projection_matrix(),
+        //         pos: Vector4::new(self.pos.x, self.pos.y, self.pos.z, 1.0),
+        //     };
+        //     queue.write_buffer(
+        //         &self.camera_buffer.as_ref().unwrap(),
+        //         0,
+        //         bytemuck::cast_slice(&[camera_uniform]));
+        // }
+
+        // // TODO: refactor.
+        // if !self.ray_camera_buffer.is_none() {
+
+        //     // Create ray camera uniform data.
+        //     let ray_camera_uniform = RayCameraUniform {
+        //         pos: [self.pos.x, self.pos.y, self.pos.z],
+        //         aperture_radius: self.aperture_radius,
+        //         view: [self.view.x, self.view.y, self.view.z],
+        //         focal_distance: self.focal_distance,
+        //         up: [self.up.x, self.up.y, self.up.z],
+        //         padding: 0,
+        //         fov: [self.fov.x, self.fov.y],
+        //         padding2: [0, 0],
+        //     };
+
+        //     queue.write_buffer(
+        //         &self.ray_camera_buffer.as_ref().unwrap(),
+        //         0,
+        //         bytemuck::cast_slice(&[ray_camera_uniform]));
+        // }
+    }
+
+    fn update_camera(&self, queue: &wgpu::Queue) {
         if !self.camera_buffer.is_none() {
 
             // Create camera uniform data. TODO: refactor.
@@ -266,8 +320,29 @@ impl Camera {
             queue.write_buffer(
                 &self.camera_buffer.as_ref().unwrap(),
                 0,
-                bytemuck::cast_slice(&[camera_uniform])
-            );
+                bytemuck::cast_slice(&[camera_uniform]));
+        }
+    }
+
+    fn update_ray_camera(&self, queue: &wgpu::Queue) {
+        if !self.ray_camera_buffer.is_none() {
+
+            // Create ray camera uniform data.
+            let ray_camera_uniform = RayCameraUniform {
+                pos: [self.pos.x, self.pos.y, self.pos.z],
+                aperture_radius: self.aperture_radius,
+                view: [self.view.x, self.view.y, self.view.z],
+                focal_distance: self.focal_distance,
+                up: [self.up.x, self.up.y, self.up.z],
+                padding: 0,
+                fov: [self.fov.x, self.fov.y],
+                padding2: [0, 0],
+            };
+
+            queue.write_buffer(
+                &self.ray_camera_buffer.as_ref().unwrap(),
+                0,
+                bytemuck::cast_slice(&[ray_camera_uniform]));
         }
     }
 

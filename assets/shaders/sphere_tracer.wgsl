@@ -1,3 +1,27 @@
+// Debugging.
+
+struct AABB {
+    min: vec4<f32>, 
+    max: vec4<f32>, 
+};
+
+struct Char {
+    start_pos: vec3<f32>,
+    font_size: f32,
+    value: vec4<f32>,
+    vec_dim_count: u32,
+    color: u32,
+    decimal_count: u32,
+    auxiliary_data: u32,
+};
+
+struct Arrow {
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
+};
+
 struct FmmCellPc {
     tag: atomic<u32>,
     value: f32,
@@ -27,7 +51,7 @@ struct RayOutput {
     intersection_point: vec3<f32>,
     opacity: f32,
     normal: vec3<f32>,
-    diffuce_color: u32,
+    diffuse_color: u32,
 };
 
 struct Ray {
@@ -64,7 +88,13 @@ struct SphereTracerParams {
 @group(0) @binding(2) var<uniform>            camera: RayCamera;
 @group(0) @binding(3) var<storage,read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
+@group(0) @binding(5) var<storage,read_write> screen_output_color: array<u32>;
 
+@group(1) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;
+@group(1) @binding(1) var<storage,read_write> output_char: array<Char>;
+@group(1) @binding(2) var<storage,read_write> output_arrow: array<Arrow>;
+@group(1) @binding(3) var<storage,read_write> output_aabb: array<AABB>;
+@group(1) @binding(4) var<storage,read_write> output_aabb_wire: array<AABB>;
 // Push constants.
 // var<push_constant> pc: PushConstants;
 
@@ -239,7 +269,104 @@ fn index_to_screen(index: u32, dim_x: u32, dim_y: u32, global_dim_x:u32) -> vec2
         // [gx, gy]
 }
 
+fn screen_to_index(v: vec2<u32>) -> u32 {
+
+    let stride = sphere_tracer_params.inner_dim.x * sphere_tracer_params.inner_dim.y;
+    let global_coordinate = v / sphere_tracer_params.inner_dim;
+    let global_index = (global_coordinate.x + global_coordinate.y * sphere_tracer_params.outer_dim.x);
+    let local_coordinate = v - global_coordinate * sphere_tracer_params.inner_dim;
+    let local_index = local_coordinate.x + local_coordinate.y * sphere_tracer_params.inner_dim.x;
+    return global_index + local_index;
+}
+
+// Box (exact).
+fn sdBox(p: vec3<f32>, b: vec3<f32>) -> f32 {
+  let q = abs(p) - b;
+  return length(max(q,vec3<f32>(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
+  //return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
+// Calculate the point in the Ray direction.
+fn getPoint(parameter: f32, ray: ptr<function, Ray>) -> vec3<f32> { return (*ray).origin + parameter * (*ray).direction; }
+
+fn hit(payload: ptr<function, RayPayload>) {
+
+    var grad: vec3<f32>;
+
+    var pos = (*payload).intersection_point;
+    var offset = 0.1;
+    var right = sdBox(vec3(pos.x+offset, pos.y,pos.z), vec3<f32>(15.0, 15.0, 15.0));
+    var left = sdBox(vec3(pos.x-offset, pos.y,pos.z), vec3<f32>(15.0, 15.0, 15.0));
+    var up = sdBox(vec3(pos.x, pos.y+offset,pos.z), vec3<f32>(15.0, 15.0, 15.0));
+    var down = sdBox(vec3(pos.x, pos.y-offset,pos.z), vec3<f32>(15.0, 15.0, 15.0));
+    var z_minus = sdBox(vec3(pos.x, pos.y,pos.z-offset), vec3<f32>(15.0, 15.0, 15.0));
+    var z = sdBox(vec3(pos.x, pos.y,pos.z+offset), vec3<f32>(15.0, 15.0, 15.0));
+    grad.x = right - left;
+    grad.y = up - down;
+    grad.z = z - z_minus;
+    var normal = normalize(grad);
+    (*payload).color = rgba_u32(0u, 255u, 0u, 255u);
+}
 // ray intersection aabb
+
+fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
+
+  var dist = (*ray).rMin;
+  var maxi = (*ray).rMax;
+
+  let temp_offset = 0.1;
+  var p: vec3<f32>;
+  var distance_to_interface: f32;
+
+  while (dist < (*ray).rMax) {
+      p = getPoint(dist, ray);
+      distance_to_interface = sdBox(p, vec3<f32>(15.0, 15.0, 15.0));
+      if (abs(distance_to_interface) < 0.1) {
+	  (*payload).intersection_point = p;
+          hit(payload);
+	  return;
+      }
+      dist = dist + distance_to_interface;
+
+  //            // Step backward the ray.
+  // 	     float temp_distance = dist;
+  //            dist -= STEP_SIZE;
+  // 	     float value;
+  // 	     vec3 p;
+
+  //            // Calculate more accurate intersection point.
+  // 	     while (dist < temp_distance) {
+  // 	       p = getPoint(dist, ray);
+  //              //value = trilinear_density(p); //calculate_density(p);
+  //              value = calculate_density(p);
+  // 	       if (value < 0.0) break;
+////            if (temp_distance > 200.0) {
+////                temp_distance = temp_distance + STEP_SIZE;  break;
+////            }
+  // 	       //temp_distance += temp_offset;
+  // 	       dist += temp_offset;
+  // 	     }
+
+  //         // Jump back a litte.
+  //         dist -= temp_offset;
+
+  //         // Save intersection point.
+  //         payload.intersection_point = vec4(getPoint(dist, ray) , 1.0);
+
+  //         // Calculate normal and the actual value. payload.normal == vec3(normal, value);
+  //     //payload.normal = vec4(calculate_normal2(payload.intersection_point.xyz).xyz, 0.0);
+  //     payload.normal = vec4(calculate_normal(payload.intersection_point.xyz), 0.0);
+
+  //     // Calculate the colo for intersection.
+  //     //++hit(ray,payload);
+  //     return;
+
+  //   } // if
+  //    dist += STEP_SIZE;
+  } // while
+
+  //  miss(ray,payload);
+}
 
 @compute
 @workgroup_size(64,1,1)
@@ -285,10 +412,54 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     payload.color = rgba_u32(255u, 0u, 0u, 255u);
     payload.visibility = 1.0;
 
-    // traceRay(ray, payload);
+    // traceRay(&ray, &payload);
 
-    // RayOutput result;
-    // result.origin = vec4(ray.origin, 1.0);
-    // result.intersection_point = payload.intersection_point;
-    // result.normal = payload.normal;
+    var result: RayOutput;
+    result.origin = ray.origin;
+    result.visibility = 1.0;
+    result.intersection_point = payload.intersection_point;
+    result.opacity = 1.0;
+    result.normal = payload.normal;
+    result.diffuse_color = payload.color;
+
+    if (global_id.x == 0u) {
+	
+	let focal_point = camera.pos - camera.view * d; 
+
+        output_aabb[atomicAdd(&counter[2], 1u)] =  
+              AABB (
+                  vec4<f32>(focal_point.x - 0.1,
+                            focal_point.y - 0.1,
+                            focal_point.z - 0.1,
+                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(focal_point.x + 0.1,
+                            focal_point.y + 0.1,
+                            focal_point.z + 0.1,
+                            0.0),
+        );
+        output_arrow[atomicAdd(&counter[1], 1u)] =  
+              Arrow (
+                  vec4<f32>(focal_point, 0.0),
+                  vec4<f32>(focal_point + camera.view * 1.0, 0.0),
+                  //vec4<f32>(result.intersection_point, 0.0),
+                  rgba_u32(255u, 0u, 2550u, 255u),
+                  0.01
+        );
+    }
+
+    //if (global_id.x % 256u == 0u) {
+        output_arrow[atomicAdd(&counter[1], 1u)] =  
+              Arrow (
+                  vec4<f32>(ray.origin, 0.0),
+                  vec4<f32>(getPoint(50.0, &ray), 0.0),
+                  //vec4<f32>(result.intersection_point, 0.0),
+                  payload.color,
+                  0.1
+        );
+    //}
+
+    let buffer_index = global_id.x; // screen_to_index(screen_coord);
+    screen_output[buffer_index] = result;
+    // screen_output_color[buffer_index] = rgba_u32(0u, 255u, 0u, 255u);//  result.diffuse_color;
+    screen_output_color[buffer_index] = rgba_u32(u32(distance(result.origin, result.intersection_point) / 300.0), 0u, 0u, 255u);//  result.diffuse_color;
 }

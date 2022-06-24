@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use jaankaup_core::two_triangles::TwoTriangles;
 use std::mem::size_of;
 use jaankaup_core::fmm_things::FmmBlock;
@@ -21,6 +22,12 @@ use jaankaup_core::common_functions::{
     get_bit,
     encode_rgba_u32,
 };
+
+enum CameraMode {
+    Camera,
+    RayCamera,
+}
+
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
 use jaankaup_core::buffer::{buffer_from_data, to_vec};
@@ -40,7 +47,7 @@ use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_ARROWS:     usize = 40960;
+const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]
@@ -118,6 +125,8 @@ impl WGPUFeatures for FmmAppFeatures {
 /// FmmApp solver. A Fast marching method (GPU) for solving the eikonal equation.
 struct FmmApp {
     camera: Camera,
+    ray_camera: Camera,
+    camera_mode: CameraMode,
     gpu_debugger: GpuDebugger,
     gpu_timer: GpuTimer,
     keyboard_manager: KeyboardManager,
@@ -157,9 +166,17 @@ impl Application for FmmApp {
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 130.0, 480.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.1);
-        camera.set_restriction_area([0.0, 0.0, 0.0],
-                                    [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
-        camera.enable_restriction_area(true);
+
+        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (150.0, 100.0, 380.0), -89.0, 0.0);
+        ray_camera.set_rotation_sensitivity(0.4);
+        ray_camera.set_movement_sensitivity(0.1);
+
+        let camera_mode = CameraMode::Camera;
+
+        camera.set_focal_distance(5.2, &configuration.queue);
+        // camera.set_restriction_area([0.0, 0.0, 0.0],
+        //                             [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
+        // camera.enable_restriction_area(true);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,
@@ -421,22 +438,25 @@ impl Application for FmmApp {
         // for (i, elem) in filtered_blocks.iter().enumerate() {
         //     println!("{:?} :: {:?}", i, elem);
         // }
+        //
+        let sphere_tracer_renderer = TwoTriangles::init(
+                &configuration.device, &configuration.sc_desc, [512,512]);
+
 
         let sphere_tracer = SphereTracer::init(
                 &configuration.device,
                 [8, 8],
-                [64, 64],
+                [32, 32],
                 fmm.get_fmm_params_buffer(),
                 fmm.get_fmm_data_buffer(),
-                &camera.get_ray_camera_uniform(&configuration.device),
-                &None
+                &ray_camera.get_ray_camera_uniform(&configuration.device),
+                &Some(&gpu_debugger),
         );
-
-        let sphere_tracer_renderer = TwoTriangles::init(
-                &configuration.device, &configuration.sc_desc, [512,512]);
 
         Self {
             camera: camera,
+            ray_camera: ray_camera,
+            camera_mode: camera_mode,
             gpu_debugger: gpu_debugger,
             gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
@@ -496,6 +516,18 @@ impl Application for FmmApp {
              clear
         );
 
+        clear = false;
+
+        // draw(&mut encoder,
+        //      &view,
+        //      self.screen.depth_texture.as_ref().unwrap(),
+        //      &self.sphere_tracer_renderer.get_bind_groups(), 
+        //      &self.sphere_tracer_renderer.get_render_object().pipeline,
+        //      &self.sphere_tracer_renderer.get_draw_buffer(),
+        //      0..6,
+        //      clear
+        // );
+
         // clear = false;
 
         if self.app_render_params.draw_point_cloud {
@@ -535,7 +567,10 @@ impl Application for FmmApp {
 
     #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input: &InputCache) {
-        self.camera.update_from_input(&queue, &input);
+        match self.camera_mode {
+            CameraMode::Camera => self.camera.update_from_input(&queue, &input),
+            CameraMode::RayCamera => self.ray_camera.update_from_input(&queue, &input),
+        }
 
         // Far.
         if self.keyboard_manager.test_key(&Key::Key1, input) {
@@ -563,6 +598,22 @@ impl Application for FmmApp {
             let bit = if get_bit(self.app_render_params.visualization_method, 6) == 0 { true } else { false };
             self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 6, bit);
             self.app_render_params.update = true;
+        }
+
+        // Focal distance
+        if self.keyboard_manager.test_key(&Key::O, input) {
+            self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() - 0.1, &queue);
+        }
+        // Focal distance
+        if self.keyboard_manager.test_key(&Key::P, input) {
+            self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() + 0.1, &queue);
+        }
+        // Switch camera mode to ray camera.
+        if self.keyboard_manager.test_key(&Key::I, input) {
+            self.camera_mode = CameraMode::RayCamera; 
+        }
+        if self.keyboard_manager.test_key(&Key::U, input) {
+            self.camera_mode = CameraMode::Camera; 
         }
 
         if self.app_render_params.update {
@@ -660,9 +711,33 @@ impl Application for FmmApp {
         }
 
         // self.gpu_timer.resolve_timestamps(&mut encoder);
+        self.sphere_tracer.dispatch(&mut encoder);
+
+        encoder.copy_buffer_to_texture(
+            wgpu::ImageCopyBuffer {
+                buffer: self.sphere_tracer.get_color_buffer(),
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(NonZeroU32::new(self.sphere_tracer.get_width() * 4).unwrap()), 
+                    //bytes_per_row: Some(NonZeroU32::new(self.width * 4).unwrap()), 
+                    rows_per_image: None,
+                    // rows_per_image: Some(NonZeroU32::new(self.depth).unwrap()),
+                },
+            },
+            wgpu::ImageCopyTexture {
+                texture: self.sphere_tracer_renderer.get_texture(),
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::Extent3d {
+                width: self.sphere_tracer.get_width(),
+                height: self.sphere_tracer.get_height(),
+                depth_or_array_layers: 1,
+            }
+        );
 
         queue.submit(Some(encoder.finish())); 
-
 
         if self.once {
             self.gpu_timer.create_timestamp_data(&device, &queue);
@@ -697,6 +772,7 @@ impl Application for FmmApp {
             // }
             self.once = false;
         }
+
     }
 }
 
@@ -751,6 +827,8 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Down, 5.0);
         keys.register_key(Key::P, 5.0);
         keys.register_key(Key::O, 5.0);
+        keys.register_key(Key::I, 10.0);
+        keys.register_key(Key::U, 10.0);
         keys.register_key(Key::Key1, 20.0);
         keys.register_key(Key::Key2, 20.0);
         keys.register_key(Key::Key3, 20.0);

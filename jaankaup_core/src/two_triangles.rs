@@ -22,13 +22,16 @@ impl TwoTriangles {
         let two_triangles_vertex_buffer  = buffer_from_data::<f32>(
             &device,
             // gl_Position     |    point_pos
-            &[-1.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-               1.0, -1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
-               1.0,  1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
-               1.0,  1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
-              -1.0,  1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
-              -1.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-            ],
+            &[-1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 0.0, 1.0,
+               1.0,  1.0, 0.0, 1.0, 1.0,  1.0, 0.0, 1.0,
+              -1.0,  1.0, 0.0, 1.0,-1.0, -1.0, 0.0, 1.0],
+            // &[-1.0, -1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
+            //    1.0, -1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
+            //    1.0,  1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+            //    1.0,  1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+            //   -1.0,  1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+            //   -1.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            // ],
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_SRC,
             None
         );
@@ -77,5 +80,21 @@ impl TwoTriangles {
             two_triangles_texture: two_triangle_texture,
             two_triangles_vertex_buffer: two_triangles_vertex_buffer,
         }
+    }
+
+    pub fn get_draw_buffer(&self) -> &wgpu::Buffer {
+        &self.two_triangles_vertex_buffer
+    }
+
+    pub fn get_render_object(&self) -> &RenderObject {
+        &self.two_triangles_ro
+    }
+
+    pub fn get_bind_groups(&self) -> &Vec<wgpu::BindGroup> {
+        &self.two_triangles_bg
+    }
+
+    pub fn get_texture(&self) -> &wgpu::Texture {
+        &self.two_triangles_texture.texture
     }
 }

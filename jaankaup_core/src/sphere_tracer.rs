@@ -30,6 +30,7 @@ pub struct SphereTracer {
     st_compute_object: ComputeObject,
     st_bind_groups: Vec<wgpu::BindGroup>,
     output_buffer: wgpu::Buffer,
+    output_buffer_color: wgpu::Buffer,
     sphere_tracer_params: SphereTracerParams,
     sphere_tracer_buffer: wgpu::Buffer,
 }
@@ -72,24 +73,26 @@ impl SphereTracer {
                             // @group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
+                            // @group(0) @binding(5) var<storage,read_write> screen_output_color: array<u32>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
                         ],
-                        // vec![
+                        vec![
 
-                        //     // @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
-                        //     create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
 
-                        //     // @group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
-                        //     create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
+                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                        //     // @group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
-                        //     create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                        //     // @group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
-                        //     create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-                        //     // @group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
-                        //     create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
-                        // ],
+                            // @group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                        ],
 
                     ],
                     &"main".to_string(),
@@ -111,7 +114,14 @@ impl SphereTracer {
         let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Sphere tracer output"),
             size: (inner_dimension[0] * inner_dimension[1] * outer_dimension[0] * outer_dimension[1]) as u64 * size_of::<RayOutput>() as u64,
-            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let output_buffer_color = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Sphere tracer output color"),
+            size: (inner_dimension[0] * inner_dimension[1] * outer_dimension[0] * outer_dimension[1]) as u64 * size_of::<u32>() as u64,
+            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
@@ -126,14 +136,15 @@ impl SphereTracer {
                         &camera_buffer.as_entire_binding(),
                         &fmm_data.as_entire_binding(),
                         &output_buffer.as_entire_binding(),
+                        &output_buffer_color.as_entire_binding(),
                     ],
-                    // vec![
-                    //     &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
-                    // ],
+                    vec![
+                        &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                        &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
                 ]
         );
 
@@ -141,8 +152,37 @@ impl SphereTracer {
             st_compute_object: st_compute_object,
             st_bind_groups: st_bind_groups, 
             output_buffer: output_buffer,
+            output_buffer_color: output_buffer_color,
             sphere_tracer_params: sphere_tracer_params,
             sphere_tracer_buffer: sphere_tracer_buffer,
         }
+    }
+    pub fn get_color_buffer(&self) -> &wgpu::Buffer {
+        &self.output_buffer_color
+    }
+
+    pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
+        let number_of_dispatches = self.sphere_tracer_params.outer_dim[0] * self.sphere_tracer_params.outer_dim[1];
+
+        let mut pass = encoder.begin_compute_pass(
+            &wgpu::ComputePassDescriptor { label: Some("Sphere tracer dispatch.")}
+        );
+
+        pass.set_pipeline(&self.st_compute_object.pipeline);
+
+        for (e, bgs) in self.st_bind_groups.iter().enumerate() {
+            pass.set_bind_group(e as u32, &bgs, &[]);
+        }
+
+        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
+
+        drop(pass);
+    }
+    pub fn get_width(&self) -> u32 {
+        self.sphere_tracer_params.inner_dim[0] * self.sphere_tracer_params.outer_dim[0]
+    }
+
+    pub fn get_height(&self) -> u32 {
+        self.sphere_tracer_params.inner_dim[1] * self.sphere_tracer_params.outer_dim[1]
     }
 }
