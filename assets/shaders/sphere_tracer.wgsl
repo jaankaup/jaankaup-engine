@@ -83,6 +83,11 @@ struct SphereTracerParams {
     outer_dim: vec2<u32>,
 };
 
+// struct ModF {
+//     fract: f32,
+//     whole: f32,
+// };
+
 @group(0) @binding(0) var<uniform>            fmm_params: FmmParams;
 @group(0) @binding(1) var<uniform>            sphere_tracer_params: SphereTracerParams;
 @group(0) @binding(2) var<uniform>            camera: RayCamera;
@@ -111,6 +116,27 @@ fn total_cell_count() -> u32 {
 fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
+
+fn rgba_u32_tex(r: u32, g: u32, b: u32, a: u32) -> u32 {
+  return (a << 24u) | (r << 16u) | (g  << 8u) | b;
+}
+
+fn rgba_u32_argb(c: u32) -> u32 {
+  let b = (c & 0xffu);
+  let g = (c & 0xff00u) >> 8u;
+  let r = (c & 0xff0000u) >> 16u;
+  let a = (c & 0xff000000u) >> 24u;
+  return (r << 24u) | (g << 16u) | (b  << 8u) | a;
+}
+
+// fn my_modf(f: f32) -> ModF {
+//     let iptr = trunc(f);
+//     let fptr = f - iptr;
+//     return ModF (
+//         select(fptr, (-1.0)*fptr, f < 0.0),
+//         iptr
+//     );
+// }
 
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside(coord: vec3<i32>) -> bool {
@@ -165,6 +191,22 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
         get_third_bits32(m >> 1u),
         get_third_bits32(m >> 2u)
    );
+}
+
+fn decode_color(c: u32) -> vec4<f32> {
+  let a: f32 = f32(c & 0xffu) / 255.0;
+  let b: f32 = f32((c & 0xff00u) >> 8u) / 255.0;
+  let g: f32 = f32((c & 0xff0000u) >> 16u) / 255.0;
+  let r: f32 = f32((c & 0xff000000u) >> 24u) / 255.0;
+  return vec4<f32>(r,g,b,a);
+}
+
+fn vec4_to_rgba(v: vec4<f32>) -> u32 {
+    let r = u32(v.x * 255.0);
+    let g = u32(v.y * 255.0);
+    let b = u32(v.z * 255.0);
+    let a = u32(v.w * 255.0);
+    return rgba_u32(r, g, b, a);
 }
 
 /// Get memory index from given cell coordinate.
@@ -269,14 +311,21 @@ fn index_to_screen(index: u32, dim_x: u32, dim_y: u32, global_dim_x:u32) -> vec2
         // [gx, gy]
 }
 
-fn screen_to_index(v: vec2<u32>) -> u32 {
+// fn screen_to_index(v: vec2<u32>) -> u32 {
+// 
+//     let stride = sphere_tracer_params.inner_dim.x * sphere_tracer_params.inner_dim.y;
+//     let global_coordinate = v / sphere_tracer_params.inner_dim;
+//     let global_index = (global_coordinate.x + global_coordinate.y * sphere_tracer_params.outer_dim.x) * stride;
+//     let local_coordinate = v - global_coordinate * sphere_tracer_params.inner_dim;
+//     let local_index = local_coordinate.x + local_coordinate.y * sphere_tracer_params.inner_dim.x;
+//     return global_index + local_index;
+// }
 
-    let stride = sphere_tracer_params.inner_dim.x * sphere_tracer_params.inner_dim.y;
-    let global_coordinate = v / sphere_tracer_params.inner_dim;
-    let global_index = (global_coordinate.x + global_coordinate.y * sphere_tracer_params.outer_dim.x);
-    let local_coordinate = v - global_coordinate * sphere_tracer_params.inner_dim;
-    let local_index = local_coordinate.x + local_coordinate.y * sphere_tracer_params.inner_dim.x;
-    return global_index + local_index;
+fn screen_to_index(v: vec2<u32>) -> u32 {
+    let stride = sphere_tracer_params.inner_dim.x *
+                 sphere_tracer_params.outer_dim.x;
+    let index = v.x + v.y * stride;
+    return index;
 }
 
 // Box (exact).
@@ -286,86 +335,297 @@ fn sdBox(p: vec3<f32>, b: vec3<f32>) -> f32 {
   //return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 }
 
+
+fn sdSphere(p: vec3<f32>, s: f32) -> f32
+{
+  return length(p)-s;
+}
+
+fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
+
+    let light_pos = vec3<f32>(100.0,100.0,100.0);
+    let lightColor = vec3<f32>(1.0,1.0,1.0);
+    let lightPower = 500.0;
+    
+    // Material properties
+    let materialDiffuseColor = decode_color((*payload).color).xyz; //vec3<f32>(1.0, 0.0, 0.0);
+    let materialAmbientColor = vec3<f32>(0.1,0.1,0.1) * materialDiffuseColor;
+    let materialSpecularColor = vec3<f32>(0.3,0.3,0.3);
+    
+    // Distance to the light
+    let distance = length(light_pos - (*payload).intersection_point);
+    
+    // Normal of the computed fragment, in camera space
+    let n = (*payload).normal; //normalize( Normal_cameraspace );
+    
+    // Direction of the light (from the fragment to the light)
+    let l = normalize(((*payload).intersection_point + light_pos));
+    let cosTheta = clamp( dot( n,l ), 0.0,1.0 );
+    
+    // Eye vector (towards the camera)
+    let e = normalize((*ray).origin - ((*payload).intersection_point));
+    let r = reflect(-l,n);
+    let cosAlpha = clamp( dot( e,r ), 0.0,1.0);
+    
+    let final_color =
+    	// Ambient : simulates indirect lighting
+    	materialAmbientColor +
+    	// Diffuse : "color" of the object
+    	materialDiffuseColor * lightColor * lightPower * cosTheta / (distance*distance) +
+    	// Specular : reflective highlight, like a mirror
+    	materialSpecularColor * lightColor * lightPower * pow(cosAlpha,5.0) / (distance*distance);
+    
+    (*payload).color = 
+       rgba_u32_tex(
+           min(u32(final_color.x * 255.0), 255u),
+           min(u32(final_color.y * 255.0), 255u),
+           min(u32(final_color.z * 255.0), 255u),
+           // u32(final_color.x * 255.0),
+           // u32(final_color.y * 255.0),
+           // u32(final_color.z * 255.0),
+           255u
+       );
+}
+
 // Calculate the point in the Ray direction.
 fn getPoint(parameter: f32, ray: ptr<function, Ray>) -> vec3<f32> { return (*ray).origin + parameter * (*ray).direction; }
 
-fn hit(payload: ptr<function, RayPayload>) {
+fn load_trilinear_neighbors(coord: vec3<u32>) -> array<u32, 8> {
+
+    var neighbors: array<vec3<i32>, 8> = array<vec3<i32>, 8>(
+        vec3<i32>(coord) + vec3<i32>(0,  0,  0),
+        vec3<i32>(coord) + vec3<i32>(1,  0,  0),
+        vec3<i32>(coord) + vec3<i32>(0,  1,  0),
+        vec3<i32>(coord) + vec3<i32>(1,  1,  0),
+        vec3<i32>(coord) + vec3<i32>(0,  0,  1),
+        vec3<i32>(coord) + vec3<i32>(1,  0,  1),
+        vec3<i32>(coord) + vec3<i32>(0,  1,  1),
+        vec3<i32>(coord) + vec3<i32>(1,  1,  1),
+    );
+
+    let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
+    let i1 = get_cell_mem_location(vec3<u32>(neighbors[1]));
+    let i2 = get_cell_mem_location(vec3<u32>(neighbors[2]));
+    let i3 = get_cell_mem_location(vec3<u32>(neighbors[3]));
+    let i4 = get_cell_mem_location(vec3<u32>(neighbors[4]));
+    let i5 = get_cell_mem_location(vec3<u32>(neighbors[5]));
+    let i6 = get_cell_mem_location(vec3<u32>(neighbors[6]));
+    let i7 = get_cell_mem_location(vec3<u32>(neighbors[7]));
+
+    // The index of the "outside" cell.
+    let tcc = total_cell_count();
+
+    return array<u32, 8>(
+        select(tcc ,i0, isInside(neighbors[0])),
+        select(tcc ,i1, isInside(neighbors[1])),
+        select(tcc ,i2, isInside(neighbors[2])),
+        select(tcc ,i3, isInside(neighbors[3])),
+        select(tcc ,i4, isInside(neighbors[4])),
+        select(tcc ,i5, isInside(neighbors[5])),
+        select(tcc ,i6, isInside(neighbors[5])),
+        select(tcc ,i7, isInside(neighbors[5]))
+    );
+}
+
+fn fmm_color(p: vec3<f32>) -> u32 {
+
+   let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
+   var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
+
+   var c000 = decode_color(fmm_data[memory_locations[0]].color);
+   var c100 = decode_color(fmm_data[memory_locations[1]].color);
+   var c010 = decode_color(fmm_data[memory_locations[2]].color);
+   var c110 = decode_color(fmm_data[memory_locations[3]].color);
+   var c001 = decode_color(fmm_data[memory_locations[4]].color);
+   var c101 = decode_color(fmm_data[memory_locations[5]].color);
+   var c011 = decode_color(fmm_data[memory_locations[6]].color);
+   var c111 = decode_color(fmm_data[memory_locations[7]].color);
+
+   let tx = fract(p.x);
+   let ty = fract(p.y);
+   let tz = fract(p.z);
+
+   let color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+          tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+          (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+          tx * ty * (1.0 - tz) * c110 + 
+          (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+          tx * (1.0 - ty) * tz * c101 + 
+          (1.0 - tx) * ty * tz * c011 + 
+          tx * ty * tz * c111;
+   return vec4_to_rgba(color);
+}
+
+
+fn fmm_value(p: vec3<f32>) -> f32 {
+
+   let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
+   //let neighbors = load_neighbors_6(coord: vec3<u32>);
+
+   var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
+
+        // vec3<i32>(coord) + vec3<i32>(0,  0,  0),
+        // vec3<i32>(coord) + vec3<i32>(1,  0,  0),
+        // vec3<i32>(coord) + vec3<i32>(0,  1,  0),
+        // vec3<i32>(coord) + vec3<i32>(1,  1,  0),
+        // vec3<i32>(coord) + vec3<i32>(0,  0,  1),
+        // vec3<i32>(coord) + vec3<i32>(1,  0,  1),
+        // vec3<i32>(coord) + vec3<i32>(0,  1,  1),
+        // vec3<i32>(coord) + vec3<i32>(1,  1,  1),
+   // 
+   //            n2                        n3
+   //          +------------------------+
+   //         /|                       /|
+   //        / |                      / |
+   //       /  |                     /  |
+   //      /   |                    /   |
+   //     /    |                   /    |
+   // n6 +------------------------+ n7  |
+   //    |     |                  |     |
+   //    |     |                  |     |
+   //    |     |                  |     |
+   //    |  n0 +------------------|-----+ n1
+   //    |    /                   |    /
+   //    |   /       P            |   /
+   //    |  /                     |  /
+   //    | /                      | /
+   //    |/                       |/
+   //    +------------------------+
+   //   n4                       n5
+   // 
+
+   // The point P should be inside the cube.
+   var c000 = fmm_data[memory_locations[0]].value;
+   var c100 = fmm_data[memory_locations[1]].value;
+   var c010 = fmm_data[memory_locations[2]].value;
+   var c110 = fmm_data[memory_locations[3]].value;
+   var c001 = fmm_data[memory_locations[4]].value;
+   var c101 = fmm_data[memory_locations[5]].value;
+   var c011 = fmm_data[memory_locations[6]].value;
+   var c111 = fmm_data[memory_locations[7]].value;
+
+   // var c001 = fmm_data[memory_locations[0]].value;
+   // var c101 = fmm_data[memory_locations[1]].value;
+   // var c011 = fmm_data[memory_locations[2]].value;
+   // var c111 = fmm_data[memory_locations[3]].value;
+   // var c000 = fmm_data[memory_locations[4]].value;
+   // var c100 = fmm_data[memory_locations[5]].value;
+   // var c010 = fmm_data[memory_locations[6]].value;
+   // var c110 = fmm_data[memory_locations[7]].value;
+
+   // fn my_modf(f: f32) -> ModF {
+   let tx = fract(p.x);
+   let ty = fract(p.y);
+   let tz = fract(p.z);
+
+   // let x_value = x_part * n0 + (1.0 - x_part) * n1;  
+   // let y_value = y_part * n2 + (1.0 - y_part) * n1;  
+   // let z_value = z_part * n0 + (1.0 - z_part) * n1;  
+
+   return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+          tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+          (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+          tx * ty * (1.0 - tz) * c110 + 
+          (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+          tx * (1.0 - ty) * tz * c101 + 
+          (1.0 - tx) * ty * tz * c011 + 
+          tx * ty * tz * c111; 
+   // if (abs(isovalue - va.w) < 0.00001) { return va.xyz; }
+   // else if (abs(isovalue - vb.w) < 0.00001) { return vb.xyz; }
+   // else if (abs(va.w-vb.w) < 0.00001) { return va.xyz; }
+
+   // else
+   // {
+   //   vec3 p;
+   //   float mu = (isovalue - va.w) / (vb.w - va.w);
+   //   p.x = va.x + mu * (vb.x - va.x);
+   //   p.y = va.y + mu * (vb.y - va.y);
+   //   p.z = va.z + mu * (vb.z - va.z);
+   //   return p;
+   // }
+   
+   // return 123.0;
+}
+
+
+fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
     var grad: vec3<f32>;
 
     var pos = (*payload).intersection_point;
-    var offset = 0.1;
-    var right = sdBox(vec3(pos.x+offset, pos.y,pos.z), vec3<f32>(15.0, 15.0, 15.0));
-    var left = sdBox(vec3(pos.x-offset, pos.y,pos.z), vec3<f32>(15.0, 15.0, 15.0));
-    var up = sdBox(vec3(pos.x, pos.y+offset,pos.z), vec3<f32>(15.0, 15.0, 15.0));
-    var down = sdBox(vec3(pos.x, pos.y-offset,pos.z), vec3<f32>(15.0, 15.0, 15.0));
-    var z_minus = sdBox(vec3(pos.x, pos.y,pos.z-offset), vec3<f32>(15.0, 15.0, 15.0));
-    var z = sdBox(vec3(pos.x, pos.y,pos.z+offset), vec3<f32>(15.0, 15.0, 15.0));
+    var offset = 0.01;
+    // var right = sdBox(vec3(pos.x+offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
+    // var left = sdBox(vec3(pos.x-offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
+    // var up = sdBox(vec3(pos.x, pos.y+offset,pos.z), vec3<f32>(50.0, 50.0, 50.0));
+    // var down = sdBox(vec3(pos.x, pos.y-offset,pos.z), vec3<f32>(50.0, 50.0, 50.0));
+    // var z_minus = sdBox(vec3(pos.x, pos.y,pos.z-offset), vec3<f32>(50.0, 50.0, 50.0));
+    // var z = sdBox(vec3(pos.x, pos.y,pos.z+offset), vec3<f32>(50.0, 50.0, 50.0));
+    var right = fmm_value(vec3(pos.x+offset, pos.y,pos.z));
+    var left = fmm_value(vec3(pos.x-offset, pos.y,pos.z));
+    var up = fmm_value(vec3(pos.x, pos.y+offset,pos.z));
+    var down = fmm_value(vec3(pos.x, pos.y-offset,pos.z));
+    var z_minus = fmm_value(vec3(pos.x, pos.y,pos.z-offset));
+    var z = fmm_value(vec3(pos.x, pos.y,pos.z+offset));
+    // var right = sdSphere(vec3(pos.x+offset, pos.y,pos.z), 50.0);
+    // var left = sdSphere(vec3(pos.x-offset, pos.y,pos.z), 50.0);
+    // var up = sdSphere(vec3(pos.x, pos.y+offset,pos.z), 50.0);
+    // var down = sdSphere(vec3(pos.x, pos.y-offset,pos.z), 50.0);
+    // var z_minus = sdSphere(vec3(pos.x, pos.y,pos.z-offset), 50.0);
+    // var z = sdSphere(vec3(pos.x, pos.y,pos.z+offset), 50.0);
     grad.x = right - left;
     grad.y = up - down;
     grad.z = z - z_minus;
+    //grad.z = z_minus - z;
     var normal = normalize(grad);
-    (*payload).color = rgba_u32(0u, 255u, 0u, 255u);
+    (*payload).color = rgba_u32(0u, 0u, 155u, 0u);
+    // (*payload).color = fmm_color((*payload).intersection_point); // rgba_u32(0u, 0u, 155u, 0u);
+    // (*payload).normal = normal;
+    (*payload).visibility = 1.0;
+    diffuse(ray, payload);
 }
+
+// fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
+//    payload.intersection_point = ray. 
+// }
 // ray intersection aabb
+
+fn fmm_is_outside_value(v: vec3<f32>) -> bool {
+    if (v.x < 0.0 ||
+        v.y < 0.0 ||
+        v.z < 0.0 ||
+        v.x >= f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) ||
+        v.y >= f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) ||
+        v.z >= f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) {
+            return true;
+	}
+     return false;
+}
 
 fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
   var dist = (*ray).rMin;
-  var maxi = (*ray).rMax;
+  var calc = 0u; 
 
-  let temp_offset = 0.1;
   var p: vec3<f32>;
   var distance_to_interface: f32;
 
-  while (dist < (*ray).rMax) {
+  while (dist < (*ray).rMax && calc < 800u) {
       p = getPoint(dist, ray);
-      distance_to_interface = sdBox(p, vec3<f32>(15.0, 15.0, 15.0));
-      if (abs(distance_to_interface) < 0.1) {
+      //distance_to_interface = sdSphere(p, 50.0);
+      // distance_to_interface = sdBox(p, vec3<f32>(50.0, 50.0, 50.0));
+
+      // if (fmm_is_outside_value(p)) { return; }
+      distance_to_interface = fmm_value(p) * 0.01;
+      if (abs(distance_to_interface) < 0.01) {
 	  (*payload).intersection_point = p;
-          hit(payload);
+          hit(ray, payload);
 	  return;
       }
+      calc = calc + 1u;
       dist = dist + distance_to_interface;
-
-  //            // Step backward the ray.
-  // 	     float temp_distance = dist;
-  //            dist -= STEP_SIZE;
-  // 	     float value;
-  // 	     vec3 p;
-
-  //            // Calculate more accurate intersection point.
-  // 	     while (dist < temp_distance) {
-  // 	       p = getPoint(dist, ray);
-  //              //value = trilinear_density(p); //calculate_density(p);
-  //              value = calculate_density(p);
-  // 	       if (value < 0.0) break;
-////            if (temp_distance > 200.0) {
-////                temp_distance = temp_distance + STEP_SIZE;  break;
-////            }
-  // 	       //temp_distance += temp_offset;
-  // 	       dist += temp_offset;
-  // 	     }
-
-  //         // Jump back a litte.
-  //         dist -= temp_offset;
-
-  //         // Save intersection point.
-  //         payload.intersection_point = vec4(getPoint(dist, ray) , 1.0);
-
-  //         // Calculate normal and the actual value. payload.normal == vec3(normal, value);
-  //     //payload.normal = vec4(calculate_normal2(payload.intersection_point.xyz).xyz, 0.0);
-  //     payload.normal = vec4(calculate_normal(payload.intersection_point.xyz), 0.0);
-
-  //     // Calculate the colo for intersection.
-  //     //++hit(ray,payload);
-  //     return;
-
-  //   } // if
-  //    dist += STEP_SIZE;
   } // while
 
-  //  miss(ray,payload);
+  (*payload).intersection_point = p;
 }
 
 @compute
@@ -403,16 +663,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let point_on_plane = alpha * u + beta * v;
 
     var ray: Ray;
-    ray.origin = point_on_plane + camera.pos.xyz;
+    ray.origin = point_on_plane + camera.pos.xyz * 0.25;
     ray.direction = normalize(point_on_plane + d*camera.view.xyz);
     ray.rMin = 0.0;
-    ray.rMax = 300.0;
+    ray.rMax = 200.0;
 
     var payload: RayPayload;
-    payload.color = rgba_u32(255u, 0u, 0u, 255u);
-    payload.visibility = 1.0;
+    payload.color = rgba_u32(0u, 100u, 0u, 255u);
+    payload.visibility = 0.0;
 
-    // traceRay(&ray, &payload);
+    traceRay(&ray, &payload);
 
     var result: RayOutput;
     result.origin = ray.origin;
@@ -428,38 +688,66 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         output_aabb[atomicAdd(&counter[2], 1u)] =  
               AABB (
-                  vec4<f32>(focal_point.x - 0.1,
-                            focal_point.y - 0.1,
-                            focal_point.z - 0.1,
+                  vec4<f32>(focal_point.x - 1.1,
+                            focal_point.y - 1.1,
+                            focal_point.z - 1.1,
                             f32(rgba_u32(255u, 0u, 2550u, 255u))),
-                  vec4<f32>(focal_point.x + 0.1,
-                            focal_point.y + 0.1,
-                            focal_point.z + 0.1,
+                  vec4<f32>(focal_point.x + 1.1,
+                            focal_point.y + 1.1,
+                            focal_point.z + 1.1,
                             0.0),
         );
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (
                   vec4<f32>(focal_point, 0.0),
-                  vec4<f32>(focal_point + camera.view * 1.0, 0.0),
+                  vec4<f32>(focal_point + camera.view, 0.0),
                   //vec4<f32>(result.intersection_point, 0.0),
                   rgba_u32(255u, 0u, 2550u, 255u),
                   0.01
         );
+        let renderable_element = Char (
+                        // element_position,
+                        vec3<f32>(focal_point.x - 1.11, focal_point.y + 1.11, focal_point.z + 1.11),
+                        0.2,
+                        vec4<f32>(0.25 * camera.pos.x, 0.25 * camera.pos.y, 0.25 * camera.pos.z, 0.0),
+                        //vec4<f32>(vec3<f32>(fmm_params.local_dimension), 6.0),
+                        4u,
+                        rgba_u32(255u, 255u, 255u, 255u),
+                        1u,
+                        0u
+        );
+        output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
     }
 
-    //if (global_id.x % 256u == 0u) {
+    //if (local_index == 0u) {
+    if (payload.visibility > 0.0) {
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (
-                  vec4<f32>(ray.origin, 0.0),
-                  vec4<f32>(getPoint(50.0, &ray), 0.0),
+                  vec4<f32>(ray.origin * 4.0, 0.0),
+                  vec4<f32>(payload.intersection_point * 4.0, 0.0),
                   //vec4<f32>(result.intersection_point, 0.0),
-                  payload.color,
+                  rgba_u32_argb(payload.color),
                   0.1
         );
-    //}
 
-    let buffer_index = global_id.x; // screen_to_index(screen_coord);
-    screen_output[buffer_index] = result;
-    // screen_output_color[buffer_index] = rgba_u32(0u, 255u, 0u, 255u);//  result.diffuse_color;
-    screen_output_color[buffer_index] = rgba_u32(u32(distance(result.origin, result.intersection_point) / 300.0), 0u, 0u, 255u);//  result.diffuse_color;
+        // output_arrow[atomicAdd(&counter[1], 1u)] =  
+        //       Arrow (
+        //           vec4<f32>(payload.intersection_point, 0.0),
+        //           vec4<f32>(payload.intersection_point + payload.normal * 3.0, 0.0),
+        //           //vec4<f32>(result.intersection_point, 0.0),
+        //           rgba_u32(155u, 0u, 1550u, 255u),
+        //           0.1
+        // );
+    }
+
+    //if (workgroup_id.x == 0u) {
+        let buffer_index = screen_to_index(screen_coord); 
+        // screen_output_color[buffer_index] = rgba_u32(255u, 0u, 0u, 255u);
+        screen_output_color[buffer_index] = payload.color; // rgba_u32(u32(distance(result.origin, result.intersection_point) / 300.0), 0u, 0u, 255u);//  result.diffuse_color;
+    //}
+    // let buffer_index = screen_to_index(screen_coord); 
+    // // let buffer_index = global_id.x; 
+    // screen_output[buffer_index] = result;
+    // // screen_output_color[buffer_index] = rgba_u32(0u, 255u, 0u, 255u);//  result.diffuse_color;
+    // screen_output_color[buffer_index] = result.diffuse_color; // rgba_u32(u32(distance(result.origin, result.intersection_point) / 300.0), 0u, 0u, 255u);//  result.diffuse_color;
 }

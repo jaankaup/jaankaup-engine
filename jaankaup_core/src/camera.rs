@@ -247,7 +247,7 @@ impl Camera {
 
            self.pos = new_pos;
         }
-        else {
+        else if !self.restriction_area_enabled {
            self.pos = new_pos;
         }
 

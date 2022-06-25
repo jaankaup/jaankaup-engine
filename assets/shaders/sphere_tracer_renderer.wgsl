@@ -14,7 +14,7 @@ struct VertexOutput {
 fn vs_main(@location(0) gl_pos: vec4<f32>) -> VertexOutput {
     var out_next_stage: VertexOutput;
     out_next_stage.my_pos  = gl_pos;
-    out_next_stage.pos  = gl_pos;
+    out_next_stage.pos  = vec4<f32>(gl_pos.xy * 0.5, 0.0, 1.0) + vec4<f32>(0.5, 0.5, 0.0, 0.0);
     return out_next_stage;
     //return VertexOutput(
     //    gl_pos,

@@ -29,7 +29,8 @@ struct PointCloudParams {
 
 struct FmmCellPc {
     tag: u32,
-    value: atomic<u32>,
+    value: atomic<i32>,
+    //value: atomic<u32>,
     color: atomic<u32>,
 }
 
@@ -207,18 +208,22 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             // Check if cell is inside the computational domain.
             let inside = isInside(nearest_cell);
 
-            // Calculate the distance between point and nearest cell. 0.1 is the radius of the ball.
-            let dist = distance(p.position, vec3<f32>(nearest_cell)); // - min_distance;
+            // Calculate the distance between point and nearest cell. 0.3 is the radius of the ball.
+            var dist = distance(p.position, vec3<f32>(nearest_cell)) - 0.9; // - min_distance;
+	    // if (dist < 0.3) {
+            //     dist = dist - 0.3;
+	    // }
 
             // 0.045 => 45000
-            var dist_to_u32 = u32(abs(dist) * 1000000.0);
+            var dist_to_i32 = i32(dist * 1000000.0);
+            // var dist_to_u32 = u32(abs(dist) * 100000.0);
 
             // If inside update distance.
             //if (inside && abs(dist) < min_distance) {
             if (inside) {
                 
                 let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
-                atomicMin(&fmm_data[memory_index].value, dist_to_u32);
+                atomicMin(&fmm_data[memory_index].value, dist_to_i32);
             }
         } // if
 
@@ -236,11 +241,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             if (final_value == dist_to_u32) {
 
                 // Add sign.
-                if (dist < 0.0) { final_value = final_value | (1u << 31u); } 
+                //++ if (dist < 0.0) { final_value = final_value | (1u << 31u); } 
 
                 atomicExchange(&fmm_data[memory_index].color, p.color);
                 fmm_data[memory_index].tag = KNOWN;
-                atomicExchange(&fmm_data[memory_index].value, final_value);
+                // atomicExchange(&fmm_data[memory_index].value, final_value);
 
                 //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
                 //++       Arrow (

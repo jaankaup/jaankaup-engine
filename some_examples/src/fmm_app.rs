@@ -149,6 +149,7 @@ struct FmmApp {
     once: bool,
     sphere_tracer: SphereTracer,
     sphere_tracer_renderer: TwoTriangles,
+    draw_two_triangles: bool,
 }
 
 impl Application for FmmApp {
@@ -167,16 +168,16 @@ impl Application for FmmApp {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.1);
 
-        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (150.0, 100.0, 380.0), -89.0, 0.0);
-        ray_camera.set_rotation_sensitivity(0.4);
-        ray_camera.set_movement_sensitivity(0.1);
+        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (60.0, 60.0, 60.0), -89.0, 0.0);
+        ray_camera.set_rotation_sensitivity(0.3);
+        ray_camera.set_movement_sensitivity(0.05);
 
         let camera_mode = CameraMode::Camera;
 
-        camera.set_focal_distance(5.2, &configuration.queue);
-        // camera.set_restriction_area([0.0, 0.0, 0.0],
-        //                             [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
-        // camera.enable_restriction_area(true);
+        ray_camera.set_focal_distance(1.0, &configuration.queue);
+        ray_camera.set_restriction_area([0.0, 0.0, 0.0],
+                                    [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
+        ray_camera.enable_restriction_area(true);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,
@@ -440,7 +441,7 @@ impl Application for FmmApp {
         // }
         //
         let sphere_tracer_renderer = TwoTriangles::init(
-                &configuration.device, &configuration.sc_desc, [512,512]);
+                &configuration.device, &configuration.sc_desc, [256,256]);
 
 
         let sphere_tracer = SphereTracer::init(
@@ -480,6 +481,7 @@ impl Application for FmmApp {
             once: once,
             sphere_tracer: sphere_tracer,
             sphere_tracer_renderer: sphere_tracer_renderer,
+            draw_two_triangles: false,
          }
     }
 
@@ -517,16 +519,17 @@ impl Application for FmmApp {
         );
 
         clear = false;
-
-        // draw(&mut encoder,
-        //      &view,
-        //      self.screen.depth_texture.as_ref().unwrap(),
-        //      &self.sphere_tracer_renderer.get_bind_groups(), 
-        //      &self.sphere_tracer_renderer.get_render_object().pipeline,
-        //      &self.sphere_tracer_renderer.get_draw_buffer(),
-        //      0..6,
-        //      clear
-        // );
+        if self.draw_two_triangles {
+           draw(&mut encoder,
+                &view,
+                self.screen.depth_texture.as_ref().unwrap(),
+                &self.sphere_tracer_renderer.get_bind_groups(), 
+                &self.sphere_tracer_renderer.get_render_object().pipeline,
+                &self.sphere_tracer_renderer.get_draw_buffer(),
+                0..6,
+                clear
+           );
+        }
 
         // clear = false;
 
@@ -547,14 +550,16 @@ impl Application for FmmApp {
 
         queue.submit(Some(encoder.finish())); 
 
-        self.gpu_debugger.render(
-                  &device,
-                  &queue,
-                  &view,
-                  self.screen.depth_texture.as_ref().unwrap(),
-                  &mut clear,
-                  spawner
-        );
+        if !self.draw_two_triangles {
+            self.gpu_debugger.render(
+                      &device,
+                      &queue,
+                      &view,
+                      self.screen.depth_texture.as_ref().unwrap(),
+                      &mut clear,
+                      spawner
+            );
+        }
     
         //self.gpu_debugger.reset_element_counters(&queue);
         self.gpu_debugger.reset_chars(&device, &queue);
@@ -592,6 +597,10 @@ impl Application for FmmApp {
             self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 2, bit);
             self.app_render_params.update = true;
         }
+
+        if self.keyboard_manager.test_key(&Key::Key0, input) {
+            self.app_render_params.draw_point_cloud = !self.app_render_params.draw_point_cloud;
+        }
         
         // Numbers.
         if self.keyboard_manager.test_key(&Key::N, input) {
@@ -599,22 +608,27 @@ impl Application for FmmApp {
             self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 6, bit);
             self.app_render_params.update = true;
         }
-
         // Focal distance
         if self.keyboard_manager.test_key(&Key::O, input) {
-            self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() - 0.1, &queue);
+            self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() - 0.01, &queue);
         }
         // Focal distance
         if self.keyboard_manager.test_key(&Key::P, input) {
-            self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() + 0.1, &queue);
+            self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() + 0.01, &queue);
         }
         // Switch camera mode to ray camera.
         if self.keyboard_manager.test_key(&Key::I, input) {
             self.camera_mode = CameraMode::RayCamera; 
         }
+        // Switch camera mode to camera.
         if self.keyboard_manager.test_key(&Key::U, input) {
             self.camera_mode = CameraMode::Camera; 
         }
+        // Switch camera mode to camera.
+        if self.keyboard_manager.test_key(&Key::Space, input) {
+            self.draw_two_triangles = !self.draw_two_triangles; 
+        }
+
 
         if self.app_render_params.update {
 

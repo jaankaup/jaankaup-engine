@@ -1,6 +1,6 @@
 use std::mem::size_of;
 use crate::fmm_things::{FmmPrefixParams, FmmCellPc, FmmBlock};
-use crate::common_functions::udiv_up_safe32;
+use crate::common_functions::{udiv_up_safe32, encode_rgba_u32};
 use crate::fmm_things::FmmValueFixer;
 use crate::fmm_things::PointCloudParamsBuffer;
 use std::convert::TryInto;
@@ -255,7 +255,7 @@ impl FastMarchingMethod {
         let number_of_fmm_blocks: usize = (global_dimension[0] * global_dimension[1] * global_dimension[2]).try_into().unwrap();
         let number_of_fmm_cells: usize = (number_of_fmm_blocks as u32 * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap();
 
-        let mut fmm_data = vec![FmmCellPc { tag: 0, value: 100000.0, color: 0, } ; number_of_fmm_cells + 1];
+        let mut fmm_data = vec![FmmCellPc { tag: 0, value: 100000.0, color: encode_rgba_u32(255, 10, 10, 255), } ; number_of_fmm_cells + 1];
 
         // The outside value.
         fmm_data[number_of_fmm_cells] = FmmCellPc { tag: 4, value: 100000.0, color: 0, };
@@ -667,7 +667,7 @@ impl FastMarchingMethod {
         }
 
         //for _ in 0..416 {
-        for _ in 0..416 {
+        for _ in 0..417 {
         // else {
                 // let mut pass = encoder.begin_compute_pass(
                 //     &wgpu::ComputePassDescriptor { label: Some("Fmm compute pass.")}
