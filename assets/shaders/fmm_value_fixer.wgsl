@@ -5,8 +5,9 @@ struct FmmParams {
 
 struct FmmCellPc {
     tag: u32,
+    //value: f32,
+    //value: atomic<i32>,
     value: i32,
-    // value: u32,
     color: u32,
 }
 
@@ -18,6 +19,7 @@ let OUTSIDE  = 4u;
 
 @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
 @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCellPc>;
+@group(0) @binding(2) var<storage, read_write> fmm_temp_data: array<f32>;
 
 @compute
 @workgroup_size(1024,1,1)
@@ -49,12 +51,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     // Convert value back to f32.
     if (cell.tag == KNOWN) {
-        cell.value = bitcast<i32>(f32(cell.value) * 0.0000001);
+        // cell.value = bitcast<i32>(-0.005);
+        //cell.value = fmm_temp_data[global_id.x];
+        fmm_data[global_id.x].value = bitcast<i32>(f32(cell.value) * 0.000001); 
+        //fmm_data[global_id.x].value = bitcast<i32>(-0.666); 
         //cell.value = bitcast<u32>(f32(cell.value & (!(1u << 31u))) * 0.000001 * the_sign);
     }
-    else {
-        cell.value = bitcast<i32>(100000.0);
-    }
+    // else {
+    //     cell.value = 100000.0;
+    // }
 
-    fmm_data[global_id.x].value = cell.value; 
+    // atomicExchange(&fmm_data[global_id.x].value, bitcast<i32>(0.666)); //cell.value; 
 }

@@ -128,7 +128,7 @@ pub struct FastMarchingMethod {
 
     /// Point data to fmm interface bing groups.
     #[allow(dead_code)]
-    point_to_interface_bind_groups: Option<Vec<wgpu::BindGroup>>,
+    pc_to_interface_bind_groups: Option<Vec<wgpu::BindGroup>>,
 
     /// Preprocessor for fmm values.
     #[allow(dead_code)]
@@ -255,7 +255,7 @@ impl FastMarchingMethod {
         let number_of_fmm_blocks: usize = (global_dimension[0] * global_dimension[1] * global_dimension[2]).try_into().unwrap();
         let number_of_fmm_cells: usize = (number_of_fmm_blocks as u32 * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap();
 
-        let mut fmm_data = vec![FmmCellPc { tag: 0, value: 100000.0, color: encode_rgba_u32(255, 10, 10, 255), } ; number_of_fmm_cells + 1];
+        let mut fmm_data = vec![FmmCellPc { tag: 0, value: 100000.0, color: encode_rgba_u32(155, 155, 155, 255), } ; number_of_fmm_cells + 1];
 
         // The outside value.
         fmm_data[number_of_fmm_cells] = FmmCellPc { tag: 4, value: 100000.0, color: 0, };
@@ -385,6 +385,7 @@ impl FastMarchingMethod {
         let fmm_value_fixer = FmmValueFixer::init(&device,
                                                   &fmm_params_buffer.get_buffer(),
                                                   &fmm_data,
+                                                  &prefix_temp_array,
         );
 
         // Update band counts shader.
@@ -550,7 +551,7 @@ impl FastMarchingMethod {
             fmm_blocks: fmm_blocks,
             temporary_fmm_data: temporary_fmm_data,
             pc_to_interface_compute_object: pc_to_interface_compute_object,
-            point_to_interface_bind_groups: None,
+            pc_to_interface_bind_groups: None,
             fmm_value_fixer: fmm_value_fixer,
             fmm_prefix_params: fmm_prefix_params,
             prefix_temp_array: prefix_temp_array,
@@ -578,15 +579,15 @@ impl FastMarchingMethod {
     #[allow(dead_code)]
     pub fn initialize_interface_pc(&self, encoder: &mut wgpu::CommandEncoder, pc: &PointCloud) {
 
-        assert!(!self.point_to_interface_bind_groups.is_none(), "Consider calling add_point_cloud_data before this function."); 
+        assert!(!self.pc_to_interface_bind_groups.is_none(), "Consider calling add_point_cloud_data before this function."); 
 
          self.pc_to_interface_compute_object.dispatch(
-             &self.point_to_interface_bind_groups.as_ref().unwrap(),
+             &self.pc_to_interface_bind_groups.as_ref().unwrap(),
              encoder,
              1, 1, 1, Some("Point data to interface dispatch")
          );
 
-        self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(pc.get_point_count(), 1024) + 1, 1, 1]);
+         self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(pc.get_point_count(), 1024), 1, 1]);
     }
 
     // pub fn create_compute_pass_fmm<'a>(&'a self, encoder: &'a mut wgpu::CommandEncoder) -> wgpu::ComputePass<'a> {
@@ -771,7 +772,7 @@ impl FastMarchingMethod {
                                 pc_data: &wgpu::Buffer,
                                 point_cloud_params_buffer: &PointCloudParamsBuffer) {
 
-        let point_to_interface_bind_groups = create_bind_groups(
+        let pc_to_interface_bind_groups = create_bind_groups(
                 &device,
                 &self.pc_to_interface_compute_object.bind_group_layout_entries,
                 &self.pc_to_interface_compute_object.bind_group_layouts,
@@ -781,7 +782,8 @@ impl FastMarchingMethod {
                     &point_cloud_params_buffer.get_buffer().as_entire_binding(),
                     &self.fmm_data.as_entire_binding(),
                     &pc_data.as_entire_binding(),
-                    // &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                    &self.prefix_temp_array.as_entire_binding(),
+                    //&gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                     // &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
                     // &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
                     // &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
@@ -789,7 +791,7 @@ impl FastMarchingMethod {
                     ],
                 ]
         );
-        self.point_to_interface_bind_groups = Some(point_to_interface_bind_groups);
+        self.pc_to_interface_bind_groups = Some(pc_to_interface_bind_groups);
 
     }
 

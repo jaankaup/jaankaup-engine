@@ -602,6 +602,7 @@ impl FmmValueFixer {
     pub fn init(device: &wgpu::Device,
                 fmm_params_buffer: &wgpu::Buffer,
                 fmm_data: &wgpu::Buffer,
+                fmm_temp_data: &wgpu::Buffer
                 ) -> Self {
 
         let compute_object =
@@ -621,6 +622,9 @@ impl FmmValueFixer {
 
                             // @group(0) @binding(1) var<storage,read_write> fmm_data: array<FmmCellPc>;
                             create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(1) var<storage,read_write> fmm_temp_data: array<f32>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string(),
@@ -635,6 +639,7 @@ impl FmmValueFixer {
                     vec![
                         &fmm_params_buffer.as_entire_binding(),
                         &fmm_data.as_entire_binding(),
+                        &fmm_temp_data.as_entire_binding(),
                     ],
                 ]
         );

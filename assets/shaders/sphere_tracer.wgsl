@@ -343,7 +343,7 @@ fn sdSphere(p: vec3<f32>, s: f32) -> f32
 
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    let light_pos = vec3<f32>(100.0,100.0,100.0);
+    let light_pos = vec3<f32>(50.0,40.0,50.0);
     let lightColor = vec3<f32>(1.0,1.0,1.0);
     let lightPower = 500.0;
     
@@ -373,7 +373,7 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     	// Diffuse : "color" of the object
     	materialDiffuseColor * lightColor * lightPower * cosTheta / (distance*distance) +
     	// Specular : reflective highlight, like a mirror
-    	materialSpecularColor * lightColor * lightPower * pow(cosAlpha,5.0) / (distance*distance);
+    	materialSpecularColor * lightColor * lightPower * pow(cosAlpha,4.0) / (distance*distance);
     
     (*payload).color = 
        rgba_u32_tex(
@@ -577,8 +577,8 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     grad.z = z - z_minus;
     //grad.z = z_minus - z;
     var normal = normalize(grad);
-    (*payload).color = rgba_u32(0u, 0u, 155u, 0u);
-    // (*payload).color = fmm_color((*payload).intersection_point); // rgba_u32(0u, 0u, 155u, 0u);
+    //(*payload).color = rgba_u32(255u, 0u, 0u, 255u);
+    (*payload).color = fmm_color((*payload).intersection_point); // rgba_u32(0u, 0u, 155u, 0u);
     // (*payload).normal = normal;
     (*payload).visibility = 1.0;
     diffuse(ray, payload);
@@ -614,9 +614,9 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
       //distance_to_interface = sdSphere(p, 50.0);
       // distance_to_interface = sdBox(p, vec3<f32>(50.0, 50.0, 50.0));
 
-      // if (fmm_is_outside_value(p)) { return; }
-      distance_to_interface = fmm_value(p) * 0.01;
-      if (abs(distance_to_interface) < 0.01) {
+      if (fmm_is_outside_value(p)) { return; }
+      distance_to_interface = fmm_value(p) * 0.1;
+      if (abs(distance_to_interface) < 0.1) {
 	  (*payload).intersection_point = p;
           hit(ray, payload);
 	  return;
@@ -683,8 +683,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     result.diffuse_color = payload.color;
 
     if (global_id.x == 0u) {
-	
-	let focal_point = camera.pos - camera.view * d; 
+        
+        let focal_point = camera.pos - camera.view * d; 
 
         output_aabb[atomicAdd(&counter[2], 1u)] =  
               AABB (

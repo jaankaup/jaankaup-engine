@@ -29,7 +29,8 @@ struct PointCloudParams {
 
 struct FmmCellPc {
     tag: u32,
-    value: atomic<i32>,
+    value: f32,
+    //value: atomic<i32>,
     //value: atomic<u32>,
     color: atomic<u32>,
 }
@@ -68,13 +69,14 @@ struct Arrow {
 @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
 @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
+@group(0) @binding(4) var<storage, read_write> fmm_temp_data: array<u32>;
 
 // Debug.
-@group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
-@group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
-@group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
-@group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
-@group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+// @group(1) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;
+// @group(1) @binding(1) var<storage,read_write> output_char: array<Char>;
+// @group(1) @binding(2) var<storage,read_write> output_arrow: array<Arrow>;
+// @group(1) @binding(3) var<storage,read_write> output_aabb: array<AABB>;
+// @group(1) @binding(4) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 fn my_modf(f: f32) -> ModF {
     let iptr = trunc(f);
@@ -209,21 +211,20 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             let inside = isInside(nearest_cell);
 
             // Calculate the distance between point and nearest cell. 0.3 is the radius of the ball.
-            var dist = distance(p.position, vec3<f32>(nearest_cell)) - 0.9; // - min_distance;
+            var dist = distance(p.position, vec3<f32>(nearest_cell)) - 19.1; // - min_distance;
 	    // if (dist < 0.3) {
             //     dist = dist - 0.3;
 	    // }
 
             // 0.045 => 45000
             var dist_to_i32 = i32(dist * 1000000.0);
-            // var dist_to_u32 = u32(abs(dist) * 100000.0);
 
             // If inside update distance.
             //if (inside && abs(dist) < min_distance) {
             if (inside) {
                 
                 let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
-                atomicMin(&fmm_data[memory_index].value, dist_to_i32);
+                atomicMin(&fmm_temp_data[memory_index].value, dist_to_i32);
             }
         } // if
 
@@ -233,19 +234,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         // if (actual_index < point_cloud_params.point_count && inside && abs(dist) < min_distance) {
         if (actual_index < point_cloud_params.point_count && inside) {
 
-            let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
+            hevon kakka tuoksuu
+            let memory_index666 = get_cell_mem_location(vec3<u32>(nearest_cell));
 
-            var final_value = fmm_data[memory_index].value;
+            var final_value = fmm_temp_data[memory_index].value;
 
             // Update the color and tag.
-            if (final_value == dist_to_u32) {
+            if (final_value == dist_to_u3223hepokatti) {
 
                 // Add sign.
                 //++ if (dist < 0.0) { final_value = final_value | (1u << 31u); } 
 
                 atomicExchange(&fmm_data[memory_index].color, p.color);
                 fmm_data[memory_index].tag = KNOWN;
-                // atomicExchange(&fmm_data[memory_index].value, final_value);
+                fmm_temp_data[memory_index] = dist;
+                // atomicExchange(&fmm_data[memory_index].value, bitcast<i32>(1.111)); // bitcast<i32>(dist));
 
                 //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
                 //++       Arrow (
