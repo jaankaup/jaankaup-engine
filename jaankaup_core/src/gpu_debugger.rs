@@ -158,6 +158,8 @@ impl GpuDebugger {
                 scale_factor: f32,
                 ) -> Self {
 
+        println!("max_number_of_vertices == {}", max_number_of_vertices);
+
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         let histogram_dispatch_counter = Histogram::init(&device, &vec![0; 1]);
@@ -187,6 +189,7 @@ impl GpuDebugger {
         ////                 BUFFERS                    ////
         ////////////////////////////////////////////////////
 
+        print!("Creating gpu debugger buffers    ");
         buffers.insert(
             "indirect_draw_buffer".to_string(),
                 buffer_from_data::<DrawIndirect>(
@@ -305,6 +308,8 @@ impl GpuDebugger {
             None)
         );
 
+        println!("OK");
+
         let render_object_vvvvnnnn =
                 RenderObject::init(
                     &device,
@@ -371,6 +376,7 @@ impl GpuDebugger {
                                          ]
                                      ]
         );
+        println!("hihhulihei");
 
         ////////////////////////////////////////////////////
         ////                 Compute char               ////
@@ -404,6 +410,7 @@ impl GpuDebugger {
                     &"main".to_string(),
                     None
         );
+        println!("hihhulihei a");
 
         let compute_bind_groups_char = create_bind_groups(
                                       &device,
@@ -418,6 +425,8 @@ impl GpuDebugger {
                                           ]
                                       ]
         );
+
+        println!("hihhulihei2");
 
         ////////////////////////////////////////////////////
         ////                 Char preprocessor          ////
@@ -471,6 +480,8 @@ impl GpuDebugger {
                     ]
         );
 
+        println!("hihhulihei3");
+
         ////////////////////////////////////////////////////
         ////               Compute arrow/aabb           ////
         ////////////////////////////////////////////////////
@@ -507,6 +518,7 @@ impl GpuDebugger {
                     None
         );
 
+
         let compute_bind_groups_arrow = create_bind_groups(
                                       &device,
                                       &compute_object_arrow.bind_group_layout_entries,
@@ -521,6 +533,8 @@ impl GpuDebugger {
                                           ]
                                       ]
         );
+
+        println!("hihhulihei4");
 
         Self {
             render_object_vvvvnnnn: render_object_vvvvnnnn,

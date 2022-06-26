@@ -255,18 +255,20 @@ impl FastMarchingMethod {
         let number_of_fmm_blocks: usize = (global_dimension[0] * global_dimension[1] * global_dimension[2]).try_into().unwrap();
         let number_of_fmm_cells: usize = (number_of_fmm_blocks as u32 * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap();
 
-        let mut fmm_data = vec![FmmCellPc { tag: 0, value: 100000.0, color: encode_rgba_u32(155, 155, 155, 255), } ; number_of_fmm_cells + 1];
+        let mut fmm_data = vec![FmmCellPc { tag: 0, value: 100000.0, color: encode_rgba_u32(0, 0, 0, 255), } ; number_of_fmm_cells + 1];
 
         // The outside value.
-        fmm_data[number_of_fmm_cells] = FmmCellPc { tag: 4, value: 100000.0, color: 0, };
+        fmm_data[number_of_fmm_cells] = FmmCellPc { tag: 4, value: 100000.0, color: encode_rgba_u32(0, 0, 0, 255), };
                                                 
         // Fast marching method cell data.
+        print!("Creating fmm_data buffer.  ");
         let fmm_data = buffer_from_data::<FmmCellPc>(
                 &device,
                 &fmm_data,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
         );
+        println!("OK");
 
         // Fast marching method cell data.
         let mut fmm_blocks_vec: Vec<FmmBlock> = Vec::with_capacity(number_of_fmm_blocks);
@@ -285,6 +287,7 @@ impl FastMarchingMethod {
                 None
         );
 
+        print!("Creating temporary fmm data buffer.  ");
         // Create temp data buffer.
         let temporary_fmm_data = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Fmm temporary data buffer"),
@@ -292,7 +295,10 @@ impl FastMarchingMethod {
             usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        println!("OK");
 
+
+        print!("Creating prefix_temp_array.  ");
         // Prefix temp array.
         let prefix_temp_array = buffer_from_data::<u32>(
                 &device,
@@ -300,6 +306,7 @@ impl FastMarchingMethod {
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
         );
+        println!("OK");
 
         // Prefix sum params.
         let fmm_prefix_params = buffer_from_data::<FmmPrefixParams>(
@@ -668,7 +675,10 @@ impl FastMarchingMethod {
         }
 
         //for _ in 0..416 {
-        for _ in 0..417 {
+        //for _ in 0..417 {
+        //for _ in 0..670 {
+        //for _ in 0..730 {
+        for _ in 0..1300 {
         // else {
                 // let mut pass = encoder.begin_compute_pass(
                 //     &wgpu::ComputePassDescriptor { label: Some("Fmm compute pass.")}
@@ -747,7 +757,6 @@ impl FastMarchingMethod {
         // println!("{:?}", self.fmm_state);
         // self.next_fmm_state();
         gpu_timer.resolve_timestamps(encoder);
-
     }
 
     pub fn next_fmm_state(&mut self) {

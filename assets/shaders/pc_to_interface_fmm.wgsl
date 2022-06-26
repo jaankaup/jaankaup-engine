@@ -208,7 +208,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             let inside = isInside(nearest_cell);
 
             // Calculate the distance between point and nearest cell. 0.1 is the radius of the ball.
-            let dist = distance(p.position, vec3<f32>(nearest_cell)) - 0.1; // - min_distance;
+            let dist = distance(p.position, vec3<f32>(nearest_cell)) - 0.5; // - min_distance;
 
             // 0.045 => 45000
             var dist_to_i32 = i32(dist * 1000000.0);

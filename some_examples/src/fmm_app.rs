@@ -66,15 +66,15 @@ const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
 #[allow(dead_code)]
-const TOTAL_INDICES: usize = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
+const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
 /// Mc global dimensions. 
-const FMM_GLOBAL_X: usize = 32; 
-const FMM_GLOBAL_Y: usize = 8; 
-const FMM_GLOBAL_Z: usize = 32; 
+const FMM_GLOBAL_X: usize = 68; 
+const FMM_GLOBAL_Y: usize = 14; 
+const FMM_GLOBAL_Z: usize = 68; 
 
 /// Mc inner dimensions.
 const FMM_INNER_X: usize = 4; 
@@ -118,6 +118,11 @@ impl WGPUFeatures for FmmAppFeatures {
         limits.max_compute_workgroup_size_x = 1024;
         limits.max_storage_buffers_per_shader_stage = 10;
         limits.max_push_constant_size = 4;
+        limits.max_push_constant_size = 4;
+        // limits.max_compute_workgroup_size_x = 65536 * 2;
+        //limits.max_storage_buffer_binding_size = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z *
+        //                                         FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z * size_of::<FmmCellPc>()) as u32;
+        println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
         limits
     }
 }
@@ -187,11 +192,15 @@ impl Application for FmmApp {
              update: false,
         };
 
+        print!("Creating Gpu debugger   ");
         // Gpu debugger.
         let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
+        println!("OK");
 
+        print!("Creating Gpu timer   ");
         // Gpu timer.
         let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer")).unwrap();
+        println!("OK");
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
         let keyboard_manager = create_keyboard_manager();
@@ -270,6 +279,7 @@ impl Application for FmmApp {
         // Generate the point cloud.
         let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
 
+        print!("Creating pc buffer.");
         // Store point data.
         let _pc_sample_data =
             buffers.insert(
@@ -285,6 +295,7 @@ impl Application for FmmApp {
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None)
             );
+        println!("OK");
 
         let pc_max_coord = point_cloud.get_max_coord();
 
@@ -441,13 +452,13 @@ impl Application for FmmApp {
         // }
         //
         let sphere_tracer_renderer = TwoTriangles::init(
-                &configuration.device, &configuration.sc_desc, [256,256]);
+                &configuration.device, &configuration.sc_desc, [1024,1536]);
 
 
         let sphere_tracer = SphereTracer::init(
                 &configuration.device,
                 [8, 8],
-                [32, 32],
+                [128, 192],
                 fmm.get_fmm_params_buffer(),
                 fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),
@@ -491,6 +502,8 @@ impl Application for FmmApp {
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
               spawner: &Spawner) {
+
+        println!("render");
 
         self.screen.acquire_screen_texture(
             &device,
