@@ -311,9 +311,11 @@ fn visualize_cell(position: vec3<f32>, color: u32) {
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
+        // @builtin(workgroup_id) workgroup_id: vec3<u32>,
+        // @builtin(num_workgroups) num_workgroups: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-    let color = bitcast<f32>(rgba_u32(222u, 0u, 150u, 255u));
+    // let color = bitcast<f32>(rgba_u32(222u, 0u, 150u, 255u));
 
     let cell = fmm_data[global_id.x];
 

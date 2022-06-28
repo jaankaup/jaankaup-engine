@@ -430,32 +430,33 @@ fn load_trilinear_neighbors(coord: vec3<u32>) -> array<u32, 8> {
 fn fmm_color(p: vec3<f32>) -> u32 {
 
    let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
-   let temp = decode_color(cell_value.color); 
-   return vec4_to_rgba(temp);
-   // var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
+   //++ let temp = decode_color(cell_value.color); 
+   //++ return vec4_to_rgba(temp);
 
-   // var c000 = decode_color(fmm_data[memory_locations[0]].color);
-   // var c100 = decode_color(fmm_data[memory_locations[1]].color);
-   // var c010 = decode_color(fmm_data[memory_locations[2]].color);
-   // var c110 = decode_color(fmm_data[memory_locations[3]].color);
-   // var c001 = decode_color(fmm_data[memory_locations[4]].color);
-   // var c101 = decode_color(fmm_data[memory_locations[5]].color);
-   // var c011 = decode_color(fmm_data[memory_locations[6]].color);
-   // var c111 = decode_color(fmm_data[memory_locations[7]].color);
+   var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
 
-   // let tx = fract(p.x);
-   // let ty = fract(p.y);
-   // let tz = fract(p.z);
+   var c000 = decode_color(fmm_data[memory_locations[0]].color);
+   var c100 = decode_color(fmm_data[memory_locations[1]].color);
+   var c010 = decode_color(fmm_data[memory_locations[2]].color);
+   var c110 = decode_color(fmm_data[memory_locations[3]].color);
+   var c001 = decode_color(fmm_data[memory_locations[4]].color);
+   var c101 = decode_color(fmm_data[memory_locations[5]].color);
+   var c011 = decode_color(fmm_data[memory_locations[6]].color);
+   var c111 = decode_color(fmm_data[memory_locations[7]].color);
 
-   // let color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-   //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-   //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-   //        tx * ty * (1.0 - tz) * c110 + 
-   //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-   //        tx * (1.0 - ty) * tz * c101 + 
-   //        (1.0 - tx) * ty * tz * c011 + 
-   //        tx * ty * tz * c111;
-   // return vec4_to_rgba(color);
+   let tx = fract(p.x);
+   let ty = fract(p.y);
+   let tz = fract(p.z);
+
+   let color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+          tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+          (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+          tx * ty * (1.0 - tz) * c110 + 
+          (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+          tx * (1.0 - ty) * tz * c101 + 
+          (1.0 - tx) * ty * tz * c011 + 
+          tx * ty * tz * c111;
+   return vec4_to_rgba(color);
 }
 
 

@@ -299,7 +299,7 @@ impl Application for Fmm {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_debug_visualizator.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
@@ -340,7 +340,7 @@ impl Application for Fmm {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v3c1.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
@@ -557,7 +557,7 @@ impl Application for Fmm {
         let compute_object_fmm =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fmm.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm.wgsl"))),
@@ -616,7 +616,7 @@ impl Application for Fmm {
         let compute_object_fmm_triangle =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("triangle_mest_to_interface.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/triangle_mesh_to_interface.wgsl"))),
@@ -684,7 +684,7 @@ impl Application for Fmm {
         let compute_object_fmm_prefix_scan =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("prefix_scan.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/prefix_scan.wgsl"))),
@@ -753,7 +753,7 @@ impl Application for Fmm {
         let compute_object_reduce =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("initial_fmm_block_generator.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/initial_fmm_block_generator.wgsl"))),
@@ -814,7 +814,7 @@ impl Application for Fmm {
         let compute_object_fmm_visualizer =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fmm_data_visualizer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_data_visualizer.wgsl"))),
@@ -883,7 +883,7 @@ impl Application for Fmm {
         let compute_object_initial_band_points =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("initial_band_points.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/initial_band_points.wgsl"))),
@@ -957,7 +957,7 @@ impl Application for Fmm {
         let compute_object_calculate_all_band_values =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("initial_band_points.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/initial_band_points.wgsl"))),
@@ -1231,7 +1231,7 @@ impl Application for Fmm {
             bytemuck::cast_slice(&[self.fmm_visualization_params])
         );
 
-        self.fmm_prefix_params.stage = 1;
+        //self.fmm_prefix_params.stage = 1;
 
         queue.write_buffer(
             &self.buffers.get(&"fmm_prefix_params".to_string()).unwrap(),
@@ -1280,7 +1280,7 @@ impl Application for Fmm {
 
         queue.submit(Some(encoder_command.finish()));
 
-        self.fmm_prefix_params.stage = 2;
+        //self.fmm_prefix_params.stage = 2;
 
 
         queue.write_buffer(

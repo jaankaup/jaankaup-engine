@@ -233,7 +233,7 @@ impl Application for McTerrain {
             })
         );
 
-        let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let mc_shader = &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("mc compute shader"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),

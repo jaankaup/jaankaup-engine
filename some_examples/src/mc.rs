@@ -227,7 +227,7 @@ impl Application for McApp {
                 0.0,
         );
 
-        let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let mc_shader = &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("mc compute shader"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/mc_with_3d_texture.wgsl"))),
@@ -250,7 +250,7 @@ impl Application for McApp {
         //++ let noise_compute_object =
         //++         ComputeObject::init(
         //++             &configuration.device,
-        //++             &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        //++             &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
         //++                 label: Some("noise compute object"),
         //++                 source: wgpu::ShaderSource::Wgsl(
         //++                     Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),

@@ -241,7 +241,7 @@ impl RenderObject {
             fragment: Some(wgpu::FragmentState {
                 module: &wgsl_module,
                 entry_point: "fs_main",
-                targets: &[wgpu::ColorTargetState {
+                targets: &[Some(wgpu::ColorTargetState {
                     format: sc_desc.format,
                     blend: None, //Some(wgpu::BlendState {
                            //     color: wgpu::BlendComponent {
@@ -258,7 +258,7 @@ impl RenderObject {
                     // alpha_blend: wgpu::BlendState::REPLACE,
                     // color_blend: wgpu::BlendState::REPLACE,
                     write_mask: wgpu::ColorWrites::COLOR,
-                }],
+                })],
             }),
             multiview: None,
         });
@@ -405,7 +405,7 @@ fn create_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder,
             &wgpu::RenderPassDescriptor {
                 label: Some("Render pass descriptor"),
                 color_attachments: &[
-                    wgpu::RenderPassColorAttachment {
+                    Some(wgpu::RenderPassColorAttachment {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
@@ -424,7 +424,7 @@ fn create_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder,
                                 },
                                 store: true,
                             },
-                    }
+                    })
                 ],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &depth_texture.view,

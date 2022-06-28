@@ -15,7 +15,7 @@ use jaankaup_core::template::{
         Spawner,
 };
 use jaankaup_core::common_functions::{
-    // udiv_up_safe32,
+    udiv_up_safe32,
     create_buffer_bindgroup_layout,
     create_uniform_bindgroup_layout,
     set_bit_to,
@@ -72,9 +72,9 @@ const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
 /// Mc global dimensions. 
-const FMM_GLOBAL_X: usize = 68; 
+const FMM_GLOBAL_X: usize = 72; 
 const FMM_GLOBAL_Y: usize = 14; 
-const FMM_GLOBAL_Z: usize = 68; 
+const FMM_GLOBAL_Z: usize = 72; 
 
 /// Mc inner dimensions.
 const FMM_INNER_X: usize = 4; 
@@ -108,7 +108,8 @@ impl WGPUFeatures for FmmAppFeatures {
     }
 
     fn required_features() -> wgpu::Features {
-        wgpu::Features::PUSH_CONSTANTS
+        wgpu::Features::PUSH_CONSTANTS |
+        wgpu::Features::WRITE_TIMESTAMP_INSIDE_PASSES
         // wgpu::Features::empty()
     }
 
@@ -174,8 +175,8 @@ impl Application for FmmApp {
         camera.set_movement_sensitivity(0.1);
 
         let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (60.0, 60.0, 60.0), -89.0, 0.0);
-        ray_camera.set_rotation_sensitivity(0.3);
-        ray_camera.set_movement_sensitivity(0.05);
+        ray_camera.set_rotation_sensitivity(0.4);
+        ray_camera.set_movement_sensitivity(0.15);
 
         let camera_mode = CameraMode::Camera;
 
@@ -240,7 +241,7 @@ impl Application for FmmApp {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v3c1_x4.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1_x4.wgsl"))),
@@ -278,24 +279,6 @@ impl Application for FmmApp {
 
         // Generate the point cloud.
         let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
-
-        print!("Creating pc buffer.");
-        // Store point data.
-        let _pc_sample_data =
-            buffers.insert(
-                "pc_sample_data".to_string(),
-                buffer_from_data::<FmmCellPc>(
-                &configuration.device,
-                &vec![FmmCellPc {
-                    tag: 0,
-                    value: 100000.0,
-                    color: 0,
-                    // padding: 0,
-                } ; total_cell_count],
-                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                None)
-            );
-        println!("OK");
 
         let pc_max_coord = point_cloud.get_max_coord();
 
@@ -348,7 +331,7 @@ impl Application for FmmApp {
         let compute_object_fmm_visualizer =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fmm_data_visualizer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_data_visualizer.wgsl"))),
@@ -452,17 +435,20 @@ impl Application for FmmApp {
         // }
         //
         let sphere_tracer_renderer = TwoTriangles::init(
-                &configuration.device, &configuration.sc_desc, [1024,1536]);
+                &configuration.device, &configuration.sc_desc, [1024,1024]);
+                //&configuration.device, &configuration.sc_desc, [1024,1024]);
+                //&configuration.device, &configuration.sc_desc, [1024,1536]);
 
 
         let sphere_tracer = SphereTracer::init(
                 &configuration.device,
                 [8, 8],
-                [128, 192],
+                [128, 128],
+                //[128, 192],
                 fmm.get_fmm_params_buffer(),
                 fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),
-                &Some(&gpu_debugger),
+                &Some(&gpu_debugger)
         );
 
         Self {
@@ -726,12 +712,20 @@ impl Application for FmmApp {
             //drop(pass);
         }
 
+        let total_block_count = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32;
+        let disp_y = udiv_up_safe32(total_block_count.try_into().unwrap(), 65535);  
+        let disp_x = total_block_count / disp_y; 
+
+        println!("total_block_count == {}", total_block_count);
+        println!("disp_x == {}, disp_y == {}", disp_x, disp_y);
+
         // Cell visualizer.
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(
                 &self.compute_bind_groups_fmm_visualizer,
                 &mut encoder,
-                (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+                // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+                disp_x, disp_y, 1,
                 Some("fmm visualizer dispatch")
             );
             self.app_render_params.update = false;

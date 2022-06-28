@@ -217,7 +217,7 @@ impl DomainTester {
                 domain_iterator: [u32 ; 3]
                 ) -> Self {
 
-        let shader = &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let shader = &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                       label: Some("domain_tester.wgsl"),
                       source: wgpu::ShaderSource::Wgsl(
                           Cow::Borrowed(include_str!("../../assets/shaders/domain_test.wgsl"))),
@@ -426,6 +426,8 @@ impl PointCloud {
 
         let (point_count, aabb_min, aabb_max, buffer) = load_pc_data(device, file_location);
 
+        println!("POINT COUNT = {}", point_count);
+
         Self {
             point_cloud_buffer: buffer,
             point_count: point_count,
@@ -486,7 +488,7 @@ impl PointCloudHandler {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("point_cloud_to_interface.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/point_cloud_to_interface.wgsl"))),
@@ -608,7 +610,7 @@ impl FmmValueFixer {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fmm_value_fixer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_value_fixer.wgsl"))),
@@ -676,7 +678,7 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fmm_value_fixer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/fast_marching_method.wgsl"))),

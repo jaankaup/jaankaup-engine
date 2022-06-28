@@ -183,7 +183,7 @@ impl Application for DebugVisualizator {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_debug_visualizator_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
@@ -224,7 +224,7 @@ impl Application for DebugVisualizator {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4c1.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
@@ -300,7 +300,7 @@ impl Application for DebugVisualizator {
         let compute_object =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("font_visualizer_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/font_visualizer.wgsl"))),
@@ -351,7 +351,7 @@ impl Application for DebugVisualizator {
         let compute_object_arrow =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("compute_visualizer_wgsl array"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/visualizer.wgsl"))),
@@ -453,7 +453,7 @@ impl Application for DebugVisualizator {
             // Submit compute.
             queue.submit(Some(encoder_command.finish()));
 
-            let counter = self.histogram.get_values(device, queue, spawner);
+            let counter = self.histogram.get_values(device, queue);
             self.draw_count_points = counter[0];
             
             let mut encoder_command = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Visualiztion (AABB)") });
@@ -466,7 +466,7 @@ impl Application for DebugVisualizator {
 
             queue.submit(Some(encoder_command.finish()));
 
-            let counter2 = self.histogram.get_values(device, queue, spawner);
+            let counter2 = self.histogram.get_values(device, queue);
             self.draw_count_triangles = counter2[0];
 
             //println!("self.draw_count  == {}", self.draw_count); 

@@ -27,7 +27,7 @@ impl RenderVvvvnnnnCamera {
             render_object: RenderObject::init(
                                &device,
                                &sc_desc,
-                               &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                               &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                                    label: Some("renderer_v4n4_debug_visualizator.wgsl"),
                                    source: wgpu::ShaderSource::Wgsl(
                                        Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
@@ -85,7 +85,7 @@ impl RenderVvvvnnnnCameraTextures2 {
             render_object: RenderObject::init(
                                &device,
                                &sc_desc,
-                               &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                               &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                                    label: Some("renderer_v4n4_tex.wgsl"),
                                    source: wgpu::ShaderSource::Wgsl(
                                        Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_tex.wgsl"))),
@@ -306,7 +306,7 @@ impl NoiseMaker {
 
         let compute_obj = ComputeObject::init(
                     &device,
-                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("noise compute object"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/noise_to_buffer.wgsl"))),

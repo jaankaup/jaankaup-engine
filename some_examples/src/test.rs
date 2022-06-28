@@ -220,7 +220,7 @@ impl Application for TestProject {
                 &configuration.device,
                 &vec![FmmCellPc {
                     tag: 0,
-                    value: 10000000,
+                    value: 10000000.0,
                     color: 0,
                     // padding: 0,
                 } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
@@ -311,7 +311,7 @@ impl Application for TestProject {
         let compute_object_fmm_visualizer =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fmm_data_visualizer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_data_visualizer.wgsl"))),
@@ -397,7 +397,7 @@ impl Application for TestProject {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v3c1_x4.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1_x4.wgsl"))),
@@ -457,7 +457,7 @@ impl Application for TestProject {
              })
          );
 
-         let mc_shader = &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+         let mc_shader = &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                          label: Some("mc compute shader"),
                          source: wgpu::ShaderSource::Wgsl(
                              Cow::Borrowed(include_str!("../../assets/shaders/mc_pc_data.wgsl"))),

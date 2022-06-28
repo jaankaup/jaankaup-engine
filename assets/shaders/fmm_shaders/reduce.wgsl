@@ -147,6 +147,7 @@ fn reduce(local_index: u32) {
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
+        @builtin(num_workgroups) num_workgroups: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
         // // Initialize shader_counter;
@@ -155,9 +156,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         let block_count = fmm_counter[1];
 
-        if (workgroup_id.x < block_count) {
+        //if (workgroup_id.x < block_count) {
+	let actual_index = workgroup_id.x + workgroup_id.y * 17150u; // num_workgroups.x
+        if (actual_index < block_count) {
 
-	    let b = temp_data[workgroup_id.x];
+	    let b = temp_data[actual_index]; // num_workgroups.x)];
+	    // let b = temp_data[workgroup_id.x];
 
             // Load cell to workgroup memory.
             //let cell_index = (b.index << 6u) + local_index;
@@ -165,7 +169,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	    var cell = fmm_data[cell_index];
             wg_cells[local_index] = TempData(cell_index, cell.tag, cell.value);
 
-            workgroupBarrier(); // This is safe because all threads, or none of thems, comes here.
+            workgroupBarrier(); // This is safe because all threads, or none of them, comes here.
 
             reduce(local_index);
 
@@ -179,7 +183,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 		// Add new found known point to 
                 let known_index = atomicAdd(&fmm_counter[KNOWN], 1u); // TODO: remove.
-                temp_prefix_sum[workgroup_id.x] = wg_cells[0].index;
+                // temp_prefix_sum[workgroup_id.x] = wg_cells[0].index;
+                temp_prefix_sum[actual_index] = wg_cells[0].index;
             }
 	}
 
