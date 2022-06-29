@@ -491,8 +491,6 @@ impl Application for FmmApp {
               sc_desc: &wgpu::SurfaceConfiguration,
               spawner: &Spawner) {
 
-        println!("render");
-
         self.screen.acquire_screen_texture(
             &device,
             &sc_desc,
@@ -718,8 +716,8 @@ impl Application for FmmApp {
         let disp_y = udiv_up_safe32(total_block_count.try_into().unwrap(), 65535);  
         let disp_x = total_block_count / disp_y; 
 
-        println!("total_block_count == {}", total_block_count);
-        println!("disp_x == {}, disp_y == {}", disp_x, disp_y);
+        // println!("total_block_count == {}", total_block_count);
+        // println!("disp_x == {}, disp_y == {}", disp_x, disp_y);
 
         // Cell visualizer.
         if self.app_render_params.visualization_method != 0 {

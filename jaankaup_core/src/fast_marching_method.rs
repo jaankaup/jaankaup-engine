@@ -70,19 +70,6 @@ const MAX_NUMBER_OF_CHARS:      usize = FMM_CELL_COUNT;
 #[allow(dead_code)]
 const MAX_NUMBER_OF_VVVVNNNN: usize =  2000000;
 
-// 
-// Temp prefix sum array.
-//   
-// 
-//
-//
-
-
-// TODO list:
-//
-// * initial wave front
-// *  
-
 /// Struct for parallel fast marching method. 
 pub struct FastMarchingMethod {
 
@@ -822,89 +809,6 @@ impl FastMarchingMethod {
         self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]
     }
 
-
-    /// Collect all known cells to temp_data array. The known cell count is saved to fmm_histogram[0].
-    // pub fn switch_pipeline1<'a>(&'a self, pass: &'a mut wgpu::ComputePass<'a>) {
-    pub fn collect_known_cells<'a>(&'a self, pass: &'a mut wgpu::ComputePass<'a>) {
-
-        let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count(), 1024);
-        pass.set_pipeline(&self.count_cells.pipeline);
-        pass.set_push_constants(0, bytemuck::cast_slice(&[2]));
-        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
-        //pass.dispatch_workgroups(udiv_up_safe32(self.calculate_cell_count(), 1024), 1, 1);
-    }
-
-    /// Collect all band cells to temp_data array. The known cell count is saved to fmm_histogram[0].
-    pub fn collect_band_cells(&self, pass: &mut wgpu::ComputePass) {
-
-        pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
-        pass.dispatch_workgroups(1, 1, 1);
-    }
-
-    /// Fmm for all selected band cells.
-    pub fn fmm(&self, pass: &mut wgpu::ComputePass) {
-        pass.set_push_constants(0, bytemuck::cast_slice(&[5]));
-        pass.dispatch_workgroups(udiv_up_safe32(self.calculate_cell_count(), 1024), 1, 1);
-    }
-
-    pub fn filter_active_blocks(&self, pass: &mut wgpu::ComputePass) {
-                
-        let number_of_dispatches = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);
-
-        pass.set_push_constants(0, bytemuck::cast_slice(&[0]));
-        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
-
-        pass.set_push_constants(0, bytemuck::cast_slice(&[1]));
-        pass.dispatch_workgroups(1, 1, 1);
-    }
-
-    /// Update all band point counts from global computational domain. 
-    pub fn update_band_point_counts(&self, pass: &mut wgpu::ComputePass) {
-
-        let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count() , 64);
-
-        pass.set_push_constants(0, bytemuck::cast_slice(&[6]));
-        pass.dispatch_workgroups(number_of_dispatches, 1, 1);
-    }
-
-    /// Gather the indexes from knwon points to fmm_temp array. 
-    pub fn gather_all_known_points(&self, pass: &mut wgpu::ComputePass) {
-        pass.set_push_constants(0, bytemuck::cast_slice(&[2]));
-        pass.dispatch_workgroups(1, 1, 1);
-    }
-
-    /// 
-    pub fn create_initial_band(&self, pass: &mut wgpu::ComputePass) {
-
-        pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
-        pass.dispatch_workgroups(1, 1, 1);
-    }
-
-    pub fn visualize_active_blocs(&self, pass: &mut wgpu::ComputePass) {
-
-        pass.set_push_constants(0, bytemuck::cast_slice(&[15]));
-        pass.dispatch_workgroups(1, 1, 1);
-    }
-
-    pub fn get_pipeline1(&self) -> &wgpu::ComputePipeline {
-        &self.pc_to_interface_compute_object.pipeline
-    }
-
-    pub fn get_pipeline2(&self) -> &wgpu::ComputePipeline {
-        &self.compute_object.pipeline
-    }
-
-    // 
-    #[allow(dead_code)]
-    pub fn update_neighbors(&self) {
-
-    }
-
-    #[allow(dead_code)]
-    pub fn expand_interface(&self) {
-
-    }
-
     pub fn get_fmm_data_buffer(&self) -> &wgpu::Buffer {
         &self.fmm_data
     }
@@ -1450,28 +1354,3 @@ impl FastMarchingMethod {
         compute_object
     }
 }
-
-    // /// From each active fmm block, find smallest band point and change the tag to known. 
-    // /// Add the known cells to update list.
-    // pub fn poll_band(&self) {
-
-    // }
-
-    // fn create_buffers(device: &wgpu::Device, buffers: &HashMap<String, wgpu::Buffer>) {
-
-    //     // let pc_sample_data = 
-    //     //     buffers.insert(
-    //     //         "pc_sample_data".to_string(),
-    //     //         buffer_from_data::<FmmCellPc>(
-    //     //         &configuration.device,
-    //     //         &vec![FmmCellPc {
-    //     //             tag: 0,
-    //     //             value: 10000000,
-    //     //             color: 0,
-    //     //             // padding: 0,
-    //     //         } ; FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z],
-    //     //         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-    //     //         None)
-    //     //     );
-    // }
-

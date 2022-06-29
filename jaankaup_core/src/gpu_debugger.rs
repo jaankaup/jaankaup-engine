@@ -376,7 +376,6 @@ impl GpuDebugger {
                                          ]
                                      ]
         );
-        println!("hihhulihei");
 
         ////////////////////////////////////////////////////
         ////                 Compute char               ////
@@ -410,7 +409,6 @@ impl GpuDebugger {
                     &"main".to_string(),
                     None
         );
-        println!("hihhulihei a");
 
         let compute_bind_groups_char = create_bind_groups(
                                       &device,
@@ -425,8 +423,6 @@ impl GpuDebugger {
                                           ]
                                       ]
         );
-
-        println!("hihhulihei2");
 
         ////////////////////////////////////////////////////
         ////                 Char preprocessor          ////
@@ -480,8 +476,6 @@ impl GpuDebugger {
                     ]
         );
 
-        println!("hihhulihei3");
-
         ////////////////////////////////////////////////////
         ////               Compute arrow/aabb           ////
         ////////////////////////////////////////////////////
@@ -533,8 +527,6 @@ impl GpuDebugger {
                                           ]
                                       ]
         );
-
-        println!("hihhulihei4");
 
         Self {
             render_object_vvvvnnnn: render_object_vvvvnnnn,

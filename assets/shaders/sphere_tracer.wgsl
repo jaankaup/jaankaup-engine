@@ -230,37 +230,6 @@ fn get_cell_mem_location(v: vec3<u32>) -> u32 {
     return global_index + local_index;
 }
 
-// fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
-// 
-//     var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
-//         vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
-//         vec3<i32>(coord) + vec3<i32>(1,   0,  0),
-//         vec3<i32>(coord) + vec3<i32>(0,   1,  0),
-//         vec3<i32>(coord) + vec3<i32>(0,  -1,  0),
-//         vec3<i32>(coord) + vec3<i32>(0,   0,  1),
-//         vec3<i32>(coord) + vec3<i32>(0,   0, -1)
-//     );
-// 
-//     let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
-//     let i1 = get_cell_mem_location(vec3<u32>(neighbors[1]));
-//     let i2 = get_cell_mem_location(vec3<u32>(neighbors[2]));
-//     let i3 = get_cell_mem_location(vec3<u32>(neighbors[3]));
-//     let i4 = get_cell_mem_location(vec3<u32>(neighbors[4]));
-//     let i5 = get_cell_mem_location(vec3<u32>(neighbors[5]));
-// 
-//     // The index of the "outside" cell.
-//     let tcc = total_cell_count();
-// 
-//     return array<u32, 6>(
-//         select(tcc ,i0, isInside(neighbors[0])),
-//         select(tcc ,i1, isInside(neighbors[1])),
-//         select(tcc ,i2, isInside(neighbors[2])),
-//         select(tcc ,i3, isInside(neighbors[3])),
-//         select(tcc ,i4, isInside(neighbors[4])),
-//         select(tcc ,i5, isInside(neighbors[5])) 
-//     );
-// }
-
 /// Get cell index based on domain dimension.
 fn get_cell_index(global_index: u32) -> vec3<u32> {
 
@@ -314,35 +283,12 @@ fn index_to_screen(index: u32, dim_x: u32, dim_y: u32, global_dim_x:u32) -> vec2
         // [gx, gy]
 }
 
-// fn screen_to_index(v: vec2<u32>) -> u32 {
-// 
-//     let stride = sphere_tracer_params.inner_dim.x * sphere_tracer_params.inner_dim.y;
-//     let global_coordinate = v / sphere_tracer_params.inner_dim;
-//     let global_index = (global_coordinate.x + global_coordinate.y * sphere_tracer_params.outer_dim.x) * stride;
-//     let local_coordinate = v - global_coordinate * sphere_tracer_params.inner_dim;
-//     let local_index = local_coordinate.x + local_coordinate.y * sphere_tracer_params.inner_dim.x;
-//     return global_index + local_index;
-// }
-
 fn screen_to_index(v: vec2<u32>) -> u32 {
     let stride = sphere_tracer_params.inner_dim.x *
                  sphere_tracer_params.outer_dim.x;
     let index = v.x + v.y * stride;
     return index;
 }
-
-// // Box (exact).
-// fn sdBox(p: vec3<f32>, b: vec3<f32>) -> f32 {
-//   let q = abs(p) - b;
-//   return length(max(q,vec3<f32>(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
-//   //return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
-// }
-// 
-// 
-// fn sdSphere(p: vec3<f32>, s: f32) -> f32
-// {
-//   return length(p)-s;
-// }
 
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
@@ -432,12 +378,6 @@ fn load_trilinear_neighbors(coord: vec3<u32>) -> array<u32, 8> {
 
 fn fmm_color(p: vec3<f32>) -> u32 {
 
-   //let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
-   //++ let temp = decode_color(cell_value.color); 
-   //++ return vec4_to_rgba(temp);
-
-   // var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
-
    var c000 = decode_color(private_neighbors[0].color);
    var c100 = decode_color(private_neighbors[1].color);
    var c010 = decode_color(private_neighbors[2].color);
@@ -504,60 +444,6 @@ fn load_neighbors_private(p: vec3<u32>) {
 }
 
 fn fmm_value(p: vec3<f32>) -> f32 {
-
-   // let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
-   //let neighbors = load_neighbors_6(coord: vec3<u32>);
-
-   // var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
-
-        // vec3<i32>(coord) + vec3<i32>(0,  0,  0),
-        // vec3<i32>(coord) + vec3<i32>(1,  0,  0),
-        // vec3<i32>(coord) + vec3<i32>(0,  1,  0),
-        // vec3<i32>(coord) + vec3<i32>(1,  1,  0),
-        // vec3<i32>(coord) + vec3<i32>(0,  0,  1),
-        // vec3<i32>(coord) + vec3<i32>(1,  0,  1),
-        // vec3<i32>(coord) + vec3<i32>(0,  1,  1),
-        // vec3<i32>(coord) + vec3<i32>(1,  1,  1),
-   // 
-   //            n2                        n3
-   //          +------------------------+
-   //         /|                       /|
-   //        / |                      / |
-   //       /  |                     /  |
-   //      /   |                    /   |
-   //     /    |                   /    |
-   // n6 +------------------------+ n7  |
-   //    |     |                  |     |
-   //    |     |                  |     |
-   //    |     |                  |     |
-   //    |  n0 +------------------|-----+ n1
-   //    |    /                   |    /
-   //    |   /       P            |   /
-   //    |  /                     |  /
-   //    | /                      | /
-   //    |/                       |/
-   //    +------------------------+
-   //   n4                       n5
-   // 
-
-   // The point P should be inside the cube.
-   // var c000 = fmm_data[memory_locations[0]].value;
-   // var c100 = fmm_data[memory_locations[1]].value;
-   // var c010 = fmm_data[memory_locations[2]].value;
-   // var c110 = fmm_data[memory_locations[3]].value;
-   // var c001 = fmm_data[memory_locations[4]].value;
-   // var c101 = fmm_data[memory_locations[5]].value;
-   // var c011 = fmm_data[memory_locations[6]].value;
-   // var c111 = fmm_data[memory_locations[7]].value;
-
-   // var c001 = fmm_data[memory_locations[0]].value;
-   // var c101 = fmm_data[memory_locations[1]].value;
-   // var c011 = fmm_data[memory_locations[2]].value;
-   // var c111 = fmm_data[memory_locations[3]].value;
-   // var c000 = fmm_data[memory_locations[4]].value;
-   // var c100 = fmm_data[memory_locations[5]].value;
-   // var c010 = fmm_data[memory_locations[6]].value;
-   // var c110 = fmm_data[memory_locations[7]].value;
 
    load_neighbors_private(vec3<u32>(p));
 
