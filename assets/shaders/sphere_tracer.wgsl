@@ -92,8 +92,8 @@ struct SphereTracerParams {
 @group(0) @binding(1) var<uniform>            sphere_tracer_params: SphereTracerParams;
 @group(0) @binding(2) var<uniform>            camera: RayCamera;
 @group(0) @binding(3) var<storage,read_write> fmm_data: array<FmmCellPc>;
-@group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
-@group(0) @binding(5) var<storage,read_write> screen_output_color: array<u32>;
+// @group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
+@group(0) @binding(4) var<storage,read_write> screen_output_color: array<u32>;
 
 @group(1) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;
 @group(1) @binding(1) var<storage,read_write> output_char: array<Char>;
@@ -102,6 +102,9 @@ struct SphereTracerParams {
 @group(1) @binding(4) var<storage,read_write> output_aabb_wire: array<AABB>;
 // Push constants.
 // var<push_constant> pc: PushConstants;
+
+var<private> private_neighbors:     array<FmmCellPc, 8>;
+var<private> private_neighbors_loc: array<u32, 8>;
 
 fn total_cell_count() -> u32 {
 
@@ -227,36 +230,36 @@ fn get_cell_mem_location(v: vec3<u32>) -> u32 {
     return global_index + local_index;
 }
 
-fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
-
-    var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
-        vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
-        vec3<i32>(coord) + vec3<i32>(1,   0,  0),
-        vec3<i32>(coord) + vec3<i32>(0,   1,  0),
-        vec3<i32>(coord) + vec3<i32>(0,  -1,  0),
-        vec3<i32>(coord) + vec3<i32>(0,   0,  1),
-        vec3<i32>(coord) + vec3<i32>(0,   0, -1)
-    );
-
-    let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
-    let i1 = get_cell_mem_location(vec3<u32>(neighbors[1]));
-    let i2 = get_cell_mem_location(vec3<u32>(neighbors[2]));
-    let i3 = get_cell_mem_location(vec3<u32>(neighbors[3]));
-    let i4 = get_cell_mem_location(vec3<u32>(neighbors[4]));
-    let i5 = get_cell_mem_location(vec3<u32>(neighbors[5]));
-
-    // The index of the "outside" cell.
-    let tcc = total_cell_count();
-
-    return array<u32, 6>(
-        select(tcc ,i0, isInside(neighbors[0])),
-        select(tcc ,i1, isInside(neighbors[1])),
-        select(tcc ,i2, isInside(neighbors[2])),
-        select(tcc ,i3, isInside(neighbors[3])),
-        select(tcc ,i4, isInside(neighbors[4])),
-        select(tcc ,i5, isInside(neighbors[5])) 
-    );
-}
+// fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
+// 
+//     var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
+//         vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
+//         vec3<i32>(coord) + vec3<i32>(1,   0,  0),
+//         vec3<i32>(coord) + vec3<i32>(0,   1,  0),
+//         vec3<i32>(coord) + vec3<i32>(0,  -1,  0),
+//         vec3<i32>(coord) + vec3<i32>(0,   0,  1),
+//         vec3<i32>(coord) + vec3<i32>(0,   0, -1)
+//     );
+// 
+//     let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
+//     let i1 = get_cell_mem_location(vec3<u32>(neighbors[1]));
+//     let i2 = get_cell_mem_location(vec3<u32>(neighbors[2]));
+//     let i3 = get_cell_mem_location(vec3<u32>(neighbors[3]));
+//     let i4 = get_cell_mem_location(vec3<u32>(neighbors[4]));
+//     let i5 = get_cell_mem_location(vec3<u32>(neighbors[5]));
+// 
+//     // The index of the "outside" cell.
+//     let tcc = total_cell_count();
+// 
+//     return array<u32, 6>(
+//         select(tcc ,i0, isInside(neighbors[0])),
+//         select(tcc ,i1, isInside(neighbors[1])),
+//         select(tcc ,i2, isInside(neighbors[2])),
+//         select(tcc ,i3, isInside(neighbors[3])),
+//         select(tcc ,i4, isInside(neighbors[4])),
+//         select(tcc ,i5, isInside(neighbors[5])) 
+//     );
+// }
 
 /// Get cell index based on domain dimension.
 fn get_cell_index(global_index: u32) -> vec3<u32> {
@@ -328,18 +331,18 @@ fn screen_to_index(v: vec2<u32>) -> u32 {
     return index;
 }
 
-// Box (exact).
-fn sdBox(p: vec3<f32>, b: vec3<f32>) -> f32 {
-  let q = abs(p) - b;
-  return length(max(q,vec3<f32>(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
-  //return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
-}
-
-
-fn sdSphere(p: vec3<f32>, s: f32) -> f32
-{
-  return length(p)-s;
-}
+// // Box (exact).
+// fn sdBox(p: vec3<f32>, b: vec3<f32>) -> f32 {
+//   let q = abs(p) - b;
+//   return length(max(q,vec3<f32>(0.0))) + min(max(q.x,max(q.y,q.z)),0.0);
+//   //return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+// }
+// 
+// 
+// fn sdSphere(p: vec3<f32>, s: f32) -> f32
+// {
+//   return length(p)-s;
+// }
 
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
@@ -377,12 +380,12 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     
     (*payload).color = 
        rgba_u32_tex(
-           // min(u32(final_color.x * 255.0), 255u),
-           // min(u32(final_color.y * 255.0), 255u),
-           // min(u32(final_color.z * 255.0), 255u),
-           u32(final_color.x * 255.0),
-           u32(final_color.y * 255.0),
-           u32(final_color.z * 255.0),
+           min(u32(final_color.x * 255.0), 255u),
+           min(u32(final_color.y * 255.0), 255u),
+           min(u32(final_color.z * 255.0), 255u),
+           // u32(final_color.x * 255.0),
+           // u32(final_color.y * 255.0),
+           // u32(final_color.z * 255.0),
            255u
        );
 }
@@ -429,20 +432,21 @@ fn load_trilinear_neighbors(coord: vec3<u32>) -> array<u32, 8> {
 
 fn fmm_color(p: vec3<f32>) -> u32 {
 
-   let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
+   //let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
    //++ let temp = decode_color(cell_value.color); 
    //++ return vec4_to_rgba(temp);
 
-   var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
+   // var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
 
-   var c000 = decode_color(fmm_data[memory_locations[0]].color);
-   var c100 = decode_color(fmm_data[memory_locations[1]].color);
-   var c010 = decode_color(fmm_data[memory_locations[2]].color);
-   var c110 = decode_color(fmm_data[memory_locations[3]].color);
-   var c001 = decode_color(fmm_data[memory_locations[4]].color);
-   var c101 = decode_color(fmm_data[memory_locations[5]].color);
-   var c011 = decode_color(fmm_data[memory_locations[6]].color);
-   var c111 = decode_color(fmm_data[memory_locations[7]].color);
+   var c000 = decode_color(private_neighbors[0].color);
+   var c100 = decode_color(private_neighbors[1].color);
+   var c010 = decode_color(private_neighbors[2].color);
+   var c110 = decode_color(private_neighbors[3].color);
+   var c001 = decode_color(private_neighbors[4].color);
+   var c101 = decode_color(private_neighbors[5].color);
+   var c011 = decode_color(private_neighbors[6].color);
+   var c111 = decode_color(private_neighbors[7].color);
+
 
    var c000_factor = select(1.0, 0.0, c000.x == 0.0 && c000.y == 0.0 && c000.z == 0.0);
    var c100_factor = select(1.0, 0.0, c100.x == 0.0 && c100.y == 0.0 && c100.z == 0.0);
@@ -473,17 +477,38 @@ fn fmm_color(p: vec3<f32>) -> u32 {
           tx * (1.0 - ty) * tz * c101 * c101_factor + 
           (1.0 - tx) * ty * tz * c011 * c011_factor + 
           tx * ty * tz * c111 * c111_factor;
+   // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[0].color) * c000_factor + 
+   //        tx * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[1].color) * c100_factor + 
+   //        (1.0 - tx) * ty * (1.0 - tz) * decode_color(private_neighbors[2].color) * c010_factor + 
+   //        tx * ty * (1.0 - tz) * decode_color(private_neighbors[3].color) * c110_factor + 
+   //        (1.0 - tx) * (1.0 - ty) * tz * decode_color(private_neighbors[4].color) * c001_factor + 
+   //        tx * (1.0 - ty) * tz * decode_color(private_neighbors[5].color) * c101_factor + 
+   //        (1.0 - tx) * ty * tz * decode_color(private_neighbors[6].color) * c011_factor + 
+   //        tx * ty * tz * decode_color(private_neighbors[7].color) * c111_factor;
    color.w = 1.0;
    return vec4_to_rgba(color);
 }
 
+fn load_neighbors_private(p: vec3<u32>) {
+
+   private_neighbors_loc = load_trilinear_neighbors(p);
+
+   private_neighbors[0] = fmm_data[private_neighbors_loc[0]];
+   private_neighbors[1] = fmm_data[private_neighbors_loc[1]];
+   private_neighbors[2] = fmm_data[private_neighbors_loc[2]];
+   private_neighbors[3] = fmm_data[private_neighbors_loc[3]];
+   private_neighbors[4] = fmm_data[private_neighbors_loc[4]];
+   private_neighbors[5] = fmm_data[private_neighbors_loc[5]];
+   private_neighbors[6] = fmm_data[private_neighbors_loc[6]];
+   private_neighbors[7] = fmm_data[private_neighbors_loc[7]];
+}
 
 fn fmm_value(p: vec3<f32>) -> f32 {
 
-   let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
+   // let cell_value = fmm_data[get_cell_mem_location(vec3<u32>(p))];
    //let neighbors = load_neighbors_6(coord: vec3<u32>);
 
-   var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
+   // var memory_locations = load_trilinear_neighbors(vec3<u32>(p));
 
         // vec3<i32>(coord) + vec3<i32>(0,  0,  0),
         // vec3<i32>(coord) + vec3<i32>(1,  0,  0),
@@ -516,14 +541,14 @@ fn fmm_value(p: vec3<f32>) -> f32 {
    // 
 
    // The point P should be inside the cube.
-   var c000 = fmm_data[memory_locations[0]].value;
-   var c100 = fmm_data[memory_locations[1]].value;
-   var c010 = fmm_data[memory_locations[2]].value;
-   var c110 = fmm_data[memory_locations[3]].value;
-   var c001 = fmm_data[memory_locations[4]].value;
-   var c101 = fmm_data[memory_locations[5]].value;
-   var c011 = fmm_data[memory_locations[6]].value;
-   var c111 = fmm_data[memory_locations[7]].value;
+   // var c000 = fmm_data[memory_locations[0]].value;
+   // var c100 = fmm_data[memory_locations[1]].value;
+   // var c010 = fmm_data[memory_locations[2]].value;
+   // var c110 = fmm_data[memory_locations[3]].value;
+   // var c001 = fmm_data[memory_locations[4]].value;
+   // var c101 = fmm_data[memory_locations[5]].value;
+   // var c011 = fmm_data[memory_locations[6]].value;
+   // var c111 = fmm_data[memory_locations[7]].value;
 
    // var c001 = fmm_data[memory_locations[0]].value;
    // var c101 = fmm_data[memory_locations[1]].value;
@@ -534,6 +559,8 @@ fn fmm_value(p: vec3<f32>) -> f32 {
    // var c010 = fmm_data[memory_locations[6]].value;
    // var c110 = fmm_data[memory_locations[7]].value;
 
+   load_neighbors_private(vec3<u32>(p));
+
    // fn my_modf(f: f32) -> ModF {
    let tx = fract(p.x);
    let ty = fract(p.y);
@@ -543,38 +570,33 @@ fn fmm_value(p: vec3<f32>) -> f32 {
    // let y_value = y_part * n2 + (1.0 - y_part) * n1;  
    // let z_value = z_part * n0 + (1.0 - z_part) * n1;  
 
-   return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-          tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-          (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-          tx * ty * (1.0 - tz) * c110 + 
-          (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-          tx * (1.0 - ty) * tz * c101 + 
-          (1.0 - tx) * ty * tz * c011 + 
-          tx * ty * tz * c111; 
-   // if (abs(isovalue - va.w) < 0.00001) { return va.xyz; }
-   // else if (abs(isovalue - vb.w) < 0.00001) { return vb.xyz; }
-   // else if (abs(va.w-vb.w) < 0.00001) { return va.xyz; }
+   // return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+   //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+   //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+   //        tx * ty * (1.0 - tz) * c110 + 
+   //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+   //        tx * (1.0 - ty) * tz * c101 + 
+   //        (1.0 - tx) * ty * tz * c011 + 
+   //        tx * ty * tz * c111; 
 
-   // else
-   // {
-   //   vec3 p;
-   //   float mu = (isovalue - va.w) / (vb.w - va.w);
-   //   p.x = va.x + mu * (vb.x - va.x);
-   //   p.y = va.y + mu * (vb.y - va.y);
-   //   p.z = va.z + mu * (vb.z - va.z);
-   //   return p;
-   // }
-   
-   // return 123.0;
+   return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value + 
+          tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value + 
+          (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value + 
+          tx * ty * (1.0 - tz) * private_neighbors[3].value + 
+          (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value + 
+          tx * (1.0 - ty) * tz * private_neighbors[5].value + 
+          (1.0 - tx) * ty * tz * private_neighbors[6].value + 
+          tx * ty * tz * private_neighbors[7].value; 
 }
 
-
 fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
+
+    (*payload).color = fmm_color((*payload).intersection_point); // rgba_u32(0u, 0u, 155u, 0u);
 
     var grad: vec3<f32>;
 
     var pos = (*payload).intersection_point;
-    var offset = 0.05;
+    var offset = 0.01;
     // var right = sdBox(vec3(pos.x+offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
     // var left = sdBox(vec3(pos.x-offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
     // var up = sdBox(vec3(pos.x, pos.y+offset,pos.z), vec3<f32>(50.0, 50.0, 50.0));
@@ -599,7 +621,6 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     //grad.z = z_minus - z;
     var normal = normalize(grad);
     //(*payload).color = rgba_u32(255u, 0u, 0u, 255u);
-    (*payload).color = fmm_color((*payload).intersection_point); // rgba_u32(0u, 0u, 155u, 0u);
     // (*payload).normal = normal;
     (*payload).visibility = 1.0;
     diffuse(ray, payload);

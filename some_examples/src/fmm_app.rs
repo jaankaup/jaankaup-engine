@@ -72,9 +72,9 @@ const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
 /// Mc global dimensions. 
-const FMM_GLOBAL_X: usize = 68;
-const FMM_GLOBAL_Y: usize = 14;
-const FMM_GLOBAL_Z: usize = 68;
+const FMM_GLOBAL_X: usize = 62;
+const FMM_GLOBAL_Y: usize = 16;
+const FMM_GLOBAL_Z: usize = 54;
 
 /// Mc inner dimensions.
 const FMM_INNER_X: usize = 4; 
@@ -121,8 +121,7 @@ impl WGPUFeatures for FmmAppFeatures {
         limits.max_push_constant_size = 4;
         limits.max_push_constant_size = 4;
         // limits.max_compute_workgroup_size_x = 65536 * 2;
-        //limits.max_storage_buffer_binding_size = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z *
-        //                                         FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z * size_of::<FmmCellPc>()) as u32;
+        // limits.max_storage_buffer_binding_size = (2560 * 1560 * size_of::<u32>()) as u32;
         println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
         limits
     }
@@ -282,6 +281,8 @@ impl Application for FmmApp {
 
         let pc_max_coord = point_cloud.get_max_coord();
 
+        // println!("point_cloud.get_max_coord() == {:?}. point_cloud.get_min_coord() == {:?}", point_cloud.get_max_coord(), point_cloud.get_min_coord());
+
         // Create scale factor for point data so it fits under computation domain ranges.
         let point_cloud_scale_factor_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32 / pc_max_coord[0];
         let point_cloud_scale_factor_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32 / pc_max_coord[1];
@@ -438,13 +439,14 @@ impl Application for FmmApp {
                 //&configuration.device, &configuration.sc_desc, [1024,1024]);
                 //&configuration.device, &configuration.sc_desc, [1024,1024]);
                 &configuration.device, &configuration.sc_desc, [1024,1536]);
+                //&configuration.device, &configuration.sc_desc, [1536,2560]);
 
 
         let sphere_tracer = SphereTracer::init(
                 &configuration.device,
                 [8, 8],
-                // [128, 128],
                 [128, 192],
+                //[192, 320],
                 fmm.get_fmm_params_buffer(),
                 fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),

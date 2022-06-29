@@ -29,7 +29,7 @@ pub struct SphereTracer {
     /// Sphere tracer compute object. 
     st_compute_object: ComputeObject,
     st_bind_groups: Vec<wgpu::BindGroup>,
-    output_buffer: wgpu::Buffer,
+    // output_buffer: wgpu::Buffer,
     output_buffer_color: wgpu::Buffer,
     sphere_tracer_params: SphereTracerParams,
     sphere_tracer_buffer: wgpu::Buffer,
@@ -70,11 +70,11 @@ impl SphereTracer {
                             // @group(0) @binding(3) var<storage,read_write> fmm_data: array<FmmCellPc>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                               
-                            // @group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            // // @group(0) @binding(4) var<storage,read_write> screen_output: array<RayOutput>;
+                            // create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(5) var<storage,read_write> screen_output_color: array<u32>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                         vec![
 
@@ -111,12 +111,12 @@ impl SphereTracer {
                 None
         );
 
-        let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Sphere tracer output"),
-            size: (inner_dimension[0] * inner_dimension[1] * outer_dimension[0] * outer_dimension[1]) as u64 * size_of::<RayOutput>() as u64,
-            usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        // let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        //     label: Some("Sphere tracer output"),
+        //     size: (inner_dimension[0] * inner_dimension[1] * outer_dimension[0] * outer_dimension[1]) as u64 * size_of::<RayOutput>() as u64,
+        //     usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //     mapped_at_creation: false,
+        // });
 
         let output_buffer_color = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Sphere tracer output color"),
@@ -135,7 +135,7 @@ impl SphereTracer {
                         &sphere_tracer_buffer.as_entire_binding(),
                         &camera_buffer.as_entire_binding(),
                         &fmm_data.as_entire_binding(),
-                        &output_buffer.as_entire_binding(),
+                        // &output_buffer.as_entire_binding(),
                         &output_buffer_color.as_entire_binding(),
                     ],
                     vec![
@@ -151,7 +151,7 @@ impl SphereTracer {
         Self {
             st_compute_object: st_compute_object,
             st_bind_groups: st_bind_groups, 
-            output_buffer: output_buffer,
+            // output_buffer: output_buffer,
             output_buffer_color: output_buffer_color,
             sphere_tracer_params: sphere_tracer_params,
             sphere_tracer_buffer: sphere_tracer_buffer,

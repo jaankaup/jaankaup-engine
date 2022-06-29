@@ -683,7 +683,8 @@ impl FastMarchingMethod {
 
         //for _ in 0..416 {
         //for _ in 0..417 {
-        for _ in 0..670 {
+        //for _ in 0..670 {
+        for _ in 0..818 {
         //for _ in 0..1 {
         //for _ in 0..1300 {
         //for _ in 0..100 {
