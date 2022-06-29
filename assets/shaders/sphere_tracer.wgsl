@@ -349,7 +349,7 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     
     // Material properties
     let materialDiffuseColor = decode_color((*payload).color).xyz; //vec3<f32>(1.0, 0.0, 0.0);
-    let materialAmbientColor = vec3<f32>(0.5,0.5,0.5) * materialDiffuseColor;
+    let materialAmbientColor = vec3<f32>(0.8,0.8,0.8) * materialDiffuseColor;
     let materialSpecularColor = vec3<f32>(0.5,0.5,0.5);
     
     // Distance to the light
@@ -444,18 +444,36 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    var c011 = decode_color(fmm_data[memory_locations[6]].color);
    var c111 = decode_color(fmm_data[memory_locations[7]].color);
 
+   var c000_factor = select(1.0, 0.0, c000.x == 0.0 && c000.y == 0.0 && c000.z == 0.0);
+   var c100_factor = select(1.0, 0.0, c100.x == 0.0 && c100.y == 0.0 && c100.z == 0.0);
+   var c010_factor = select(1.0, 0.0, c010.x == 0.0 && c010.y == 0.0 && c010.z == 0.0);
+   var c110_factor = select(1.0, 0.0, c110.x == 0.0 && c110.y == 0.0 && c110.z == 0.0);
+   var c001_factor = select(1.0, 0.0, c001.x == 0.0 && c001.y == 0.0 && c001.z == 0.0);
+   var c101_factor = select(1.0, 0.0, c101.x == 0.0 && c101.y == 0.0 && c101.z == 0.0);
+   var c011_factor = select(1.0, 0.0, c011.x == 0.0 && c011.y == 0.0 && c011.z == 0.0);
+   var c111_factor = select(1.0, 0.0, c111.x == 0.0 && c111.y == 0.0 && c111.z == 0.0);
+
    let tx = fract(p.x);
    let ty = fract(p.y);
    let tz = fract(p.z);
 
-   let color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-          tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-          (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-          tx * ty * (1.0 - tz) * c110 + 
-          (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-          tx * (1.0 - ty) * tz * c101 + 
-          (1.0 - tx) * ty * tz * c011 + 
-          tx * ty * tz * c111;
+   // let color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+   //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+   //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+   //        tx * ty * (1.0 - tz) * c110 + 
+   //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+   //        tx * (1.0 - ty) * tz * c101 + 
+   //        (1.0 - tx) * ty * tz * c011 + 
+   //        tx * ty * tz * c111;
+   var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 * c000_factor + 
+          tx * (1.0 - ty) * (1.0 - tz) * c100 * c100_factor + 
+          (1.0 - tx) * ty * (1.0 - tz) * c010 * c010_factor + 
+          tx * ty * (1.0 - tz) * c110 * c110_factor + 
+          (1.0 - tx) * (1.0 - ty) * tz * c001 * c001_factor + 
+          tx * (1.0 - ty) * tz * c101 * c101_factor + 
+          (1.0 - tx) * ty * tz * c011 * c011_factor + 
+          tx * ty * tz * c111 * c111_factor;
+   color.w = 1.0;
    return vec4_to_rgba(color);
 }
 
@@ -672,7 +690,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     ray.rMax = 200.0;
 
     var payload: RayPayload;
-    payload.color = rgba_u32(0u, 0u, 0u, 255u);
+    payload.color = rgba_u32(0u, 0u, 0u, 0u);
     payload.visibility = 0.0;
 
     traceRay(&ray, &payload);

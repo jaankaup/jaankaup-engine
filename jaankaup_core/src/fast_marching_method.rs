@@ -642,115 +642,115 @@ impl FastMarchingMethod {
             pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: create dispatch_indirect
             //timer gpu_timer.end_pass(&mut pass);
 
-            //++ // Create initial band.
-            //++ //timer gpu_timer.start_pass(&mut pass);
-            //++ pass.set_pipeline(&self.create_init_band.pipeline);
-            //++ pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: dispatch_indirect
-            //++ //timer gpu_timer.end_pass(&mut pass);
+            // Create initial band.
+            //timer gpu_timer.start_pass(&mut pass);
+            pass.set_pipeline(&self.create_init_band.pipeline);
+            pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: dispatch_indirect
+            //timer gpu_timer.end_pass(&mut pass);
 
-            //++ // Collect all band cells.
-            //++ //timer gpu_timer.start_pass(&mut pass);
-            //++ pass.set_pipeline(&self.count_cells.pipeline);
-            //++ pass.set_push_constants(0, bytemuck::cast_slice(&[2])); // TODO: create dispatch_indirect
-            //++ pass.dispatch_workgroups(number_of_dispatches_128, 1, 1);
-            //++ //timer gpu_timer.end_pass(&mut pass);
+            // Collect all band cells.
+            //timer gpu_timer.start_pass(&mut pass);
+            pass.set_pipeline(&self.count_cells.pipeline);
+            pass.set_push_constants(0, bytemuck::cast_slice(&[2])); // TODO: create dispatch_indirect
+            pass.dispatch_workgroups(number_of_dispatches_128, 1, 1);
+            //timer gpu_timer.end_pass(&mut pass);
 
-            //++ // Solve quadratic on band cells.
-            //++ //timer gpu_timer.start_pass(&mut pass);
-            //++ pass.set_pipeline(&self.solve_quadratic.pipeline);
-            //++ pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
-            //++ pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
-            //++ //timer gpu_timer.end_pass(&mut pass);
+            // Solve quadratic on band cells.
+            //timer gpu_timer.start_pass(&mut pass);
+            pass.set_pipeline(&self.solve_quadratic.pipeline);
+            pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
+            pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
+            //timer gpu_timer.end_pass(&mut pass);
 
-            //++ // Scan active blocks part 1.
-            //++ //timer gpu_timer.start_pass(&mut pass);
-            //++ pass.set_pipeline(&self.prefix1.pipeline);
-            //++ pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
-            //++ //timer gpu_timer.end_pass(&mut pass);
+            // Scan active blocks part 1.
+            //timer gpu_timer.start_pass(&mut pass);
+            pass.set_pipeline(&self.prefix1.pipeline);
+            pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
+            //timer gpu_timer.end_pass(&mut pass);
 
-            //++ // Scan active blocks part 2.
-            //++ //timer gpu_timer.start_pass(&mut pass);
-            //++ pass.set_pipeline(&self.prefix2.pipeline);
-            //++ pass.dispatch_workgroups(1, 1, 1);
-            //++ //timer gpu_timer.end_pass(&mut pass);
+            // Scan active blocks part 2.
+            //timer gpu_timer.start_pass(&mut pass);
+            pass.set_pipeline(&self.prefix2.pipeline);
+            pass.dispatch_workgroups(1, 1, 1);
+            //timer gpu_timer.end_pass(&mut pass);
 
-            //++ // Recude and add new known point.
-            //++ //timer gpu_timer.start_pass(&mut pass);
-            //++ pass.set_pipeline(&self.reduce.pipeline);
-            //++ pass.dispatch_workgroups(number_of_dispatches_64 / 4, 4, 1);
-            //++ //timer gpu_timer.end_pass(&mut pass);
+            // Recude and add new known point.
+            //timer gpu_timer.start_pass(&mut pass);
+            pass.set_pipeline(&self.reduce.pipeline);
+            pass.dispatch_workgroups(number_of_dispatches_64 / 4, 4, 1);
+            //timer gpu_timer.end_pass(&mut pass);
         }
 
         //for _ in 0..416 {
         //for _ in 0..417 {
-        //for _ in 0..670 {
-        //++ for _ in 0..1 {
-        //++ //for _ in 0..1300 {
-        //++ //for _ in 0..100 {
-        //++ // else {
-        //++         // let mut pass = encoder.begin_compute_pass(
-        //++         //     &wgpu::ComputePassDescriptor { label: Some("Fmm compute pass.")}
-        //++         // );
-        //++         // // pass.set_pipeline(&self.compute_object.pipeline);
-        //++         // for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
-        //++         //     pass.set_bind_group(e as u32, &bgs, &[]);
-        //++         // }
-        //++          pass.set_pipeline(&self.find_neighbors.pipeline);
-        //++          pass.dispatch_workgroups(number_of_dispatches_128, 1, 1);
-        //++          pass.set_pipeline(&self.solve_quadratic.pipeline);
-        //++          pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
-        //++          pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
-        //++          pass.set_pipeline(&self.prefix1.pipeline);
-        //++          pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
-        //++          pass.set_pipeline(&self.prefix2.pipeline);
-        //++          pass.dispatch_workgroups(1, 1, 1);
-        //++          pass.set_pipeline(&self.reduce.pipeline);
-        //++          pass.dispatch_workgroups(number_of_dispatches_64 / 4, 4, 1);
-        //++          //pass.dispatch_workgroups(self.calculate_block_count() / 2, 2, 1);
+        for _ in 0..670 {
+        //for _ in 0..1 {
+        //for _ in 0..1300 {
+        //for _ in 0..100 {
+        // else {
+                // let mut pass = encoder.begin_compute_pass(
+                //     &wgpu::ComputePassDescriptor { label: Some("Fmm compute pass.")}
+                // );
+                // // pass.set_pipeline(&self.compute_object.pipeline);
+                // for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
+                //     pass.set_bind_group(e as u32, &bgs, &[]);
+                // }
+                 pass.set_pipeline(&self.find_neighbors.pipeline);
+                 pass.dispatch_workgroups(number_of_dispatches_128, 1, 1);
+                 pass.set_pipeline(&self.solve_quadratic.pipeline);
+                 pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
+                 pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
+                 pass.set_pipeline(&self.prefix1.pipeline);
+                 pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
+                 pass.set_pipeline(&self.prefix2.pipeline);
+                 pass.dispatch_workgroups(1, 1, 1);
+                 pass.set_pipeline(&self.reduce.pipeline);
+                 pass.dispatch_workgroups(number_of_dispatches_64 / 4, 4, 1);
+                 //pass.dispatch_workgroups(self.calculate_block_count() / 2, 2, 1);
 
-        //++      //++ if self.fmm_state == FmmState::FindNeighbors {
-        //++      //++     // Collect all band cells.
-        //++      //++     //timer gpu_timer.start_pass(&mut pass);
-        //++      //++     pass.set_pipeline(&self.find_neighbors.pipeline);
-        //++      //++     pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
-        //++      //++     //timer gpu_timer.end_pass(&mut pass);
-        //++      //++ }
+             //++ if self.fmm_state == FmmState::FindNeighbors {
+             //++     // Collect all band cells.
+             //++     //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.find_neighbors.pipeline);
+             //++     pass.dispatch_workgroups(number_of_dispatches * 8, 1, 1);
+             //++     //timer gpu_timer.end_pass(&mut pass);
+             //++ }
 
-        //++      //++ else if self.fmm_state == FmmState::SolveQuadratic {
+             //++ else if self.fmm_state == FmmState::SolveQuadratic {
 
-        //++      //++     //++ // Solve quadratic on band cells.
-        //++      //++     //++ //timer gpu_timer.start_pass(&mut pass);
-        //++      //++     pass.set_pipeline(&self.solve_quadratic.pipeline);
-        //++      //++     pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
-        //++      //++     pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
-        //++      //++     //++ //timer gpu_timer.end_pass(&mut pass);
-        //++      //++ }
+             //++     //++ // Solve quadratic on band cells.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.solve_quadratic.pipeline);
+             //++     pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
+             //++     pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++ }
 
-        //++      //++ else if self.fmm_state == FmmState::FilterActiveBlocks {
-        //++      //++     //++ // Scan active blocks part 1.
-        //++      //++     //++ //timer gpu_timer.start_pass(&mut pass);
-        //++      //++     pass.set_pipeline(&self.prefix1.pipeline);
-        //++      //++     pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
-        //++      //++     //++ //timer gpu_timer.end_pass(&mut pass);
-        //++      //++       
-        //++      //++     //++ // Scan active blocks part 2.
-        //++      //++     //++ //timer gpu_timer.start_pass(&mut pass);
-        //++      //++     pass.set_pipeline(&self.prefix2.pipeline);
-        //++      //++     pass.dispatch_workgroups(1, 1, 1);
-        //++      //++     //++ //timer gpu_timer.end_pass(&mut pass);
-        //++      //++ }
+             //++ else if self.fmm_state == FmmState::FilterActiveBlocks {
+             //++     //++ // Scan active blocks part 1.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.prefix1.pipeline);
+             //++     pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++       
+             //++     //++ // Scan active blocks part 2.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.prefix2.pipeline);
+             //++     pass.dispatch_workgroups(1, 1, 1);
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++ }
 
-        //++      //++ else if self.fmm_state == FmmState::Reduce {
+             //++ else if self.fmm_state == FmmState::Reduce {
 
-        //++      //++     //++ // Recude and add new known point.
-        //++      //++     //++ //timer gpu_timer.start_pass(&mut pass);
-        //++      //++     pass.set_pipeline(&self.reduce.pipeline);
-        //++      //++     pass.dispatch_workgroups(self.calculate_block_count(), 1, 1);
-        //++      //++     //++ //timer gpu_timer.end_pass(&mut pass);
-        //++      //++     self.iteration_counter = self.iteration_counter + 1;
-        //++      //++     println!("iteration_counter = {}", self.iteration_counter);
-        //++      //++ }
-        //++ }
+             //++     //++ // Recude and add new known point.
+             //++     //++ //timer gpu_timer.start_pass(&mut pass);
+             //++     pass.set_pipeline(&self.reduce.pipeline);
+             //++     pass.dispatch_workgroups(self.calculate_block_count(), 1, 1);
+             //++     //++ //timer gpu_timer.end_pass(&mut pass);
+             //++     self.iteration_counter = self.iteration_counter + 1;
+             //++     println!("iteration_counter = {}", self.iteration_counter);
+             //++ }
+        }
 
 
         // if self.fmm_state == FmmState::FilterActiveBlocks {

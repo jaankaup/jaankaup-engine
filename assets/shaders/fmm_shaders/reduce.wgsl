@@ -157,7 +157,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         let block_count = fmm_counter[1];
 
         //if (workgroup_id.x < block_count) {
-	let actual_index = workgroup_id.x + workgroup_id.y * 17150u; // num_workgroups.x
+	let actual_index = workgroup_id.x + workgroup_id.y * num_workgroups.x;
         if (actual_index < block_count) {
 
 	    let b = temp_data[actual_index]; // num_workgroups.x)];

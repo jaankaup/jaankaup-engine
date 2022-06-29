@@ -72,9 +72,9 @@ const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
 /// Mc global dimensions. 
-const FMM_GLOBAL_X: usize = 72; 
-const FMM_GLOBAL_Y: usize = 14; 
-const FMM_GLOBAL_Z: usize = 72; 
+const FMM_GLOBAL_X: usize = 68;
+const FMM_GLOBAL_Y: usize = 14;
+const FMM_GLOBAL_Z: usize = 68;
 
 /// Mc inner dimensions.
 const FMM_INNER_X: usize = 4; 
@@ -435,16 +435,16 @@ impl Application for FmmApp {
         // }
         //
         let sphere_tracer_renderer = TwoTriangles::init(
-                &configuration.device, &configuration.sc_desc, [1024,1024]);
                 //&configuration.device, &configuration.sc_desc, [1024,1024]);
-                //&configuration.device, &configuration.sc_desc, [1024,1536]);
+                //&configuration.device, &configuration.sc_desc, [1024,1024]);
+                &configuration.device, &configuration.sc_desc, [1024,1536]);
 
 
         let sphere_tracer = SphereTracer::init(
                 &configuration.device,
                 [8, 8],
-                [128, 128],
-                //[128, 192],
+                // [128, 128],
+                [128, 192],
                 fmm.get_fmm_params_buffer(),
                 fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),
