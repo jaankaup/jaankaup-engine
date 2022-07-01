@@ -1,5 +1,7 @@
 // Debugging.
 
+let FAR      = 0u;
+
 struct AABB {
     min: vec4<f32>, 
     max: vec4<f32>, 
@@ -105,6 +107,7 @@ struct SphereTracerParams {
 
 var<private> private_neighbors:     array<FmmCellPc, 8>;
 var<private> private_neighbors_loc: array<u32, 8>;
+var<private> this_aabb: AABB;
 
 fn total_cell_count() -> u32 {
 
@@ -145,7 +148,14 @@ fn rgba_u32_argb(c: u32) -> u32 {
 fn isInside(coord: vec3<i32>) -> bool {
     return (coord.x >= 0 && coord.x < i32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
            (coord.y >= 0 && coord.y < i32(fmm_params.local_dimension.y * fmm_params.global_dimension.y)) &&
-           (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z)); 
+           (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z));
+}
+
+/// A function that checks if a given coordinate is within the global computational domain. 
+fn isInside_f32(coord: vec3<f32>) -> bool {
+    return (coord.x >= 0.0 && coord.x < f32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
+           (coord.y >= 0.0 && coord.y < f32(fmm_params.local_dimension.y * fmm_params.global_dimension.y)) &&
+           (coord.z >= 0.0 && coord.z < f32(fmm_params.local_dimension.z * fmm_params.global_dimension.z)); 
 }
 
 /// xy-plane indexing. (x,y,z) => index
@@ -387,36 +397,55 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    var c011 = decode_color(private_neighbors[6].color);
    var c111 = decode_color(private_neighbors[7].color);
 
+   let max_value = max(c000,  
+                   max(c100, 
+                   max(c010, 
+                   max(c110, 
+                   max(c001, 
+                   max(c101, 
+                   max(c011, 
+                       c111))))))); 
 
-   var c000_factor = select(1.0, 0.0, c000.x == 0.0 && c000.y == 0.0 && c000.z == 0.0);
-   var c100_factor = select(1.0, 0.0, c100.x == 0.0 && c100.y == 0.0 && c100.z == 0.0);
-   var c010_factor = select(1.0, 0.0, c010.x == 0.0 && c010.y == 0.0 && c010.z == 0.0);
-   var c110_factor = select(1.0, 0.0, c110.x == 0.0 && c110.y == 0.0 && c110.z == 0.0);
-   var c001_factor = select(1.0, 0.0, c001.x == 0.0 && c001.y == 0.0 && c001.z == 0.0);
-   var c101_factor = select(1.0, 0.0, c101.x == 0.0 && c101.y == 0.0 && c101.z == 0.0);
-   var c011_factor = select(1.0, 0.0, c011.x == 0.0 && c011.y == 0.0 && c011.z == 0.0);
-   var c111_factor = select(1.0, 0.0, c111.x == 0.0 && c111.y == 0.0 && c111.z == 0.0);
+   c000 = select(c000, max_value, private_neighbors[0].tag == FAR);
+   c100 = select(c100, max_value, private_neighbors[1].tag == FAR);
+   c010 = select(c010, max_value, private_neighbors[2].tag == FAR);
+   c110 = select(c110, max_value, private_neighbors[3].tag == FAR);
+   c001 = select(c001, max_value, private_neighbors[4].tag == FAR);
+   c101 = select(c101, max_value, private_neighbors[5].tag == FAR);
+   c011 = select(c011, max_value, private_neighbors[6].tag == FAR);
+   c111 = select(c111, max_value, private_neighbors[7].tag == FAR);
+
+   // var c000_factor = select(1.0, 0.0, c000.x == 0.0 && c000.y == 0.0 && c000.z == 0.0);
+   // var c100_factor = select(1.0, 0.0, c100.x == 0.0 && c100.y == 0.0 && c100.z == 0.0);
+   // var c010_factor = select(1.0, 0.0, c010.x == 0.0 && c010.y == 0.0 && c010.z == 0.0);
+   // var c110_factor = select(1.0, 0.0, c110.x == 0.0 && c110.y == 0.0 && c110.z == 0.0);
+   // var c001_factor = select(1.0, 0.0, c001.x == 0.0 && c001.y == 0.0 && c001.z == 0.0);
+   // var c101_factor = select(1.0, 0.0, c101.x == 0.0 && c101.y == 0.0 && c101.z == 0.0);
+   // var c011_factor = select(1.0, 0.0, c011.x == 0.0 && c011.y == 0.0 && c011.z == 0.0);
+   // var c111_factor = select(1.0, 0.0, c111.x == 0.0 && c111.y == 0.0 && c111.z == 0.0);
 
    let tx = fract(p.x);
    let ty = fract(p.y);
    let tz = fract(p.z);
 
-   // let color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-   //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-   //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-   //        tx * ty * (1.0 - tz) * c110 + 
-   //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-   //        tx * (1.0 - ty) * tz * c101 + 
-   //        (1.0 - tx) * ty * tz * c011 + 
-   //        tx * ty * tz * c111;
-   var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 * c000_factor + 
-          tx * (1.0 - ty) * (1.0 - tz) * c100 * c100_factor + 
-          (1.0 - tx) * ty * (1.0 - tz) * c010 * c010_factor + 
-          tx * ty * (1.0 - tz) * c110 * c110_factor + 
-          (1.0 - tx) * (1.0 - ty) * tz * c001 * c001_factor + 
-          tx * (1.0 - ty) * tz * c101 * c101_factor + 
-          (1.0 - tx) * ty * tz * c011 * c011_factor + 
-          tx * ty * tz * c111 * c111_factor;
+   var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+          tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+          (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+          tx * ty * (1.0 - tz) * c110 + 
+          (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+          tx * (1.0 - ty) * tz * c101 + 
+          (1.0 - tx) * ty * tz * c011 + 
+          tx * ty * tz * c111;
+
+   //var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 * c000_factor + 
+   //       tx * (1.0 - ty) * (1.0 - tz) * c100 * c100_factor + 
+   //       (1.0 - tx) * ty * (1.0 - tz) * c010 * c010_factor + 
+   //       tx * ty * (1.0 - tz) * c110 * c110_factor + 
+   //       (1.0 - tx) * (1.0 - ty) * tz * c001 * c001_factor + 
+   //       tx * (1.0 - ty) * tz * c101 * c101_factor + 
+   //       (1.0 - tx) * ty * tz * c011 * c011_factor + 
+   //       tx * ty * tz * c111 * c111_factor;
+
    // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[0].color) * c000_factor + 
    //        tx * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[1].color) * c100_factor + 
    //        (1.0 - tx) * ty * (1.0 - tz) * decode_color(private_neighbors[2].color) * c010_factor + 
@@ -452,27 +481,45 @@ fn fmm_value(p: vec3<f32>) -> f32 {
    let ty = fract(p.y);
    let tz = fract(p.z);
 
+   let min_value = min(private_neighbors[0].value,  
+                   min(private_neighbors[1].value, 
+                   min(private_neighbors[2].value, 
+                   min(private_neighbors[3].value, 
+                   min(private_neighbors[4].value, 
+                   min(private_neighbors[5].value, 
+                   min(private_neighbors[6].value, 
+                       private_neighbors[7].value))))))); 
+
+   var c000 = select(private_neighbors[0].value, min_value, private_neighbors[0].tag == FAR);
+   var c100 = select(private_neighbors[1].value, min_value, private_neighbors[1].tag == FAR);
+   var c010 = select(private_neighbors[2].value, min_value, private_neighbors[2].tag == FAR);
+   var c110 = select(private_neighbors[3].value, min_value, private_neighbors[3].tag == FAR);
+   var c001 = select(private_neighbors[4].value, min_value, private_neighbors[4].tag == FAR);
+   var c101 = select(private_neighbors[5].value, min_value, private_neighbors[5].tag == FAR);
+   var c011 = select(private_neighbors[6].value, min_value, private_neighbors[6].tag == FAR);
+   var c111 = select(private_neighbors[7].value, min_value, private_neighbors[7].tag == FAR);
+
    // let x_value = x_part * n0 + (1.0 - x_part) * n1;  
    // let y_value = y_part * n2 + (1.0 - y_part) * n1;  
    // let z_value = z_part * n0 + (1.0 - z_part) * n1;  
 
-   // return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-   //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-   //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-   //        tx * ty * (1.0 - tz) * c110 + 
-   //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-   //        tx * (1.0 - ty) * tz * c101 + 
-   //        (1.0 - tx) * ty * tz * c011 + 
-   //        tx * ty * tz * c111; 
+   return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+          tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+          (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+          tx * ty * (1.0 - tz) * c110 + 
+          (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+          tx * (1.0 - ty) * tz * c101 + 
+          (1.0 - tx) * ty * tz * c011 + 
+          tx * ty * tz * c111; 
 
-   return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value + 
-          tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value + 
-          (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value + 
-          tx * ty * (1.0 - tz) * private_neighbors[3].value + 
-          (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value + 
-          tx * (1.0 - ty) * tz * private_neighbors[5].value + 
-          (1.0 - tx) * ty * tz * private_neighbors[6].value + 
-          tx * ty * tz * private_neighbors[7].value; 
+   //return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value + // * c000_factor + 
+   //       tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value + // * c100_factor+ 
+   //       (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value + // * c010_factor+ 
+   //       tx * ty * (1.0 - tz) * private_neighbors[3].value + // * c110_factor+ 
+   //       (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value + // * c001_factor+ 
+   //       tx * (1.0 - ty) * tz * private_neighbors[5].value + // * c101_factor+ 
+   //       (1.0 - tx) * ty * tz * private_neighbors[6].value + // * c011_factor+ 
+   //       tx * ty * tz * private_neighbors[7].value; // * c111_factor; 
 }
 
 fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
@@ -521,18 +568,42 @@ fn fmm_is_outside_value(v: vec3<f32>) -> bool {
     if (v.x < 0.0 ||
         v.y < 0.0 ||
         v.z < 0.0 ||
-        v.x >= f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) ||
-        v.y >= f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) ||
-        v.z >= f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) {
+        v.x >= f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x - 1u) ||
+        v.y >= f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y - 1u) ||
+        v.z >= f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z - 1u)) {
             return true;
 	}
      return false;
 }
 
+fn boxIntersection(ro: vec3<f32>, rd: vec3<f32>, boxSize: vec3<f32>) -> vec2<f32> {
+    let m = vec3<f32>(1.0) / rd; // can precompute if traversing a set of aligned boxes
+    let n = m * ro;   // can precompute if traversing a set of aligned boxes
+    let k = abs(m)*boxSize;
+    let t1 = -n - k;
+    let t2 = -n + k;
+    let tN = max( max( t1.x, t1.y ), t1.z );
+    let tF = min( min( t2.x, t2.y ), t2.z );
+    if( tN>tF || tF<0.0) { return vec2<f32>(-1.0); } // no intersection
+    //outNormal = -sign(rd)*step(t1.yzx,t1.xyz)*step(t1.zxy,t1.xyz);
+    return vec2<f32>( tN, tF );
+}
+
+
 fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
   var dist = (*ray).rMin;
   var calc = 0u; 
+
+  let aabb_sizes = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension - 2u) * 0.5;
+  let box_intersection = (boxIntersection((*ray).origin - aabb_sizes, (*ray).direction, aabb_sizes)).x + 0.1 ;
+  //let box_intersection = (boxIntersection((*ray).origin - aabb_sizes, (*ray).direction, aabb_sizes)).x + 0.1 ;
+
+  if (!(isInside_f32((*ray).origin)) && box_intersection != -1.0) {
+      dist = box_intersection;
+  }
+
+  if (box_intersection == -1.0) { dist = 400.1; return; }
 
   var p: vec3<f32>;
   var distance_to_interface: f32;
@@ -543,7 +614,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
       // distance_to_interface = sdBox(p, vec3<f32>(50.0, 50.0, 50.0));
 
       if (fmm_is_outside_value(p)) { return; }
-      distance_to_interface = fmm_value(p) * 0.1;
+      distance_to_interface = fmm_value(p) * 0.2; // max(min(0.01 * dist, 0.2), 0.001);
       if (distance_to_interface < 0.03) {
 	  (*payload).intersection_point = p;
           hit(ray, payload);
@@ -556,12 +627,57 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
   (*payload).intersection_point = p;
 }
 
+// fn box_intersect(aabb_min: vec<f32>, aabb_max: vec<f32>, result: ptr<function, f32>, canStartInBox: bool) -> bool {
+//     
+// }
+
+fn aabb_intersect(p0: ptr<function, vec3<f32>>,
+                  p1: ptr<function, vec3<f32>>,
+		  ray: ptr<function, Ray>,
+		  t_min: ptr<function, vec3<f32>>, 
+		  t_max: ptr<function, vec3<f32>>) -> bool {
+
+    let invRayDir = vec3<f32>(1.0) / (*ray).direction;
+    let t_lower = (*p0 - (*ray).origin) * invRayDir;
+    let t_upper = (*p1 - (*ray).origin) * invRayDir;
+    let tMins =  max(min(t_lower, t_upper), *t_min); 
+    let tMaxes = min(max(t_lower, t_upper), *t_max); 
+
+    output_arrow[atomicAdd(&counter[1], 1u)] =  
+          Arrow (
+              vec4<f32>(0.25 * tMins, 0.0),
+              vec4<f32>(0.25 * tMaxes, 0.0),
+              //vec4<f32>(tMins, 0.0),
+              //vec4<f32>(tMaxes, 0.0),
+              rgba_u32(155u, 0u, 1550u, 255u),
+              1.0
+    );
+
+    return tMins.x <= tMaxes.x && tMins.y <= tMaxes.y && tMins.z <= tMaxes.z; 
+    //return false;
+}
+
+// fn create_pinhole_ray(pixel: vec2<f32>) -> Ray {
+//     let tan_half_angle = tan(camera.fov_angle / 2.0);
+//     let screen_width = sphere_tracer_params.inner_dim.x * sphere_tracer_params.outer_dim.x; 
+//     let screen_height = sphere_tracer_params.inner_dim.y * sphere_tracer_params.outer_dim.y; 
+//     let aspect_scale = select(screen_height, screen_width, (camera_fov_direction == 0u)); 
+//     let dir = normalize(vec3<f32>(vec2<f32>(pixel.x, -pixel.y) * tanHalfAngle / aspect_scale, -1.0);
+//     return Ray(dir, 0.0, 
+// }
+
 @compute
 @workgroup_size(64,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
+
+    // this_aabb = AABB(
+    //     vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    //     vec4<f32>(fmm_params.global_dimension * fmm_params.inner_dimension, 1.0)
+
+    // );
 
     let screen_coord = vec2<f32>(index_to_screen(global_id.x,
                                        sphere_tracer_params.inner_dim.x,
@@ -594,7 +710,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     ray.origin = point_on_plane + camera.pos.xyz * 0.25;
     ray.direction = normalize(point_on_plane + d*camera.view.xyz);
     ray.rMin = 0.0;
-    ray.rMax = 200.0;
+    ray.rMax = 800.0;
 
     var payload: RayPayload;
     payload.color = rgba_u32(0u, 0u, 0u, 0u);
@@ -610,42 +726,42 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     result.normal = payload.normal;
     result.diffuse_color = payload.color;
 
-    //++ if (global_id.x == 0u) {
-    //++     
-    //++     let focal_point = camera.pos - camera.view * d; 
+    if (global_id.x == 0u) {
+        
+        let focal_point = camera.pos - camera.view * d; 
 
-    //++     output_aabb[atomicAdd(&counter[2], 1u)] =  
-    //++           AABB (
-    //++               vec4<f32>(focal_point.x - 1.1,
-    //++                         focal_point.y - 1.1,
-    //++                         focal_point.z - 1.1,
-    //++                         f32(rgba_u32(255u, 0u, 2550u, 255u))),
-    //++               vec4<f32>(focal_point.x + 1.1,
-    //++                         focal_point.y + 1.1,
-    //++                         focal_point.z + 1.1,
-    //++                         0.0),
-    //++     );
-    //++     output_arrow[atomicAdd(&counter[1], 1u)] =  
-    //++           Arrow (
-    //++               vec4<f32>(focal_point, 0.0),
-    //++               vec4<f32>(focal_point + camera.view, 0.0),
-    //++               //vec4<f32>(result.intersection_point, 0.0),
-    //++               rgba_u32(255u, 0u, 2550u, 255u),
-    //++               0.01
-    //++     );
-    //++     let renderable_element = Char (
-    //++                     // element_position,
-    //++                     vec3<f32>(focal_point.x - 1.11, focal_point.y + 1.11, focal_point.z + 1.11),
-    //++                     0.2,
-    //++                     vec4<f32>(0.25 * camera.pos.x, 0.25 * camera.pos.y, 0.25 * camera.pos.z, 0.0),
-    //++                     //vec4<f32>(vec3<f32>(fmm_params.local_dimension), 6.0),
-    //++                     4u,
-    //++                     rgba_u32(255u, 255u, 255u, 255u),
-    //++                     1u,
-    //++                     0u
-    //++     );
-    //++     output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
-    //++ }
+        output_aabb[atomicAdd(&counter[2], 1u)] =  
+              AABB (
+                  vec4<f32>(focal_point.x - 1.2,
+                            focal_point.y - 1.2,
+                            focal_point.z - 1.2,
+                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(focal_point.x + 1.2,
+                            focal_point.y + 1.2,
+                            focal_point.z + 1.2,
+                            0.0),
+        );
+        output_arrow[atomicAdd(&counter[1], 1u)] =  
+              Arrow (
+                  vec4<f32>(focal_point, 0.0),
+                  vec4<f32>(focal_point + camera.view * 9.0, 0.0),
+                  //vec4<f32>(result.intersection_point, 0.0),
+                  rgba_u32(255u, 0u, 2550u, 255u),
+                  1.1
+        );
+        let renderable_element = Char (
+                        // element_position,
+                        vec3<f32>(focal_point.x - 1.11, focal_point.y + 1.11, focal_point.z + 1.11),
+                        0.2,
+                        vec4<f32>(0.25 * camera.pos.x, 0.25 * camera.pos.y, 0.25 * camera.pos.z, 0.0),
+                        //vec4<f32>(vec3<f32>(fmm_params.local_dimension), 6.0),
+                        4u,
+                        rgba_u32(255u, 255u, 255u, 255u),
+                        1u,
+                        0u
+        );
+        output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+    }
 
     //++if (local_index == 0u) {
     //++//++ if (payload.visibility > 0.0) {
@@ -668,6 +784,26 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //++     // );
     //++ }
 
+    if (global_id.x == 0u) {
+        // let result = boxIntersection(&ray, vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension));
+        let aabb_sizes = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension) * 0.5;
+        let result = boxIntersection(ray.origin - aabb_sizes, ray.direction, aabb_sizes);
+        output_arrow[atomicAdd(&counter[1], 1u)] =  
+              Arrow (
+                  vec4<f32>(getPoint(result[0], &ray) * 4.0, 0.0),
+                  vec4<f32>(getPoint(result[1], &ray) * 4.0, 0.0),
+                  //vec4<f32>(result.intersection_point, 0.0),
+                  rgba_u32(255u, 0u, 2550u, 255u),
+                  1.0
+        );
+        //var p0 = vec3<f32>(0.0);
+        //var p1 = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension);
+        //var t_min = vec3<f32>(-1000.0, -1000.0, -1000.0);
+        //var t_max = vec3<f32>(1000.0, 1000.0, 1000.0);
+
+        //aabb_intersect(&p0, &p1, &ray, &t_min, &t_max);
+    }
+        
     //if (workgroup_id.x == 0u) {
         let buffer_index = screen_to_index(screen_coord); 
         // screen_output_color[buffer_index] = rgba_u32(255u, 0u, 0u, 255u);

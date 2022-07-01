@@ -332,8 +332,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         sum_auxiliar();
         workgroupBarrier();
 
+        // TODO: create shader for this.
         gather_data();
-        create_prefix_sum_private_data(local_index, workgroup_id.x);
+        // create_prefix_sum_private_data(local_index, workgroup_id.x);
         // if (local_index == 0u) {
         //     fmm_counter[4] = shared_aux[2];
         // }

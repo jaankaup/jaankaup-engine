@@ -21,9 +21,9 @@ dependencies = [
 
 [[package]]
 name = "android_system_properties"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40906ab18de39e789f964079c6cee50adfb8290fc17bc87f4df76057edc47368"
+checksum = "a20ae67ce26261f218e2b3f2f0d01887a9818283ca6fb260fa7c67e253d61c92"
 dependencies = [
  "libc",
 ]
@@ -499,9 +499,9 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
 name = "either"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
+checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
 
 [[package]]
 name = "fastrand"
@@ -1024,8 +1024,9 @@ dependencies = [
 
 [[package]]
 name = "naga"
-version = "0.8.0"
-source = "git+https://github.com/gfx-rs/naga?rev=27d38aae#27d38aae33fdbfa72197847038cb470720594cb1"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f50357e1167a3ab92d6b3c7f4bf5f7fd13fde3f4b28bf0d5ea07b5100fdb6c0"
 dependencies = [
  "bit-set",
  "bitflags",
@@ -1443,9 +1444,9 @@ checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
 
 [[package]]
 name = "serde_json"
-version = "1.0.81"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b7ce2b32a1aed03c558dc61a5cd328f15aff2dbc17daad8fb8af04d2100e15c"
+checksum = "82c2c1fdcd807d1098552c5b9a36e425e42e9fbd7c6a37a8425f390f781f7fa7"
 dependencies = [
  "itoa",
  "ryu",
@@ -1482,9 +1483,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.8.1"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc88c725d61fc6c3132893370cac4a0200e3fedf5da8331c570664b1987f5ca2"
+checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
 
 [[package]]
 name = "smithay-client-toolkit"
@@ -1951,9 +1952,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.57"
+version = "0.3.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b17e741662c70c8bd24ac5c5b18de314a2c26c32bf8346ee1e6f53de919c283"
+checksum = "2fed94beee57daf8dd7d51f2b15dc2bcde92d7a72304cdf662a4371008b71b90"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -1961,8 +1962,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu"
-version = "0.12.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=7cfbd874af2aeea379df4b844ba2eb3053f21212#7cfbd874af2aeea379df4b844ba2eb3053f21212"
+version = "0.13.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
 dependencies = [
  "arrayvec 0.7.2",
  "js-sys",
@@ -1981,8 +1982,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-core"
-version = "0.12.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=7cfbd874af2aeea379df4b844ba2eb3053f21212#7cfbd874af2aeea379df4b844ba2eb3053f21212"
+version = "0.13.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
 dependencies = [
  "arrayvec 0.7.2",
  "bit-vec",
@@ -2005,8 +2006,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-hal"
-version = "0.12.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=7cfbd874af2aeea379df4b844ba2eb3053f21212#7cfbd874af2aeea379df4b844ba2eb3053f21212"
+version = "0.13.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
 dependencies = [
  "android_system_properties",
  "arrayvec 0.7.2",
@@ -2043,8 +2044,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-types"
-version = "0.12.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=7cfbd874af2aeea379df4b844ba2eb3053f21212#7cfbd874af2aeea379df4b844ba2eb3053f21212"
+version = "0.13.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
 dependencies = [
  "bitflags",
 ]

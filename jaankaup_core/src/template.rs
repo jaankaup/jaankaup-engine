@@ -334,7 +334,8 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
         //format: surface.get_preferred_format(&adapter).unwrap(),
         width: size.width,
         height: size.height,
-        present_mode: wgpu::PresentMode::Mailbox,
+        present_mode: wgpu::PresentMode::Fifo,
+        //present_mode: wgpu::PresentMode::Mailbox,
     };
     surface.configure(&device, &sc_desc);
 

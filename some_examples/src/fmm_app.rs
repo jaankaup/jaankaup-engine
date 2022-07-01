@@ -173,16 +173,16 @@ impl Application for FmmApp {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.1);
 
-        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (60.0, 60.0, 60.0), -89.0, 0.0);
+        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 0.0), -89.0, 0.0);
         ray_camera.set_rotation_sensitivity(0.4);
-        ray_camera.set_movement_sensitivity(0.15);
+        ray_camera.set_movement_sensitivity(0.35);
 
         let camera_mode = CameraMode::Camera;
 
         ray_camera.set_focal_distance(1.0, &configuration.queue);
-        ray_camera.set_restriction_area([0.0, 0.0, 0.0],
-                                    [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
-        ray_camera.enable_restriction_area(true);
+        // ray_camera.set_restriction_area([0.0, 0.0, 0.0],
+        //                             [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
+        // ray_camera.enable_restriction_area(true);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,
