@@ -231,11 +231,11 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     #[cfg(target_arch = "wasm32")]
     {
         use winit::platform::web::WindowExtWebSys;
-        let query_string = web_sys::window().unwrap().location().search().unwrap();
-        let level: log::Level = parse_url_query_string(&query_string, "RUST_LOG")
-            .map(|x| x.parse().ok())
-            .flatten()
-            .unwrap_or(log::Level::Error);
+        //let query_string = web_sys::window().unwrap().location().search().unwrap();
+        //let level: log::Level = parse_url_query_string(&query_string, "RUST_LOG")
+        //    .map(|x| x.parse().ok())
+        //    .flatten()
+        //    .unwrap_or(log::Level::Error);
         // console_log::init_with_level(level).expect("could not initialize logger");
         console_log::init_with_level(log::Level::Trace).expect("could not initialize logger");
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
