@@ -181,8 +181,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         //     fmm_counter[1] = 0u;
         // }
 
-	// let known_point_count = fmm_counter[KNOWN];
-	let known_point_count = fmm_counter[1];
+	let known_point_count = fmm_counter[KNOWN];
+	// let known_point_count = fmm_counter[1];
 
         if (global_id.x < known_point_count) {
 	    let t = temp_prefix_sum[global_id.x];

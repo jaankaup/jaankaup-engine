@@ -70,7 +70,6 @@ let SCAN_BLOCK_SIZE = 2176u;
 
 // var<workgroup> shared_prefix_sum: array<u32, SCAN_BLOCK_SIZE>; 
 var<workgroup> shared_aux: array<u32, SCAN_BLOCK_SIZE>;
-var<workgroup> stream_compaction_count: u32;
 
 var<private> private_data: PrivateData;
 
@@ -108,28 +107,6 @@ fn total_cell_count() -> u32 {
            fmm_params.local_dimension.z; 
 };
 
-//////////////////////////////////
-////// Prefix scan part 1   //////
-//////////////////////////////////
-
-// fn store_block_to_global_temp() {
-// 
-//     temp_prefix_sum[private_data.global_ai] = shared_prefix_sum[private_data.ai_bcf];
-//     temp_prefix_sum[private_data.global_bi] = shared_prefix_sum[private_data.bi_bcf];
-// }
-// 
-// fn copy_block_to_shared_temp() {
-// 
-//     var a = fmm_blocks[private_data.global_ai];
-//     var b = fmm_blocks[private_data.global_bi];
-// 
-//     let end_index = total_cell_count();
-// 
-//     // Add prediates here {0 :: false, 1 :: true).
-//     shared_prefix_sum[private_data.ai_bcf] = select(0u, 1u, private_data.global_ai < end_index && a.number_of_band_points > 0u);
-//     shared_prefix_sum[private_data.bi_bcf] = select(0u, 1u, private_data.global_bi < end_index && b.number_of_band_points > 0u);
-// }
-
 fn copy_exclusive_data_to_shared_aux() {
 
     let data_count = prefix_params.exclusive_parts_end_index -
@@ -143,60 +120,19 @@ fn copy_exclusive_data_to_shared_aux() {
     shared_aux[private_data.bi_bcf] = select(0u, data_b, private_data.bi < data_count);
 }
 
-// // Perform prefix sum for one dispatch.
-// fn local_prefix_sum(workgroup_index: u32) {
-// 
-//     // Up sweep.
-// 
-//     let n = THREAD_COUNT * 2u;
-//     var offset = 1u;
-// 
-//     for (var d = n >> 1u ; d > 0u; d = d >> 1u) {
-// 
-//         workgroupBarrier();
-// 
-//         if (private_data.ai < d) {
-// 
-//             var ai_temp = offset * (private_data.ai * 2u + 1u) - 1u;
-//             var bi_temp = offset * (private_data.ai * 2u + 2u) - 1u;
-// 
-//             ai_temp = ai_temp + (ai_temp >> 4u);
-//             bi_temp = bi_temp + (bi_temp >> 4u);
-// 
-//             shared_prefix_sum[bi_temp] = shared_prefix_sum[bi_temp] + shared_prefix_sum[ai_temp];
-// 
-//         }
-//         offset = offset * 2u; // bit shift?
-//     }
-//       
-//     // Clear the last item. 
-//     if (private_data.ai == 0u) {
-// 
-//         let last_index = (THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u);
-//         temp_prefix_sum[prefix_params.exclusive_parts_start_index + workgroup_index] = shared_prefix_sum[last_index];
-//         shared_prefix_sum[last_index] = 0u;
-//     }
-// 
-//     // storageBarrier(); // ???
-//     
-//     // Down sweep.
-//     for (var d = 1u; d < n ; d = d * 2u) {
-//         offset = offset >> 1u;
-//         workgroupBarrier();
-// 
-//         if (private_data.ai < d) {
-// 
-//             var ai_temp = offset * (private_data.ai * 2u + 1u) - 1u;
-//             var bi_temp = offset * (private_data.ai * 2u + 2u) - 1u;
-//             ai_temp = ai_temp + (ai_temp >> 4u);
-//             bi_temp = bi_temp + (bi_temp >> 4u);
-//             var t = shared_prefix_sum[ai_temp];
-// 
-//             shared_prefix_sum[ai_temp] = shared_prefix_sum[bi_temp];
-//             shared_prefix_sum[bi_temp] = shared_prefix_sum[bi_temp] + t;
-//         }
-//     }
-// }
+fn copy_shared_aux_to_temp_prefix_sum() {
+
+    let data_count = prefix_params.exclusive_parts_end_index -
+                     prefix_params.exclusive_parts_start_index;
+    // TODO: check 2048 problem!
+    if (private_data.ai < data_count) {
+        temp_prefix_sum[prefix_params.exclusive_parts_start_index + private_data.ai + 2048u] = shared_aux[private_data.ai_bcf];
+    }
+    // TODO: check 2048 problem!
+    if (private_data.bi < data_count) {
+        temp_prefix_sum[prefix_params.exclusive_parts_start_index + private_data.bi + 2048u] = shared_aux[private_data.bi_bcf];
+    }
+}
 
 // Perform prefix sum for shared_aux.
 fn local_prefix_sum_aux() {
@@ -224,13 +160,6 @@ fn local_prefix_sum_aux() {
     if (private_data.ai == 0u) {
 
         let last_index = (THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u);
-
-        // Update stream compaction count.
-        //stream_compaction_count = stream_compaction_count + shared_aux[last_index];
-        stream_compaction_count = shared_aux[last_index];
-        //stream_compaction_count = stream_compaction_count + shared_aux[last_index];
-	//fmm_counter[0] = stream_compaction_count; 
-
         shared_aux[last_index] = 0u;
     }
     
@@ -254,56 +183,25 @@ fn local_prefix_sum_aux() {
 
 fn sum_auxiliar() {
 
-    let data_count = total_cell_count(); //  prefix_params.data_end_index -
-                                         // prefix_params.data_start_index;
+    let data_count = total_cell_count();
 
     let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
 
-    if (private_data.ai == 0u) {
-        let last_index = chunks + 1u;
-        stream_compaction_count = shared_aux[last_index + (last_index >> 4u)];
-
-	// Store total number of filtered objects to fmm_counter[0].
-	// atomicStore(&fmm_counter[1], 666u); // stream_compaction_count);
-	fmm_counter[1] = stream_compaction_count;
-	//atomicStore(&fmm_counter[1], stream_compaction_count);
-    } 
-    // storageBarrier();
-    workgroupBarrier();
-
     for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
 
-        var a = temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u];
-        temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u] = a + shared_aux[i + (i >> 4u)];
+        // if (private_data.ai + i * THREAD_COUNT * 2u < data_count) {
+            var a = temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u];
+            temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u] = a + temp_prefix_sum[prefix_params.exclusive_parts_start_index + i + 2048u]; // shared_aux[i + (i >> 4u)];
+            //temp_prefix_sum[private_data.ai + i * THREAD_COUNT * 2u] = a + shared_aux[i + (i >> 4u)];
+        // }
 
-        var b = temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u];
-        temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u] = b + shared_aux[i + (i >> 4u)];
+        // if (private_data.bi + i * THREAD_COUNT * 2u < data_count) {
+            var b = temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u];
+            temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u] = b + temp_prefix_sum[prefix_params.exclusive_parts_start_index + i + 2048u];
+            //temp_prefix_sum[private_data.bi + i * THREAD_COUNT * 2u] = b + shared_aux[i + (i >> 4u)];
+	// }
      }
 };
-
-fn gather_data() {
-
-    let data_count = total_cell_count(); // prefix_params.data_end_index -
-                                         // prefix_params.data_start_index;
-
-    let chunks = udiv_up_safe32(data_count, THREAD_COUNT * 2u);
-
-    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
-
-        let index_a = private_data.ai + i * THREAD_COUNT * 2u;
-        let index_b = private_data.bi + i * THREAD_COUNT * 2u;
-
-        var a = fmm_blocks[index_a];
-        let a_offset = temp_prefix_sum[index_a];
-        var predicate_a = index_a < data_count && a.number_of_band_points > 0u;
-        if (predicate_a) { temp_data[a_offset] = a; } // FmmBlock(a.index, a.number_of_band_points); }
-
-        var b = fmm_blocks[index_b];
-        let b_offset = temp_prefix_sum[index_b];
-        var predicate_b = index_b < data_count && b.number_of_band_points > 0u;
-        if (predicate_b) { temp_data[b_offset] = b; } // FmmBlock(b.index, b.number_of_band_points); }
-    }
-}
 
 @compute
 @workgroup_size(1024,1,1)
@@ -314,14 +212,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         create_prefix_sum_private_data(local_index, workgroup_id.x);
 
-	// shared_aux[private_data.ai_bcf] = 0u;
-	// shared_aux[private_data.bi_bcf] = 0u;
-
-        if (local_index == 0u) {
-            stream_compaction_count = 0u;
-        }
-        workgroupBarrier();
-
         // 2a. Load the exclusive data to the shared_aux. 
         copy_exclusive_data_to_shared_aux();
 
@@ -329,13 +219,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         local_prefix_sum_aux();
         workgroupBarrier();
 
-        sum_auxiliar();
-        // workgroupBarrier();
+        // Save shared_aux to temp_prefix_sum array.
+        copy_shared_aux_to_temp_prefix_sum();
+        workgroupBarrier();
 
-        // TODO: create shader for this.
-        // gather_data();
-        // create_prefix_sum_private_data(local_index, workgroup_id.x);
-        // if (local_index == 0u) {
-        //     fmm_counter[4] = shared_aux[2];
-        // }
+        if (private_data.ai == 0u) {
+
+            // Store total number of filtered objects to fmm_counter[1].
+            fmm_counter[1] = shared_aux[(THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u)];
+        }
+        workgroupBarrier();
 }

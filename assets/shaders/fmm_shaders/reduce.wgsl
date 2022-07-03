@@ -150,18 +150,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(num_workgroups) num_workgroups: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-        // // Initialize shader_counter;
-	// if (local_index == 0u) { shared_counter = 0u; offset = 0u; }
-        // workgroupBarrier();
-
         let block_count = fmm_counter[1];
 
-        //if (workgroup_id.x < block_count) {
 	let actual_index = workgroup_id.x + workgroup_id.y * num_workgroups.x;
         if (actual_index < block_count) {
 
 	    let b = temp_data[actual_index]; // num_workgroups.x)];
-	    // let b = temp_data[workgroup_id.x];
 
             // Load cell to workgroup memory.
             //let cell_index = (b.index << 6u) + local_index;
@@ -183,22 +177,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 		// Add new found known point to 
                 let known_index = atomicAdd(&fmm_counter[KNOWN], 1u); // TODO: remove.
-                // temp_prefix_sum[workgroup_id.x] = wg_cells[0].index;
                 temp_prefix_sum[actual_index] = wg_cells[0].index;
             }
 	}
-
-        //storageBarrier();
-        //workgroupBarrier();
-
-	// if (local_index == 0u) {
-	//     offset = atomicAdd(&fmm_counter[pc.tag], shared_counter);
-        // }
-        // storageBarrier();
-        // //workgroupBarrier();
-
-	// // Scatter data.
-        // if (local_index < shared_counter) {
-        //     temp_prefix_sum[offset + local_index] = temp_indices[local_index];
-	// }
 }
