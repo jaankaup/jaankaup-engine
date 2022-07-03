@@ -89,11 +89,6 @@ struct SphereTracerParams {
     outer_dim: vec2<u32>,
 };
 
-// struct ModF {
-//     fract: f32,
-//     whole: f32,
-// };
-
 @group(0) @binding(0) var<uniform>            fmm_params: FmmParams;
 @group(0) @binding(1) var<uniform>            sphere_tracer_params: SphereTracerParams;
 @group(0) @binding(2) var<uniform>            camera: RayCamera;
@@ -113,6 +108,8 @@ var<private> private_neighbors:     array<FmmCellPc, 8>;
 var<private> private_neighbors_loc: array<u32, 8>;
 var<private> this_aabb: AABB;
 var<private> private_global_index: vec3<u32>;
+var<private> step_counter: u32;
+
 fn total_cell_count() -> u32 {
 
     return fmm_params.global_dimension.x * 
@@ -122,6 +119,10 @@ fn total_cell_count() -> u32 {
            fmm_params.local_dimension.y * 
            fmm_params.local_dimension.z; 
 };
+
+// fn mapRange(a1: f32, a2: f32, b1: f32, b2: f32, s: f32) -> f32 {
+//     return b1 + (s - a1) * (b2 - b1) / (a2 - a1);
+// }
 
 fn rgba_u32(r: u32, g: u32, b: u32, a: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
@@ -138,15 +139,6 @@ fn rgba_u32_argb(c: u32) -> u32 {
   let a = (c & 0xff000000u) >> 24u;
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
-
-// fn my_modf(f: f32) -> ModF {
-//     let iptr = trunc(f);
-//     let fptr = f - iptr;
-//     return ModF (
-//         select(fptr, (-1.0)*fptr, f < 0.0),
-//         iptr
-//     );
-// }
 
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside(coord: vec3<i32>) -> bool {
@@ -505,34 +497,47 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    var c011 = select(private_neighbors[6].value, min_value, private_neighbors[6].tag == FAR);
    var c111 = select(private_neighbors[7].value, min_value, private_neighbors[7].tag == FAR);
 
-   if (private_global_index.x == 0u) {
-       output_aabb[atomicAdd(&counter[2], 1u)] =  
-             AABB (
-                 vec4<f32>(pah.x - 1.0,
-                           pah.y - 1.0,
-                           pah.z - 1.0,
-                           f32(rgba_u32(0u, 255u, 2550u, 255u))),
-                 vec4<f32>(pah.x + 1.0,
-                           pah.y + 1.0,
-                           pah.z + 1.0,
-                           0.0),
-       );
+   // let c = mapRange(0.0, 
+   //                  64.0,
+   //     	     0.0,
+   //     	     255.0, 
+   //     	     f32(actual_index)
+   // );
 
-       let known_color = rgba_u32(155u, 0u, 0u, 255u);
-       let outside_color = rgba_u32(0u, 0u, 255u, 255u);
+   let c = rgba_u32(min(step_counter, 255u),
+                    0u,
+                    255u - min(step_counter, 255u),
+        	    255u);
 
-       for (var i: i32 =  0 ; i<8 ; i = i + 1) {
-	   let col = select(known_color, outside_color, private_neighbors[i].tag == OUTSIDE); 
-           let size = select(0.1, 20.0, private_neighbors[i].tag == OUTSIDE); 
-           output_arrow[atomicAdd(&counter[1], 1u)] =  
-                 Arrow (
-                     vec4<f32>(pah, 0.0),
-                     vec4<f32>(vec3<f32>(get_cell_index(private_neighbors_loc[i])) * 4.0, 0.0),
-            	     col,
-                     size
-           );
-       }
-   }
+   // Draw the current point on ray and arrows to the neighbor cells. 
+   // if ((private_global_index.x & 1023u) == 0u) {
+   //     output_aabb[atomicAdd(&counter[2], 1u)] =  
+   //           AABB (
+   //               vec4<f32>(pah.x - 0.3,
+   //                         pah.y - 0.3,
+   //                         pah.z - 0.3,
+   //                         bitcast<f32>(c)),
+   //               vec4<f32>(pah.x + 0.3,
+   //                         pah.y + 0.3,
+   //                         pah.z + 0.3,
+   //                         0.0),
+   //     );
+
+   //     let known_color = rgba_u32(155u, 0u, 0u, 255u);
+   //     let outside_color = rgba_u32(0u, 0u, 255u, 255u);
+
+   //     for (var i: i32 =  0 ; i<8 ; i = i + 1) {
+   //         let col = select(known_color, outside_color, private_neighbors[i].tag == OUTSIDE); 
+   //         let size = select(0.1, 20.0, private_neighbors[i].tag == OUTSIDE); 
+   //         output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //               Arrow (
+   //                   vec4<f32>(pah, 0.0),
+   //                   vec4<f32>(vec3<f32>(get_cell_index(private_neighbors_loc[i])) * 4.0, 0.0),
+   //          	     col,
+   //                   size
+   //         );
+   //     }
+   // }
 
    // let x_value = x_part * n0 + (1.0 - x_part) * n1;  
    // let y_value = y_part * n2 + (1.0 - y_part) * n1;  
@@ -557,9 +562,8 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    //       tx * ty * tz * private_neighbors[7].value; // * c111_factor; 
 }
 
-fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
-
-    (*payload).color = fmm_color((*payload).intersection_point); // rgba_u32(0u, 0u, 155u, 0u);
+/// Calculate normal using fmm neighbors.
+fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
 
     var grad: vec3<f32>;
 
@@ -587,43 +591,36 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     grad.y = up - down;
     grad.z = z - z_minus;
     //grad.z = z_minus - z;
-    var normal = normalize(grad);
-    //(*payload).color = rgba_u32(255u, 0u, 0u, 255u);
-    // (*payload).normal = normal;
+    return normalize(grad);
+}
+
+/// Function tha is called on ray hit. TODO: separate gradien calculation to another function.
+fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
+
+    (*payload).color = fmm_color((*payload).intersection_point);
+    (*payload).normal = calculate_normal(payload);
     (*payload).visibility = 1.0;
     diffuse(ray, payload);
 }
 
-// fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
-//    payload.intersection_point = ray. 
-// }
-// ray intersection aabb
-
+/// Checks if a given value is inside the fmm domain.
 fn fmm_is_outside_value(v: vec3<f32>) -> bool {
     if (v.x < 0.0 ||
         v.y < 0.0 ||
         v.z < 0.0 ||
-        v.x >= f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x - 1u) ||
-        v.y >= f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y - 1u) ||
-        v.z >= f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z - 1u)) {
+        v.x > f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x - 1u) ||
+        v.y > f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y - 1u) ||
+        v.z > f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z - 1u)) {
             return true;
 	}
      return false;
 }
 
-// fn boxIntersection(ro: vec3<f32>, rd: vec3<f32>, boxSize: vec3<f32>) -> vec2<f32> {
-//     let m = vec3<f32>(1.0) / rd; // can precompute if traversing a set of aligned boxes
-//     let n = m * ro;   // can precompute if traversing a set of aligned boxes
-//     let k = abs(m)*boxSize;
-//     let t1 = -n - k;
-//     let t2 = -n + k;
-//     let tN = max( max( t1.x, t1.y ), t1.z );
-//     let tF = min( min( t2.x, t2.y ), t2.z );
-//     if( tN>tF || tF<0.0) { return vec2<f32>(-1.0); } // no intersection
-//     //outNormal = -sign(rd)*step(t1.yzx,t1.xyz)*step(t1.zxy,t1.xyz);
-//     return vec2<f32>( tN, tF );
-// }
-
+/// Ray aabb intersection. @p0 and @p1 are aabb box corners (p0 < p1).
+/// @t_min and @t_max are the given interval where collision are allowed.
+/// @t_near and @t_far are pointers to the intersection distances which are
+/// computed in this function.
+/// return true if ray hits the aabb, false othewise.
 fn aabb_intersect(p0: ptr<function, vec3<f32>>,
                   p1: ptr<function, vec3<f32>>,
 		  ray: ptr<function, Ray>,
@@ -646,12 +643,7 @@ fn aabb_intersect(p0: ptr<function, vec3<f32>>,
     *t_far = select(t_ma.y, t_ma.x, t_ma.x < t_ma.y);
     *t_far = select(t_ma.z, *t_far, *t_far < t_ma.z);
 
-    // var t_far: f32;
-
-    // if t_ma[1] < t_ma[0] { t_far = t_ma[0]; t_ma[0] = t_ma[1]; t_ma[1] = t_far; }
-    // if t_ma[2] < t_ma[0] { t_far = t_ma[0]; t_ma[0] = t_ma[2]; t_ma[2] = t_far; }
-    // if t_ma[2] < t_ma[1] { t_far = t_ma[1]; t_ma[1] = t_ma[2]; t_ma[2] = t_far; }
-
+    // Draw arrow between the intersection points.
     // output_arrow[atomicAdd(&counter[1], 1u)] =  
     //       Arrow (
     //           vec4<f32>(getPoint(t_near, ray) * 4.0, 0.0),
@@ -666,101 +658,96 @@ fn aabb_intersect(p0: ptr<function, vec3<f32>>,
 }
 
 
+/// Sphere tracing method.
 fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-  var dist = (*ray).rMin;
-  var calc = 0u; 
+    var dist = (*ray).rMin;
 
-  var p0 = vec3<f32>(0.0, 0.0, 0.0);
-  var p1 = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension - 1u);
-  var p_near = vec3<f32>(0.0, 0.0, 0.0);
-  var p_far = vec3<f32>(10000.0, 10000.0, 10000.0);
-  var t_near: f32;
-  var t_far: f32;
-  // let aabb_sizes = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension - 1u) * 0.5;
-  // let box_intersection = (boxIntersection((*ray).origin - aabb_sizes, (*ray).direction, aabb_sizes)).x;
-  let intersects = aabb_intersect(&p0, &p1, ray, &p_near, &p_far, &t_near, &t_far);
+    // Chech the intersection.
+    var p0 = vec3<f32>(0.0, 0.0, 0.0);
+    var p1 = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension - 1u);
+    var p_near = vec3<f32>(0.0, 0.0, 0.0);
+    var p_far = vec3<f32>(10000.0, 10000.0, 10000.0);
+    var t_near: f32;
+    var t_far: f32;
+    let intersects = aabb_intersect(&p0, &p1, ray, &p_near, &p_far, &t_near, &t_far);
 
-  // if ( private_global_index.x == 0u) {
-  //     aabb_intersect(&p0, &p1, ray, &p0, &p1, &t_near, &t_far);  
-  // }
+    // if ((private_global_index.x & 63u) == 0u && intersects) {
+    //     // let result = boxIntersection(&ray, vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension));
+    //     output_arrow[atomicAdd(&counter[1], 1u)] =  
+    //           Arrow (
+    //               vec4<f32>(getPoint(t_near, ray) * 4.0, 0.0),
+    //               vec4<f32>(getPoint(t_far, ray) * 4.0, 0.0),
+    //               //vec4<f32>(result.intersection_point, 0.0),
+    //               rgba_u32(255u, 255u, 2550u, 255u),
+    //               0.2
+    //     );
+    //     //var p0 = vec3<f32>(0.0);
+    //     //var p1 = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension);
+    //     //var t_min = vec3<f32>(-1000.0, -1000.0, -1000.0);
+    //     //var t_max = vec3<f32>(1000.0, 1000.0, 1000.0);
 
-  //let box_intersection = (boxIntersection((*ray).origin - aabb_sizes, (*ray).direction, aabb_sizes)).x + 0.0001;
-  //let box_intersection = (boxIntersection((*ray).origin - aabb_sizes, (*ray).direction, aabb_sizes)).x + 0.1 ;
-  if (private_global_index.x == 0u && intersects) {
-      // let result = boxIntersection(&ray, vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension));
-      output_arrow[atomicAdd(&counter[1], 1u)] =  
-            Arrow (
-                vec4<f32>(getPoint(t_near, ray) * 4.0, 0.0),
-                vec4<f32>(getPoint(t_far, ray) * 4.0, 0.0),
-                //vec4<f32>(result.intersection_point, 0.0),
-                rgba_u32(255u, 255u, 2550u, 255u),
-                0.2
-      );
-      //var p0 = vec3<f32>(0.0);
-      //var p1 = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension);
-      //var t_min = vec3<f32>(-1000.0, -1000.0, -1000.0);
-      //var t_max = vec3<f32>(1000.0, 1000.0, 1000.0);
+    //     //aabb_intersect(&p0, &p1, &ray, &t_min, &t_max);
+    // }
 
-      //aabb_intersect(&p0, &p1, &ray, &t_min, &t_max);
-  }
+    // TODO: this is not a bug. Check the fmm sampling code.
+    if (!(isInside_f32((*ray).origin)) && intersects) {
+        dist = t_near + 0.1;
+        var temp_p = getPoint(dist, ray);
+        if (fmm_is_outside_value(temp_p)) {
+            dist = t_near - 0.1;
+        }
+    }
 
-  if (!(isInside_f32((*ray).origin)) && intersects) {
-      dist = t_near + 0.1;
-  }
+    // if (!intersects && private_global_index.x == 0u) {
+    //     output_aabb[atomicAdd(&counter[2], 1u)] =  
+    //           AABB (
+    //               vec4<f32>(4.0 * p0.x - 23.0,
+    //                         4.0 * p0.y - 23.0,
+    //                         4.0 * p0.z - 23.0,
+    //                         f32(rgba_u32(0u, 0u, 255u, 255u))),
+    //               vec4<f32>(4.0 * p0.x + 23.0,
+    //                         4.0 * p0.y + 23.0,
+    //                         4.0 * p0.z + 23.0,
+    //                         0.0));
+    //     dist = 400.1;
+    //     return;
+    //     }
 
-  if (!intersects && private_global_index.x == 0u) {
-      output_aabb[atomicAdd(&counter[2], 1u)] =  
-            AABB (
-                vec4<f32>(4.0 * p0.x - 23.0,
-                          4.0 * p0.y - 23.0,
-                          4.0 * p0.z - 23.0,
-                          f32(rgba_u32(0u, 0u, 255u, 255u))),
-                vec4<f32>(4.0 * p0.x + 23.0,
-                          4.0 * p0.y + 23.0,
-                          4.0 * p0.z + 23.0,
-                          0.0));
-      dist = 400.1;
-      return;
-      }
-  // if (box_intersection == -1.0) { dist = 400.1; return; }
+    var p: vec3<f32>;
+    var distance_to_interface: f32;
 
-  var p: vec3<f32>;
-  var distance_to_interface: f32;
+    while (dist < (*ray).rMax && step_counter < 800u) {
+        p = getPoint(dist, ray);
 
-  while (dist < (*ray).rMax && calc < 800u) {
-      p = getPoint(dist, ray);
-      //distance_to_interface = sdSphere(p, 50.0);
-      // distance_to_interface = sdBox(p, vec3<f32>(50.0, 50.0, 50.0));
+        if (fmm_is_outside_value(p)) {
+        //     if ( private_global_index.x == 0u) {
 
-      if (fmm_is_outside_value(p)) {
-          if ( private_global_index.x == 0u) {
+        //         output_aabb[atomicAdd(&counter[2], 1u)] =  
+        //               AABB (
+        //                   vec4<f32>(4.0 * p.x - 23.0,
+        //                             4.0 * p.y - 23.0,
+        //                             4.0 * p.z - 23.0,
+        //                             f32(rgba_u32(0u, 255u, 0u, 255u))),
+        //                   vec4<f32>(4.0 * p.x + 23.0,
+        //                             4.0 * p.y + 23.0,
+        //                             4.0 * p.z + 23.0,
+        //                             0.0),
+        //         );
+        //     }
+             return;
+        }
+        distance_to_interface = fmm_value(p, true) * 0.25; // max(min(0.01 * dist, 0.2), 0.001);
+        if (distance_to_interface < 0.03) {
+            (*payload).intersection_point = p;
+            hit(ray, payload);
+            return;
+        }
+        step_counter = step_counter + 1u;
+        dist = dist + distance_to_interface;
+    } // while
 
-              output_aabb[atomicAdd(&counter[2], 1u)] =  
-                    AABB (
-                        vec4<f32>(4.0 * p.x - 23.0,
-                                  4.0 * p.y - 23.0,
-                                  4.0 * p.z - 23.0,
-                                  f32(rgba_u32(0u, 255u, 0u, 255u))),
-                        vec4<f32>(4.0 * p.x + 23.0,
-                                  4.0 * p.y + 23.0,
-                                  4.0 * p.z + 23.0,
-                                  0.0),
-              );
-          }
-          return;
-      }
-      distance_to_interface = fmm_value(p, true) * 0.25; // max(min(0.01 * dist, 0.2), 0.001);
-      if (distance_to_interface < 0.03) {
-	  (*payload).intersection_point = p;
-          hit(ray, payload);
-	  return;
-      }
-      calc = calc + 1u;
-      dist = dist + distance_to_interface;
-  } // while
-
-  (*payload).intersection_point = p;
+    (*payload).intersection_point = p;
 }
 
 // fn box_intersect(aabb_min: vec<f32>, aabb_max: vec<f32>, result: ptr<function, f32>, canStartInBox: bool) -> bool {
@@ -791,6 +778,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // );
 
     private_global_index = global_id;
+    step_counter = 0u;
 
     let screen_coord = vec2<f32>(index_to_screen(global_id.x,
                                        sphere_tracer_params.inner_dim.x,
@@ -846,30 +834,30 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         output_aabb[atomicAdd(&counter[2], 1u)] =  
               AABB (
-                  vec4<f32>(focal_point * 4.0 - vec3<f32>(1.2), f32(rgba_u32(255u, 0u, 2550u, 255u))),
-                  vec4<f32>(focal_point * 4.0 + vec3<f32>(1.2), 0.0),
+                  vec4<f32>(focal_point * 4.0 - vec3<f32>(2.2), f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(focal_point * 4.0 + vec3<f32>(2.2), 0.0),
         );
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (
                   vec4<f32>(focal_point * 4.0, 0.0),
-                  vec4<f32>(focal_point * 4.0 + camera.view * 9.0, 0.0),
+                  vec4<f32>(focal_point * 4.0 + camera.view * 19.0, 0.0),
                   //vec4<f32>(result.intersection_point, 0.0),
                   rgba_u32(255u, 0u, 2550u, 255u),
-                  1.1
+                  1.0
         );
-        let renderable_element = Char (
-                        // element_position,
-                        vec3<f32>(focal_point.x - 1.11, focal_point.y + 1.11, focal_point.z + 1.11),
-                        0.2,
-                        vec4<f32>(camera.pos * 4.0, 0.0),
-                        //vec4<f32>(0.25 * camera.pos.x, 0.25 * camera.pos.y, 0.25 * camera.pos.z, 0.0),
-                        //vec4<f32>(vec3<f32>(fmm_params.local_dimension), 6.0),
-                        4u,
-                        rgba_u32(255u, 255u, 255u, 255u),
-                        1u,
-                        0u
-        );
-        output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
+        // let renderable_element = Char (
+        //                 // element_position,
+        //                 vec3<f32>(focal_point.x - 1.11, focal_point.y + 1.11, focal_point.z + 1.11),
+        //                 0.2,
+        //                 vec4<f32>(camera.pos * 4.0, 0.0),
+        //                 //vec4<f32>(0.25 * camera.pos.x, 0.25 * camera.pos.y, 0.25 * camera.pos.z, 0.0),
+        //                 //vec4<f32>(vec3<f32>(fmm_params.local_dimension), 6.0),
+        //                 4u,
+        //                 rgba_u32(255u, 255u, 255u, 255u),
+        //                 1u,
+        //                 0u
+        // );
+        // output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
     }
 
     //++if (local_index == 0u) {

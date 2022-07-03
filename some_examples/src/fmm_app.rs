@@ -47,11 +47,11 @@ use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_ARROWS:     usize = 262144;
+const MAX_NUMBER_OF_ARROWS:     usize = 3 * 262144;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
+const MAX_NUMBER_OF_AABBS:      usize = 3 * TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
 #[allow(dead_code)]
@@ -171,11 +171,11 @@ impl Application for FmmApp {
         // Camera.
         let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 130.0, 480.0), -89.0, 0.0);
         camera.set_rotation_sensitivity(0.4);
-        camera.set_movement_sensitivity(0.1);
+        camera.set_movement_sensitivity(0.2);
 
         let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 0.0), -89.0, 0.0);
         ray_camera.set_rotation_sensitivity(0.4);
-        ray_camera.set_movement_sensitivity(0.35);
+        ray_camera.set_movement_sensitivity(0.25);
 
         let camera_mode = CameraMode::Camera;
 
@@ -855,9 +855,9 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Key3, 20.0);
         keys.register_key(Key::Key4, 20.0);
         keys.register_key(Key::Key5, 20.0);
-        keys.register_key(Key::Key0, 20.0);
+        keys.register_key(Key::Key0, 150.0);
         keys.register_key(Key::N, 200.0);
-        keys.register_key(Key::Space, 50.0);
+        keys.register_key(Key::Space, 150.0);
         keys.register_key(Key::B, 50.0);
         
         keys
