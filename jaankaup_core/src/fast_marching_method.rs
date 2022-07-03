@@ -152,6 +152,7 @@ pub struct FastMarchingMethod {
     prefix1: ComputeObject,
     prefix2: ComputeObject,
     prefix_gather: ComputeObject,
+    prefix_sum_aux: ComputeObject,
     reduce: ComputeObject,
     find_neighbors: ComputeObject,
     fmm_alg_visualizer: ComputeObject, 
@@ -290,7 +291,8 @@ impl FastMarchingMethod {
         // Prefix temp array.
         let prefix_temp_array = buffer_from_data::<u32>(
                 &device,
-                &vec![0 ; number_of_fmm_cells + 2048 as usize],
+                &vec![0 ; number_of_fmm_cells + 4096 as usize],
+                //&vec![0 ; number_of_fmm_cells + 2048 as usize],
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
         );
@@ -308,6 +310,10 @@ impl FastMarchingMethod {
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 None
         );
+        println!("fmm_prefix_params = {:?}", FmmPrefixParams { data_start_index: 0,
+                                                               data_end_index: (number_of_fmm_cells - 1) as u32,
+                                                               exclusive_parts_start_index: number_of_fmm_cells as u32,
+                                                               exclusive_parts_end_index: number_of_fmm_cells as u32 + 2048,});
 
         let compute_object_bind_groups = create_bind_groups(
                 &device,
@@ -513,6 +519,17 @@ impl FastMarchingMethod {
                                         &fmm_histogram.get_histogram_buffer()
         );
 
+        let (prefix_sum_aux, _) = Self::create_prefix_sum_aux(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &fmm_blocks,
+                                        &prefix_temp_array,
+                                        &temporary_fmm_data,
+                                        &fmm_data,
+                                        &fmm_histogram.get_histogram_buffer()
+        );
+
         let (reduce, _) = Self::create_reduce(
                                         &device,
                                         &fmm_prefix_params,
@@ -574,6 +591,7 @@ impl FastMarchingMethod {
             prefix1: prefix1,
             prefix2: prefix2,
             prefix_gather: prefix_gather,
+            prefix_sum_aux: prefix_sum_aux,
             reduce: reduce,
             find_neighbors: find_neighbors,
             fmm_alg_visualizer: fmm_alg_visualizer,
@@ -617,6 +635,7 @@ impl FastMarchingMethod {
         let number_of_dispatches_64 = udiv_up_safe32(self.calculate_cell_count(), 64);
         let number_of_dispatches_128 = udiv_up_safe32(self.calculate_cell_count(), 128);
         let number_of_dispatches_256 = udiv_up_safe32(self.calculate_cell_count(), 256);
+        let number_of_dispatches_2048 = udiv_up_safe32(self.calculate_cell_count(), 2048);
         println!("number_of_dispatches == {}", number_of_dispatches);
         println!("number_of_dispatches_64 == {}", number_of_dispatches_64);
         println!("number_of_dispatches_128 == {}", number_of_dispatches_128);
@@ -673,6 +692,10 @@ impl FastMarchingMethod {
             //timer gpu_timer.start_pass(&mut pass);
             pass.set_pipeline(&self.prefix2.pipeline);
             pass.dispatch_workgroups(1, 1, 1);
+
+            pass.set_pipeline(&self.prefix_sum_aux.pipeline);
+            pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
+
             //timer gpu_timer.end_pass(&mut pass);
             pass.set_pipeline(&self.prefix_gather.pipeline);
             pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
@@ -708,6 +731,8 @@ impl FastMarchingMethod {
                  pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
                  pass.set_pipeline(&self.prefix2.pipeline);
                  pass.dispatch_workgroups(1, 1, 1);
+                 pass.set_pipeline(&self.prefix_sum_aux.pipeline);
+                 pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
                  pass.set_pipeline(&self.prefix_gather.pipeline);
                  pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
                  pass.set_pipeline(&self.reduce.pipeline);
@@ -1195,6 +1220,71 @@ impl FastMarchingMethod {
 
                     }),
                     Some("Filter active blocks gather ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write>  fmm_data: array<TempData>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None,
+        );
+        let bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &prefix_params.as_entire_binding(),
+                        &fmm_params.as_entire_binding(),
+                        &fmm_blocks.as_entire_binding(),
+                        &temp_prefix_sum.as_entire_binding(),
+                        &filtered_blocks.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &fmm_counter.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, bind_groups)
+    }
+
+    fn create_prefix_sum_aux(device: &wgpu::Device,
+                           prefix_params: &wgpu::Buffer,
+                           fmm_params: &wgpu::Buffer,
+                           fmm_blocks: &wgpu::Buffer,
+                           temp_prefix_sum: &wgpu::Buffer,
+                           filtered_blocks: &wgpu::Buffer,
+                           fmm_data: &wgpu::Buffer,
+                           fmm_counter: &wgpu::Buffer) -> (ComputeObject, Vec<wgpu::BindGroup>) {
+
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: Some("filter_active_blocks_sum_aux.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/filter_active_blocks_sum_aux.wgsl"))),
+
+                    }),
+                    Some("Filter active blocks sum aux ComputeObject"),
                     &vec![
                         vec![
                             // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
