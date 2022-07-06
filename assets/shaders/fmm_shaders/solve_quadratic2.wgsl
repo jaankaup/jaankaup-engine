@@ -264,17 +264,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	let band_point_count = fmm_counter[1];
 
         if (global_id.x < band_point_count) {
-	    var t = temp_prefix_sum[global_id.x]; // First time. TODO: something better.
+	    var t = temp_data[global_id.x]; // The second time. TODO: something better.
 
-            //var t = temp_prefix_sum[global_id.x];
-	    // TODO: Something better.
-	    // if (pc.buffer_id == 3u) {
-            //     t = temp_prefix_sum[global_id.x];
-	    // }
-	    // else {
-            //     t = temp_data[global_id.x];
-	    // }
-	    // let t = temp_prefix_sum[global_id.x];
 	    var fmm_cell = fmm_data[t];
 	    var this_coord = get_cell_index(t);
             fmm_cell.value = solve_quadratic(this_coord);
