@@ -261,11 +261,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-	let band_point_count = fmm_counter[BAND];
+	let band_point_count = fmm_counter[1];
 
         if (global_id.x < band_point_count) {
 	    var t: u32;
 
+            //var t = temp_prefix_sum[global_id.x];
 	    // TODO: Something better.
 	    if (pc.buffer_id == 3u) {
                 t = temp_prefix_sum[global_id.x];

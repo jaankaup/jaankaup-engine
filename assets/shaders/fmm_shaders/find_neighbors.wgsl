@@ -1,4 +1,4 @@
-// Update band count to fmm_counter[BAND]
+// Update band count to fmm_counter[BAND] -> fmm_counter[1]
 // Save output to temp_data[fmm_counter[KNOWN] + band_counter_index].
 let FAR      = 0u;
 let BAND_NEW = 1u;
@@ -181,7 +181,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         //     fmm_counter[1] = 0u;
         // }
 
-	let known_point_count = fmm_counter[KNOWN];
+	let known_point_count = fmm_counter[0];
+	//let known_point_count = fmm_counter[KNOWN];
 	// let known_point_count = fmm_counter[1];
 
         if (global_id.x < known_point_count) {
@@ -200,7 +201,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             // How about BAND_NEW
             if (n0.tag == FAR || n0.tag == BAND) {
                 atomicExchange(&fmm_data[memory_locations[0]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		//let ind = atomicAdd(&fmm_counter[2], 1u);
+		let ind = atomicAdd(&fmm_counter[1], 1u);
 		temp_data[ind] = memory_locations[0];
 
 		// A new band point. Increase band point count.
@@ -210,7 +212,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             }
             if (n1.tag == FAR || n1.tag == BAND) {
                 atomicExchange(&fmm_data[memory_locations[1]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		let ind = atomicAdd(&fmm_counter[1], 1u);
 		temp_data[ind] = memory_locations[1];
 
 		// A new band point. Increase band point count.
@@ -220,7 +222,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             }
             if (n2.tag == FAR || n2.tag == BAND) {
                 atomicExchange(&fmm_data[memory_locations[2]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		let ind = atomicAdd(&fmm_counter[1], 1u);
 		temp_data[ind] = memory_locations[2];
 
 		// A new band point. Increase band point count.
@@ -230,7 +232,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             }
             if (n3.tag == FAR || n3.tag == BAND) {
                 atomicExchange(&fmm_data[memory_locations[3]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		let ind = atomicAdd(&fmm_counter[1], 1u);
 		temp_data[ind] = memory_locations[3];
 
 		// A new band point. Increase band point count.
@@ -240,7 +242,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             }
             if (n4.tag == FAR || n4.tag == BAND) {
                 atomicExchange(&fmm_data[memory_locations[4]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		let ind = atomicAdd(&fmm_counter[1], 1u);
 		temp_data[ind] = memory_locations[4];
 
 		// A new band point. Increase band point count.
@@ -250,7 +252,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             }
             if (n5.tag == FAR || n5.tag == BAND) {
                 atomicExchange(&fmm_data[memory_locations[5]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[BAND], 1u);
+		let ind = atomicAdd(&fmm_counter[1], 1u);
 		temp_data[ind] = memory_locations[5];
 
 		// A new band point. Increase band point count.

@@ -150,7 +150,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(num_workgroups) num_workgroups: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-        let block_count = fmm_counter[1];
+        let block_count = fmm_counter[2];
 
 	let actual_index = workgroup_id.x + workgroup_id.y * num_workgroups.x;
         if (actual_index < block_count) {
@@ -176,7 +176,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                 fmm_blocks[b.index].number_of_band_points = u32(i32(b.number_of_band_points) - 1);
 
 		// Add new found known point to 
-                let known_index = atomicAdd(&fmm_counter[KNOWN], 1u); // TODO: remove.
+                //let known_index = atomicAdd(&fmm_counter[KNOWN], 1u); // TODO: remove.
+                let known_index = atomicAdd(&fmm_counter[0], 1u); // TODO: remove.
                 temp_prefix_sum[actual_index] = wg_cells[0].index;
             }
 	}

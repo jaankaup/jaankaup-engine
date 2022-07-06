@@ -188,9 +188,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         
 	// Clear the counters from previous steps.
 	if (global_id.x == 0u) {
+            fmm_counter[0] = 0u;
             fmm_counter[1] = 0u;
             fmm_counter[2] = 0u;
-            fmm_counter[3] = 0u;
         }
 
         create_prefix_sum_private_data(local_index, workgroup_id.x);

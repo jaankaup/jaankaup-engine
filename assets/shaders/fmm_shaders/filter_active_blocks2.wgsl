@@ -1,4 +1,4 @@
-/// Store filter count to fmm_count[0]
+/// Store filter count to fmm_count[2]
 /// Store blocks to temp_data. 
 let FAR      = 0u;
 let BAND_NEW = 1u;
@@ -226,7 +226,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         if (private_data.ai == 0u) {
 
             // Store total number of filtered objects to fmm_counter[1].
-            fmm_counter[1] = shared_aux[(THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u)];
+            fmm_counter[2] = shared_aux[(THREAD_COUNT * 2u) - 1u + ((THREAD_COUNT * 2u - 1u) >> 4u)];
         }
         workgroupBarrier();
 }

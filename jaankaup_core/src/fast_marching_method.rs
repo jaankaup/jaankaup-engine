@@ -144,8 +144,10 @@ pub struct FastMarchingMethod {
     first_time: bool,
     fmm_state: FmmState,
 
-    count_cells: ComputeObject,
-    _count_cells_bg: Vec<wgpu::BindGroup>,
+    count_known_cells: ComputeObject,
+    _count_known_cells_bg: Vec<wgpu::BindGroup>,
+    count_band_cells: ComputeObject,
+    _count_band_cells_bg: Vec<wgpu::BindGroup>,
     create_init_band: ComputeObject,
     _create_init_band_gb: Vec<wgpu::BindGroup>,
     solve_quadratic: ComputeObject,
@@ -453,7 +455,7 @@ impl FastMarchingMethod {
                 ]
         );
 
-        let (count_cells, count_cells_bg) = Self::create_gather_known_cells_co(
+        let (count_known_cells, count_known_cells_bg) = Self::create_gather_known_cells_co(
                                         &device,
                                         &fmm_prefix_params,
                                         &fmm_params_buffer.get_buffer(),
@@ -462,6 +464,17 @@ impl FastMarchingMethod {
                                         &temporary_fmm_data,
                                         &fmm_data,
                                         &fmm_histogram.get_histogram_buffer(),
+        );
+
+        let (count_band_cells, count_band_cells_bg) = Self::create_gather_band_cells_co(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &fmm_blocks,
+                                        &prefix_temp_array,
+                                        &temporary_fmm_data,
+                                        &fmm_data,
+                                        &fmm_histogram.get_histogram_buffer()
         );
 
         let (create_init_band, create_init_band_gb) = Self::create_initial_band_co(
@@ -583,8 +596,10 @@ impl FastMarchingMethod {
             fmm_histogram: fmm_histogram,
             first_time: true,
             fmm_state: fmm_state,
-            count_cells: count_cells,
-            _count_cells_bg: count_cells_bg,
+            count_known_cells: count_known_cells,
+            _count_known_cells_bg: count_known_cells_bg,
+            count_band_cells: count_band_cells,
+            _count_band_cells_bg: count_band_cells_bg,
             create_init_band: create_init_band,
             _create_init_band_gb: create_init_band_gb,
             solve_quadratic: solve_quadratic,
@@ -629,7 +644,7 @@ impl FastMarchingMethod {
     //     pass
     // }
 
-    pub fn fmm_iteration(&mut self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut GpuTimer) {
+    pub fn fmm_iteration(&mut self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut Option<GpuTimer>) {
 
         let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count(), 1024);
         let number_of_dispatches_64 = udiv_up_safe32(self.calculate_cell_count(), 64);
@@ -652,13 +667,15 @@ impl FastMarchingMethod {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }
 
-        gpu_timer.start_pass(&mut pass);
+        if !gpu_timer.is_none() {
+            gpu_timer.as_mut().unwrap().start_pass(&mut pass);
+        }
 
         if self.first_time {
 
             // Collect all known cells.
-            pass.set_pipeline(&self.count_cells.pipeline);
-            pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
+            pass.set_pipeline(&self.count_known_cells.pipeline);
+            //pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
             pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: create dispatch_indirect
             //timer gpu_timer.end_pass(&mut pass);
 
@@ -670,15 +687,15 @@ impl FastMarchingMethod {
 
             // Collect all band cells.
             //timer gpu_timer.start_pass(&mut pass);
-            pass.set_pipeline(&self.count_cells.pipeline);
-            pass.set_push_constants(0, bytemuck::cast_slice(&[2])); // TODO: create dispatch_indirect
+            pass.set_pipeline(&self.count_band_cells.pipeline);
+            //pass.set_push_constants(0, bytemuck::cast_slice(&[2])); // TODO: create dispatch_indirect
             pass.dispatch_workgroups(number_of_dispatches_128, 1, 1);
             //timer gpu_timer.end_pass(&mut pass);
 
             // Solve quadratic on band cells.
             //timer gpu_timer.start_pass(&mut pass);
             pass.set_pipeline(&self.solve_quadratic.pipeline);
-            pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
+            pass.set_push_constants(0, bytemuck::cast_slice(&[3])); // TODO: no push_constants.
             pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
             //timer gpu_timer.end_pass(&mut pass);
 
@@ -725,7 +742,7 @@ impl FastMarchingMethod {
                  pass.set_pipeline(&self.find_neighbors.pipeline);
                  pass.dispatch_workgroups(number_of_dispatches_128, 1, 1);
                  pass.set_pipeline(&self.solve_quadratic.pipeline);
-                 pass.set_push_constants(0, bytemuck::cast_slice(&[4]));
+                 pass.set_push_constants(0, bytemuck::cast_slice(&[4])); // No push_constants!
                  pass.dispatch_workgroups(number_of_dispatches, 1, 1); // TODO: dispatch_indirect!
                  pass.set_pipeline(&self.prefix1.pipeline);
                  pass.dispatch_workgroups(number_of_dispatches_prefix, 1, 1);
@@ -791,12 +808,17 @@ impl FastMarchingMethod {
 
         // }
 
-        gpu_timer.end_pass(&mut pass);
+        if !gpu_timer.is_none() {
+            gpu_timer.as_mut().unwrap().end_pass(&mut pass);
+        }
         drop(pass);
         self.first_time = false;
         // println!("{:?}", self.fmm_state);
         // self.next_fmm_state();
-        gpu_timer.resolve_timestamps(encoder);
+          
+        if !gpu_timer.is_none() {
+            gpu_timer.as_mut().unwrap().resolve_timestamps(encoder);
+        }
     }
 
     pub fn next_fmm_state(&mut self) {
@@ -880,12 +902,79 @@ impl FastMarchingMethod {
                 ComputeObject::init(
                     &device,
                     &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: Some("collect_cells.wgsl"),
+                        label: Some("collect_known_points.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/collect_cells.wgsl"))),
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/collect_known_points.wgsl"))),
 
                     }),
-                    Some("Collect cells ComputeObject"),
+                    Some("Collect known points ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> fmm_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write>  fmm_data: array<TempData>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    Some(vec![wgpu::PushConstantRange {
+                        stages: wgpu::ShaderStages::COMPUTE,
+                        range: 0..4,
+                    }]),
+        );
+        let bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &prefix_params.as_entire_binding(),
+                        &fmm_params.as_entire_binding(),
+                        &fmm_blocks.as_entire_binding(),
+                        &temp_prefix_sum.as_entire_binding(),
+                        &filtered_blocks.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        &fmm_counter.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, bind_groups)
+    }
+
+    fn create_gather_band_cells_co(device: &wgpu::Device,
+                                   prefix_params: &wgpu::Buffer,
+                                   fmm_params: &wgpu::Buffer,
+                                   fmm_blocks: &wgpu::Buffer,
+                                   temp_prefix_sum: &wgpu::Buffer,
+                                   filtered_blocks: &wgpu::Buffer,
+                                   fmm_data: &wgpu::Buffer,
+                                   fmm_counter: &wgpu::Buffer) -> (ComputeObject, Vec<wgpu::BindGroup>) {
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: Some("collect_band_points.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/collect_band_points.wgsl"))),
+
+                    }),
+                    Some("Collect band points ComputeObject"),
                     &vec![
                         vec![
                             // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;

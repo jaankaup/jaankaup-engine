@@ -146,9 +146,9 @@ checksum = "37ccbd214614c6783386c1af30caf03192f17891059cecc394b4fb119e363de3"
 
 [[package]]
 name = "bytemuck"
-version = "1.9.1"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdead85bdec19c194affaeeb670c0e41fe23de31459efd1c174d049269cf02cc"
+checksum = "c53dfa917ec274df8ed3c572698f381a24eef2efba9492d797301b72b6db408a"
 dependencies = [
  "bytemuck_derive",
 ]
@@ -417,8 +417,9 @@ checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
 name = "d3d12"
-version = "0.4.1"
-source = "git+https://github.com/gfx-rs/d3d12-rs.git?rev=ffe5e261da0a6cb85332b82ab310abd2a7e849f6#ffe5e261da0a6cb85332b82ab310abd2a7e849f6"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "827914e1f53b1e0e025ecd3d967a7836b7bcb54520f90e21ef8df7b4d88a2759"
 dependencies = [
  "bitflags",
  "libloading",
@@ -987,8 +988,9 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.23.1"
-source = "git+https://github.com/gfx-rs/metal-rs?rev=1aaa903#1aaa9033a22b2af7ff8cae2ed412a4733799c3d3"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de11355d1f6781482d027a3b4d4de7825dcedb197bf573e0596d00008402d060"
 dependencies = [
  "bitflags",
  "block",
@@ -1181,9 +1183,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.12.0"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7709cef83f0c1f58f666e746a08b21e0085f7440fa6a29cc194d68aac97a4225"
+checksum = "18a6dbe30758c9f83eb00cbea4ac95966305f5a7772f3f42ebfc7fc7eddbd8e1"
 
 [[package]]
 name = "parking"
@@ -1441,9 +1443,9 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "serde"
-version = "1.0.137"
+version = "1.0.138"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
+checksum = "1578c6245786b9d168c5447eeacfb96856573ca56c9d68fdcf394be134882a47"
 
 [[package]]
 name = "serde_json"
@@ -1966,7 +1968,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63#1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63"
 dependencies = [
  "arrayvec 0.7.2",
  "js-sys",
@@ -1986,7 +1988,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63#1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63"
 dependencies = [
  "arrayvec 0.7.2",
  "bit-vec",
@@ -2010,7 +2012,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63#1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63"
 dependencies = [
  "android_system_properties",
  "arrayvec 0.7.2",
@@ -2048,7 +2050,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=1ceef24261c6c0ace193090a51e9d7e406da1185#1ceef24261c6c0ace193090a51e9d7e406da1185"
+source = "git+https://github.com/gfx-rs/wgpu?rev=1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63#1da5bbd7b43466a7cecbcdd67c0b613b36c6bf63"
 dependencies = [
  "bitflags",
 ]

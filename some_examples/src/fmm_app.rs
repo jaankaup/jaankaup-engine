@@ -108,9 +108,16 @@ impl WGPUFeatures for FmmAppFeatures {
     }
 
     fn required_features() -> wgpu::Features {
-        wgpu::Features::PUSH_CONSTANTS |
-        wgpu::Features::WRITE_TIMESTAMP_INSIDE_PASSES
-        // wgpu::Features::empty()
+
+        // #[cfg(not(target_arch = "wasm32"))] {
+        if cfg!(not(target_arch = "wasm32")) {
+            wgpu::Features::PUSH_CONSTANTS |
+            wgpu::Features::WRITE_TIMESTAMP_INSIDE_PASSES
+        }
+        else {
+        // #[cfg(target_arch = "wasm32"))] {
+            wgpu::Features::empty()
+        }
     }
 
     fn required_limits() -> wgpu::Limits {
@@ -133,7 +140,7 @@ struct FmmApp {
     ray_camera: Camera,
     camera_mode: CameraMode,
     gpu_debugger: GpuDebugger,
-    gpu_timer: GpuTimer,
+    gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
     _light: LightBuffer,
@@ -199,7 +206,8 @@ impl Application for FmmApp {
 
         print!("Creating Gpu timer   ");
         // Gpu timer.
-        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer")).unwrap();
+        //let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer")).unwrap();
+        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
         println!("OK");
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
@@ -761,8 +769,12 @@ impl Application for FmmApp {
         queue.submit(Some(encoder.finish())); 
 
         if self.once {
-            self.gpu_timer.create_timestamp_data(&device, &queue);
-            self.gpu_timer.print_data();
+
+        // TODO: something better.
+        if !self.gpu_timer.is_none() {
+            self.gpu_timer.as_mut().unwrap().create_timestamp_data(&device, &queue);
+            self.gpu_timer.as_mut().unwrap().print_data();
+        }
 
             //let gpu_timer_result = self.gpu_timer.get_data(); 
 

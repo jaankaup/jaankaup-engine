@@ -229,7 +229,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         // Get the number of known points;
 
 	//let known_point_count = atomicLoad(&fmm_counter[0]);
-	let known_point_count = fmm_counter[KNOWN];
+	let known_point_count = fmm_counter[0];
 
         if (global_id.x < known_point_count) {
 	    let t = temp_prefix_sum[global_id.x];

@@ -8,7 +8,7 @@ struct FmmCreationParams {
     fmm_global_dimension: vec3<u32>, 
     fmm_global_indexing: u32,
     fmm_inner_dimension: vec3<u32>, 
-    fmm_inner_indexking: u32,
+    fmm_inner_indexing: u32,
 };
 
 struct FmmCell {
