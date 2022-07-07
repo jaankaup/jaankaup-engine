@@ -1,5 +1,5 @@
-/// Kernel that finds all fmm known cells. 
-/// The number of found cells is stored to fmm_fmm_counter[0]. The fmm_counter[0] must be equal to zero. 
+/// Kernel that finds all source cells. 
+/// The number of found cells is stored to fim_counter[0]. The fim_counter[0] must be equal to zero. 
 /// The output (cell indices) are saved to temp_prefix_sum array.
 
 let FAR      = 0u;
@@ -8,20 +8,24 @@ let BAND     = 2u;
 let KNOWN    = 3u;
 let OUTSIDE  = 4u;
 
-struct FmmCellPc {
+struct FimCellPc {
     tag: atomic<u32>,
     value: f32,
     color: u32,
 };
 
-struct FmmBlock {
-    index: u32,
-    number_of_band_points: atomic<u32>,
-};
+// struct FmmBlock {
+//     index: u32,
+//     number_of_band_points: atomic<u32>,
+// };
 
 struct TempData {
     data0: u32,
     data1: u32,
+};
+
+struct PushConstants {
+    tag: u32,    
 };
 
 struct PrefixParams {
@@ -40,16 +44,20 @@ struct FmmParams {
 
 @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage,read_write> fmm_blocks: array<FmmBlock>;
+@group(0) @binding(2) var<storage,read_write> active_list: array<TempData>; //fmm_blocks
 @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-@group(0) @binding(4) var<storage,read_write> temp_data: array<TempData>;
-@group(0) @binding(5) var<storage,read_write> fmm_data: array<FmmCellPc>;
-@group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>; // 5 placeholders
+@group(0) @binding(4) var<storage,read_write> remedy_list: array<TempData>; // temp_data
+@group(0) @binding(5) var<storage,read_write> source_list: array<TempData>; // temp_data
+@group(0) @binding(6) var<storage,read_write> fim_data: array<FimCellPc>;
+@group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
 
 // Workgroup counter to keep track of count of found cells.
 var<workgroup> shared_counter: atomic<u32>;
 var<workgroup> offset: u32;
 var<workgroup> temp_indices: array<u32, 1024>; 
+
+// Push constants.
+var<push_constant> pc: PushConstants;
 
 fn total_cell_count() -> u32 {
 
@@ -63,7 +71,7 @@ fn total_cell_count() -> u32 {
 
 fn gather_cells_to_temp_data(thread_index: u32) {
 
-    var fmm_cell = fmm_data[thread_index];
+    var fmm_cell = fim_data[thread_index];
 
     if (fmm_cell.tag == KNOWN) {
 
@@ -93,7 +101,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         workgroupBarrier();
 
 	if (local_index == 0u) {
-	    offset = atomicAdd(&fmm_counter[0], shared_counter);
+	    offset = atomicAdd(&fim_counter[0], shared_counter);
         }
         storageBarrier();
         //workgroupBarrier();

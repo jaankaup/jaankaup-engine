@@ -42,6 +42,7 @@ use jaankaup_core::render_object::{draw, RenderObject, ComputeObject, create_bin
 use jaankaup_core::texture::Texture;
 use jaankaup_core::fmm_things::{PointCloud, FmmCellPc};
 use jaankaup_core::fast_marching_method::{FastMarchingMethod, FmmState};
+use jaankaup_core::fast_iterative_method::{FastIterativeMethod};
 use jaankaup_core::sphere_tracer::SphereTracer;
 use bytemuck::{Pod, Zeroable};
 
@@ -162,6 +163,7 @@ struct FmmApp {
     sphere_tracer: SphereTracer,
     sphere_tracer_renderer: TwoTriangles,
     draw_two_triangles: bool,
+    fim: FastIterativeMethod,
 }
 
 impl Application for FmmApp {
@@ -461,6 +463,12 @@ impl Application for FmmApp {
                 &Some(&gpu_debugger)
         );
 
+        let mut fim = FastIterativeMethod::init(&configuration.device,
+                                               global_dimension,
+                                               local_dimension,
+                                               &Some(&gpu_debugger),
+        );
+
         Self {
             camera: camera,
             ray_camera: ray_camera,
@@ -489,6 +497,7 @@ impl Application for FmmApp {
             sphere_tracer: sphere_tracer,
             sphere_tracer_renderer: sphere_tracer_renderer,
             draw_two_triangles: false,
+            fim: fim,
          }
     }
 

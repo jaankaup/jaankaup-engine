@@ -200,21 +200,6 @@ fn solve_quadratic(coord: vec3<u32>) -> f32 {
         p[1] = p[2];
         p[2] = tmp;
     }
-    // if p[1] < p[0] {
-    //     tmp = p[1];
-    //     p[1] = p[0];
-    //     p[0] = tmp;
-    // }
-    // if p[2] < p[0] {
-    //     tmp = p[2];
-    //     p[2] = p[0];
-    //     p[0] = tmp;
-    // }
-    // if p[2] < p[1] {
-    //     tmp = p[2];
-    //     p[2] = p[1];
-    //     p[1] = tmp;
-    // }
 
     var result: f32 = 777.0;
 
@@ -223,7 +208,6 @@ fn solve_quadratic(coord: vec3<u32>) -> f32 {
         var phi_sum2 = pow(p[0], 2.0) + pow(p[1], 2.0) + pow(p[2], 2.0);
         var phi_sum_pow2 = pow(phi_sum, 2.0);
         result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum2 - 1.0)));
-        //result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum_pow2 - 1.0)));
     }
 
     else if (abs(p[0] - p[1]) < 1.0) {
@@ -270,11 +254,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	    var this_coord = get_cell_index(t);
             fmm_cell.value = solve_quadratic(this_coord);
             fmm_cell.tag = BAND;
-            //let fmm_value = solve_quadratic(this_coord);
 	    fmm_data[t] = fmm_cell; 
-
-    //tag: atomic<u32>,
-    //value: f32,
-    //color: u32,
 	}
 }

@@ -17,6 +17,7 @@ pub mod shaders;
 pub mod fmm_things;
 pub mod pc_parser;
 pub mod fast_marching_method;
+pub mod fast_iterative_method;
 pub mod radix;
 pub mod sphere_tracer;
 pub mod two_triangles;
