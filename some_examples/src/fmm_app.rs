@@ -334,11 +334,21 @@ impl Application for FmmApp {
                                            &Some(&gpu_debugger),
         );
 
-        fmm.add_point_cloud_data(&configuration.device,
+        let mut fim = FastIterativeMethod::init(&configuration.device,
+                                               global_dimension,
+                                               local_dimension,
+                                               &Some(&gpu_debugger),
+        );
+
+        //++ fmm.add_point_cloud_data(&configuration.device,
+        //++                          &point_cloud.get_buffer(),
+        //++                          &pc_params);
+        fim.add_point_cloud_data(&configuration.device,
                                  &point_cloud.get_buffer(),
                                  &pc_params);
 
-        // The fmm scene visualizer.
+
+        // The fmm scene visualizer. TODO: fim scene visualizer.
         let compute_object_fmm_visualizer =
                 ComputeObject::init(
                     &configuration.device,
@@ -412,7 +422,8 @@ impl Application for FmmApp {
                 &vec![
                     vec![
                          &buffers.get(&"fmm_visualization_params".to_string()).unwrap().as_entire_binding(),
-                         &fmm.get_fmm_data_buffer().as_entire_binding(),
+                         &fim.get_fim_data_buffer().as_entire_binding(),
+                         //&fmm.get_fmm_data_buffer().as_entire_binding(),
                          &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
                          &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
@@ -427,7 +438,8 @@ impl Application for FmmApp {
                 label: Some("Fmm initial interface encoder"),
         });
 
-        fmm.initialize_interface_pc(&mut encoder, &point_cloud);
+        fim.initialize_interface_pc(&mut encoder, &point_cloud);
+        //++ fmm.initialize_interface_pc(&mut encoder, &point_cloud);
         // fmm.update_band_point_counts(&mut encoder);
         // fmm.filter_active_blocks(&mut encoder);
 
@@ -463,11 +475,6 @@ impl Application for FmmApp {
                 &Some(&gpu_debugger)
         );
 
-        let mut fim = FastIterativeMethod::init(&configuration.device,
-                                               global_dimension,
-                                               local_dimension,
-                                               &Some(&gpu_debugger),
-        );
 
         Self {
             camera: camera,
@@ -694,7 +701,8 @@ impl Application for FmmApp {
 
         // Fast marching method.
         if self.once {
-            self.fmm.fmm_iteration(&mut encoder, &mut self.gpu_timer);
+            // self.fmm.fmm_iteration(&mut encoder, &mut self.gpu_timer);
+            self.fim.fim_iteration(&mut encoder, &mut self.gpu_timer);
             // let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
 
             // self.gpu_timer.start_pass(&mut pass);
@@ -787,7 +795,7 @@ impl Application for FmmApp {
 
             //let gpu_timer_result = self.gpu_timer.get_data(); 
 
-            self.fmm.print_fmm_histogram(&device, &queue);
+            self.fim.print_fim_histogram(&device, &queue);
             // // println!("{:?}", gpu_timer_result);
             // let filtered_blocks = to_vec::<FmmBlock>(
             //     &device,

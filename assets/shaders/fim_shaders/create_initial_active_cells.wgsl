@@ -1,19 +1,25 @@
-let FAR      = 0u;
-let BAND_NEW = 1u;
-let BAND     = 2u;
-let KNOWN    = 3u;
-let OUTSIDE  = 4u;
+/// Find the neighbor cells from SOURCE points, update them to ACTIVE cells, save the count to fim_counter[1] and store the memomry locations to source_list.
 
-struct FmmCellPc {
+let OTHER   = 0u;
+let REMEDY  = 1u;
+let ACTIVE  = 2u;
+let SOURCE  = 3u;
+let OUTSIDE = 4u;
+
+struct FimCellPc {
     tag: atomic<u32>,
     value: f32,
     color: u32,
 };
 
-struct FmmBlock {
-    index: u32,
-    number_of_band_points: atomic<u32>,
+struct TempData {
+    data0: u32,
+    data1: u32,
 };
+
+// struct PushConstants {
+//     tag: u32,    
+// };
 
 struct PrefixParams {
     data_start_index: u32,
@@ -29,21 +35,14 @@ struct FmmParams {
     future_usage2: u32,
 };
 
-// Binding id from where to load data.
-struct PushConstants {
-    buffer_id: u32,    
-};
-
 @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage,read_write> fmm_blocks: array<FmmBlock>;
+@group(0) @binding(2) var<storage,read_write> active_list: array<u32>; //fmm_blocks
 @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-@group(0) @binding(4) var<storage,read_write> temp_data: array<u32>;
-@group(0) @binding(5) var<storage,read_write> fmm_data: array<FmmCellPc>;
-@group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>; // 5 placeholders
-
-// Push constants.
-var<push_constant> pc: PushConstants;
+@group(0) @binding(4) var<storage,read_write> remedy_list: array<TempData>; // temp_data
+@group(0) @binding(5) var<storage,read_write> source_list: array<u32>; // temp_data
+@group(0) @binding(6) var<storage,read_write> fim_data: array<FimCellPc>;
+@group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
 
 fn total_cell_count() -> u32 {
 
@@ -60,17 +59,6 @@ fn isInside(coord: vec3<i32>) -> bool {
     return (coord.x >= 0 && coord.x < i32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
            (coord.y >= 0 && coord.y < i32(fmm_params.local_dimension.y * fmm_params.global_dimension.y)) &&
            (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z)); 
-}
-
-/// xy-plane indexing. (x,y,z) => index
-fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
-  var x  = index;
-  let wh = dim_x * dim_y;
-  let z  = x / wh;
-  x  = x - z * wh; // check
-  let y  = x / dim_x;
-  x  = x - y * dim_x;
-  return vec3<u32>(x, y, z);
 }
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
@@ -108,6 +96,34 @@ fn decode3Dmorton32(m: u32) -> vec3<u32> {
         get_third_bits32(m >> 1u),
         get_third_bits32(m >> 2u)
    );
+}
+
+/// xy-plane indexing. (x,y,z) => index
+fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
+  var x  = index;
+  let wh = dim_x * dim_y;
+  let z  = x / wh;
+  x  = x - z * wh; // check
+  let y  = x / dim_x;
+  x  = x - y * dim_x;
+  return vec3<u32>(x, y, z);
+}
+
+/// Get cell index based on domain dimension.
+fn get_cell_index(global_index: u32) -> vec3<u32> {
+
+    let stride = fmm_params.local_dimension.x * fmm_params.local_dimension.y * fmm_params.local_dimension.z;
+    let block_index = global_index / stride;
+    let block_position = index_to_uvec3(block_index, fmm_params.global_dimension.x, fmm_params.global_dimension.y) * fmm_params.local_dimension;
+
+    // Calculate local position.
+    let local_index = global_index - block_index * stride;
+
+    let local_position = decode3Dmorton32(local_index);
+
+    let cell_position = block_position + local_position;
+
+    return cell_position; 
 }
 
 /// Get memory index from given cell coordinate.
@@ -159,116 +175,74 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
     );
 }
 
-fn solve_quadratic(coord: vec3<u32>) -> f32 {
-
-    var memory_locations = load_neighbors_6(coord);
-
-    var n0 = fmm_data[memory_locations[0]];
-    var n1 = fmm_data[memory_locations[1]];
-    var n2 = fmm_data[memory_locations[2]];
-    var n3 = fmm_data[memory_locations[3]];
-    var n4 = fmm_data[memory_locations[4]];
-    var n5 = fmm_data[memory_locations[5]];
-
-    var phis: array<f32, 6> = array<f32, 6>(
-                                  select(10000.0, n0.value, n0.tag == KNOWN),
-                                  select(10000.0, n1.value, n1.tag == KNOWN),
-                                  select(10000.0, n2.value, n2.tag == KNOWN),
-                                  select(10000.0, n3.value, n3.tag == KNOWN),
-                                  select(10000.0, n4.value, n4.tag == KNOWN),
-                                  select(10000.0, n5.value, n5.tag == KNOWN) 
-    );
-
-
-    var p = vec3<f32>(min(phis[0], phis[1]), min(phis[2], phis[3]), min(phis[4], phis[5]));
-    // var p_sorted: vec3<f32>;
-
-    var tmp: f32;
-
-    if p[1] < p[0] {
-        tmp = p[0];
-        p[0] = p[1];
-        p[1] = tmp;
-    }
-    if p[2] < p[0] {
-        tmp = p[0];
-        p[0] = p[2];
-        p[2] = tmp;
-    }
-    if p[2] < p[1] {
-        tmp = p[1];
-        p[1] = p[2];
-        p[2] = tmp;
-    }
-    // if p[1] < p[0] {
-    //     tmp = p[1];
-    //     p[1] = p[0];
-    //     p[0] = tmp;
-    // }
-    // if p[2] < p[0] {
-    //     tmp = p[2];
-    //     p[2] = p[0];
-    //     p[0] = tmp;
-    // }
-    // if p[2] < p[1] {
-    //     tmp = p[2];
-    //     p[2] = p[1];
-    //     p[1] = tmp;
-    // }
-
-    var result: f32 = 777.0;
-
-    if (abs(p[0] - p[2]) < 1.0) {
-        var phi_sum = p[0] + p[1] + p[2];
-        var phi_sum2 = pow(p[0], 2.0) + pow(p[1], 2.0) + pow(p[2], 2.0);
-        var phi_sum_pow2 = pow(phi_sum, 2.0);
-        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum2 - 1.0)));
-        //result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum_pow2 - 1.0)));
-    }
-
-    else if (abs(p[0] - p[1]) < 1.0) {
-        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
-    }
- 
-    else {
-        result = p[0] + 1.0;
-    }
-
-    return result;
-}
-
-/// Get cell index based on domain dimension.
-fn get_cell_index(global_index: u32) -> vec3<u32> {
-
-    let stride = fmm_params.local_dimension.x * fmm_params.local_dimension.y * fmm_params.local_dimension.z;
-    let block_index = global_index / stride;
-    let block_position = index_to_uvec3(block_index, fmm_params.global_dimension.x, fmm_params.global_dimension.y) * fmm_params.local_dimension;
-
-    // Calculate local position.
-    let local_index = global_index - block_index * stride;
-
-    let local_position = decode3Dmorton32(local_index);
-
-    let cell_position = block_position + local_position;
-
-    return cell_position; 
-}
-
 @compute
-@workgroup_size(1024,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
-	let band_point_count = fmm_counter[1];
+	//let known_point_count = atomicLoad(&fmm_counter[0]);
+	//let source_point_count = fim_counter[0];
 
-        if (global_id.x < band_point_count) {
-	    var t = temp_prefix_sum[global_id.x]; // First time. TODO: something better.
-	    var fmm_cell = fmm_data[t];
-	    var this_coord = get_cell_index(t);
-            fmm_cell.value = solve_quadratic(this_coord);
-            fmm_cell.tag = BAND;
-	    fmm_data[t] = fmm_cell; 
+        if (global_id.x < total_cell_count()) {
+	    //let t = temp_prefix_sum[global_id.x];
+	    //var this_coord = get_cell_index(t);
+	    var this_coord = get_cell_index(global_id.x);
+            var memory_locations: array<u32, 6> = load_neighbors_6(this_coord);
+
+            var this_fim_cell = fim_data[global_id.x];
+            var n0 = fim_data[memory_locations[0]];
+            var n1 = fim_data[memory_locations[1]];
+            var n2 = fim_data[memory_locations[2]];
+            var n3 = fim_data[memory_locations[3]];
+            var n4 = fim_data[memory_locations[4]];
+            var n5 = fim_data[memory_locations[5]];
+
+            if (this_fim_cell.tag == SOURCE) {
+                // TODO: atomic counters to workgroup counter and so on.
+                if (n0.tag != SOURCE) {
+                    let old_tag = atomicExchange(&fim_data[memory_locations[0]].tag, ACTIVE);
+	            if (old_tag != ACTIVE) {
+                        let index = atomicAdd(&fim_counter[1], 1u);
+                        active_list[index] = memory_locations[0];
+	            }
+                }
+                if (n1.tag != SOURCE) {
+                    let old_tag = atomicExchange(&fim_data[memory_locations[1]].tag, ACTIVE);
+	            if (old_tag != ACTIVE) {
+                       let index = atomicAdd(&fim_counter[1], 1u);
+                       active_list[index] = memory_locations[1];
+	            }
+                }
+                if (n2.tag != SOURCE) {
+                    let old_tag = atomicExchange(&fim_data[memory_locations[2]].tag, ACTIVE);
+	            if (old_tag != ACTIVE) {
+                        let index = atomicAdd(&fim_counter[1], 1u);
+                        active_list[index] = memory_locations[2];
+	            }
+                }
+                if (n3.tag != SOURCE) {
+                    let old_tag = atomicExchange(&fim_data[memory_locations[3]].tag, ACTIVE);
+	            if (old_tag != ACTIVE) {
+                        let index = atomicAdd(&fim_counter[1], 1u);
+                        active_list[index] = memory_locations[3];
+	            }
+                }
+                if (n4.tag != SOURCE) {
+                    let old_tag = atomicExchange(&fim_data[memory_locations[4]].tag, ACTIVE);
+	            if (old_tag != ACTIVE) {
+                        let index = atomicAdd(&fim_counter[1], 1u);
+                        active_list[index] = memory_locations[4];
+	            }
+                }
+                if (n5.tag != SOURCE) {
+                    let old_tag = atomicExchange(&fim_data[memory_locations[5]].tag, ACTIVE);
+	            if (old_tag != ACTIVE) {
+                        let index = atomicAdd(&fim_counter[1], 1u);
+                        active_list[index] = memory_locations[5];
+	            }
+                }
+	    }
 	}
 }

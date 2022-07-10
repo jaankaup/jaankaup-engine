@@ -2,11 +2,11 @@
 /// The number of found cells is stored to fim_counter[0]. The fim_counter[0] must be equal to zero. 
 /// The output (cell indices) are saved to temp_prefix_sum array.
 
-let FAR      = 0u;
-let BAND_NEW = 1u;
-let BAND     = 2u;
-let KNOWN    = 3u;
-let OUTSIDE  = 4u;
+let OTHER   = 0u;
+let REMEDY  = 1u;
+let ACTIVE  = 2u;
+let SOURCE  = 3u;
+let OUTSIDE = 4u;
 
 struct FimCellPc {
     tag: atomic<u32>,
@@ -22,10 +22,6 @@ struct FimCellPc {
 struct TempData {
     data0: u32,
     data1: u32,
-};
-
-struct PushConstants {
-    tag: u32,    
 };
 
 struct PrefixParams {
@@ -56,9 +52,6 @@ var<workgroup> shared_counter: atomic<u32>;
 var<workgroup> offset: u32;
 var<workgroup> temp_indices: array<u32, 1024>; 
 
-// Push constants.
-var<push_constant> pc: PushConstants;
-
 fn total_cell_count() -> u32 {
 
     return fmm_params.global_dimension.x *
@@ -71,9 +64,9 @@ fn total_cell_count() -> u32 {
 
 fn gather_cells_to_temp_data(thread_index: u32) {
 
-    var fmm_cell = fim_data[thread_index];
+    var fim_cell = fim_data[thread_index];
 
-    if (fmm_cell.tag == KNOWN) {
+    if (fim_cell.tag == 3u) {
 
         let index = atomicAdd(&shared_counter, 1u);
 

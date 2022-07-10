@@ -176,10 +176,90 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
+	
 
-	// if (global_id.x == 0u) {
-        //     fmm_counter[1] = 0u;
-        // }
+	//++ let known_point_count = fmm_counter[0];
+
+        //++ if (global_id.x < known_point_count) {
+	//++     let t = temp_prefix_sum[global_id.x];
+	//++     var this_coord = get_cell_index(t);
+
+        //++     var memory_locations = load_neighbors_6(this_coord);
+
+        //++     var n0 = fmm_data[memory_locations[0]];
+        //++     var n1 = fmm_data[memory_locations[1]];
+        //++     var n2 = fmm_data[memory_locations[2]];
+        //++     var n3 = fmm_data[memory_locations[3]];
+        //++     var n4 = fmm_data[memory_locations[4]];
+        //++     var n5 = fmm_data[memory_locations[5]];
+
+        //++     // How about BAND_NEW
+        //++     if (n0.tag == FAR || n0.tag == BAND) {
+        //++         atomicExchange(&fmm_data[memory_locations[0]].tag, BAND_NEW);
+	//++ 	//let ind = atomicAdd(&fmm_counter[2], 1u);
+	//++ 	let ind = atomicAdd(&fmm_counter[1], 1u);
+	//++ 	temp_data[ind] = memory_locations[0];
+
+	//++ 	// A new band point. Increase band point count.
+	//++ 	if (n0.tag == FAR) {
+        //++             atomicAdd(&fmm_blocks[memory_locations[0] >> 6u].number_of_band_points, 1u);
+	//++ 	}
+        //++     }
+        //++     if (n1.tag == FAR || n1.tag == BAND) {
+        //++         atomicExchange(&fmm_data[memory_locations[1]].tag, BAND_NEW);
+	//++ 	let ind = atomicAdd(&fmm_counter[1], 1u);
+	//++ 	temp_data[ind] = memory_locations[1];
+
+	//++ 	// A new band point. Increase band point count.
+	//++ 	if (n1.tag == FAR) {
+        //++             atomicAdd(&fmm_blocks[memory_locations[1] >> 6u].number_of_band_points, 1u);
+	//++ 	}
+        //++     }
+        //++     if (n2.tag == FAR || n2.tag == BAND) {
+        //++         atomicExchange(&fmm_data[memory_locations[2]].tag, BAND_NEW);
+	//++ 	let ind = atomicAdd(&fmm_counter[1], 1u);
+	//++ 	temp_data[ind] = memory_locations[2];
+
+	//++ 	// A new band point. Increase band point count.
+	//++ 	if (n2.tag == FAR) {
+        //++             atomicAdd(&fmm_blocks[memory_locations[2] >> 6u].number_of_band_points, 1u);
+	//++ 	}
+        //++     }
+        //++     if (n3.tag == FAR || n3.tag == BAND) {
+        //++         atomicExchange(&fmm_data[memory_locations[3]].tag, BAND_NEW);
+	//++ 	let ind = atomicAdd(&fmm_counter[1], 1u);
+	//++ 	temp_data[ind] = memory_locations[3];
+
+	//++ 	// A new band point. Increase band point count.
+	//++ 	if (n3.tag == FAR) {
+        //++             atomicAdd(&fmm_blocks[memory_locations[3] >> 6u].number_of_band_points, 1u);
+	//++ 	}
+        //++     }
+        //++     if (n4.tag == FAR || n4.tag == BAND) {
+        //++         atomicExchange(&fmm_data[memory_locations[4]].tag, BAND_NEW);
+	//++ 	let ind = atomicAdd(&fmm_counter[1], 1u);
+	//++ 	temp_data[ind] = memory_locations[4];
+
+	//++ 	// A new band point. Increase band point count.
+	//++ 	if (n4.tag == FAR) {
+        //++             atomicAdd(&fmm_blocks[memory_locations[4] >> 6u].number_of_band_points, 1u);
+	//++ 	}
+        //++     }
+        //++     if (n5.tag == FAR || n5.tag == BAND) {
+        //++         atomicExchange(&fmm_data[memory_locations[5]].tag, BAND_NEW);
+	//++ 	let ind = atomicAdd(&fmm_counter[1], 1u);
+	//++ 	temp_data[ind] = memory_locations[5];
+
+	//++ 	// A new band point. Increase band point count.
+	//++ 	if (n5.tag == FAR) {
+        //++             atomicAdd(&fmm_blocks[memory_locations[5] >> 6u].number_of_band_points, 1u);
+	//++ 	}
+        //++     }
+	//++ }
+
+	//++ // if (global_id.x == 0u) {
+        //++ //     fmm_counter[1] = 0u;
+        //++ // }
 
 	let known_point_count = fmm_counter[0];
 	//let known_point_count = fmm_counter[KNOWN];
@@ -200,64 +280,78 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
             // How about BAND_NEW
             if (n0.tag == FAR || n0.tag == BAND) {
-                atomicExchange(&fmm_data[memory_locations[0]].tag, BAND_NEW);
-		//let ind = atomicAdd(&fmm_counter[2], 1u);
-		let ind = atomicAdd(&fmm_counter[1], 1u);
-		temp_data[ind] = memory_locations[0];
+                // atomicExchange(&fmm_data[memory_locations[0]].tag, BAND_NEW);
+                let old_n0 = atomicExchange(&fmm_data[memory_locations[0]].tag, BAND_NEW);
 
-		// A new band point. Increase band point count.
-		if (n0.tag == FAR) {
-                    atomicAdd(&fmm_blocks[memory_locations[0] >> 6u].number_of_band_points, 1u);
-		}
+		//let ind = atomicAdd(&fmm_counter[2], 1u);
+		if (old_n0 != BAND_NEW) {
+		    let ind = atomicAdd(&fmm_counter[1], 1u);
+		    temp_data[ind] = memory_locations[0];
+
+		    // A new band point. Increase band point count.
+		    if (n0.tag == FAR) {
+                        atomicAdd(&fmm_blocks[memory_locations[0] >> 6u].number_of_band_points, 1u);
+		    }
+	        }
             }
             if (n1.tag == FAR || n1.tag == BAND) {
-                atomicExchange(&fmm_data[memory_locations[1]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[1], 1u);
-		temp_data[ind] = memory_locations[1];
+                let old_n1 = atomicExchange(&fmm_data[memory_locations[1]].tag, BAND_NEW);
+		if (old_n1 != BAND_NEW) {
+		    let ind = atomicAdd(&fmm_counter[1], 1u);
+		    temp_data[ind] = memory_locations[1];
 
-		// A new band point. Increase band point count.
-		if (n1.tag == FAR) {
-                    atomicAdd(&fmm_blocks[memory_locations[1] >> 6u].number_of_band_points, 1u);
-		}
+		    // A new band point. Increase band point count.
+		    if (n1.tag == FAR) {
+                        atomicAdd(&fmm_blocks[memory_locations[1] >> 6u].number_of_band_points, 1u);
+		    }
+	    }
             }
             if (n2.tag == FAR || n2.tag == BAND) {
-                atomicExchange(&fmm_data[memory_locations[2]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[1], 1u);
-		temp_data[ind] = memory_locations[2];
+                let old_n2 = atomicExchange(&fmm_data[memory_locations[2]].tag, BAND_NEW);
+		if (old_n2 != BAND_NEW) {
+		    let ind = atomicAdd(&fmm_counter[1], 1u);
+		    temp_data[ind] = memory_locations[2];
 
-		// A new band point. Increase band point count.
-		if (n2.tag == FAR) {
-                    atomicAdd(&fmm_blocks[memory_locations[2] >> 6u].number_of_band_points, 1u);
+		    // A new band point. Increase band point count.
+		    if (n2.tag == FAR) {
+                        atomicAdd(&fmm_blocks[memory_locations[2] >> 6u].number_of_band_points, 1u);
+		    }
 		}
             }
             if (n3.tag == FAR || n3.tag == BAND) {
-                atomicExchange(&fmm_data[memory_locations[3]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[1], 1u);
-		temp_data[ind] = memory_locations[3];
+                let old_n3 = atomicExchange(&fmm_data[memory_locations[3]].tag, BAND_NEW);
+		if (old_n3 != BAND_NEW) {
+		    let ind = atomicAdd(&fmm_counter[1], 1u);
+		    temp_data[ind] = memory_locations[3];
 
-		// A new band point. Increase band point count.
-		if (n3.tag == FAR) {
-                    atomicAdd(&fmm_blocks[memory_locations[3] >> 6u].number_of_band_points, 1u);
+		    // A new band point. Increase band point count.
+		    if (n3.tag == FAR) {
+                        atomicAdd(&fmm_blocks[memory_locations[3] >> 6u].number_of_band_points, 1u);
+		    }
 		}
             }
             if (n4.tag == FAR || n4.tag == BAND) {
-                atomicExchange(&fmm_data[memory_locations[4]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[1], 1u);
-		temp_data[ind] = memory_locations[4];
+                let old_n4 = atomicExchange(&fmm_data[memory_locations[4]].tag, BAND_NEW);
+		if (old_n4 != BAND_NEW) {
+		    let ind = atomicAdd(&fmm_counter[1], 1u);
+		    temp_data[ind] = memory_locations[4];
 
-		// A new band point. Increase band point count.
-		if (n4.tag == FAR) {
-                    atomicAdd(&fmm_blocks[memory_locations[4] >> 6u].number_of_band_points, 1u);
+		    // A new band point. Increase band point count.
+		    if (n4.tag == FAR) {
+                        atomicAdd(&fmm_blocks[memory_locations[4] >> 6u].number_of_band_points, 1u);
+		    }
 		}
             }
             if (n5.tag == FAR || n5.tag == BAND) {
-                atomicExchange(&fmm_data[memory_locations[5]].tag, BAND_NEW);
-		let ind = atomicAdd(&fmm_counter[1], 1u);
-		temp_data[ind] = memory_locations[5];
+                let old_n5 = atomicExchange(&fmm_data[memory_locations[5]].tag, BAND_NEW);
+		if (old_n5 != BAND_NEW) {
+		    let ind = atomicAdd(&fmm_counter[1], 1u);
+		    temp_data[ind] = memory_locations[5];
 
-		// A new band point. Increase band point count.
-		if (n5.tag == FAR) {
-                    atomicAdd(&fmm_blocks[memory_locations[5] >> 6u].number_of_band_points, 1u);
+		    // A new band point. Increase band point count.
+		    if (n5.tag == FAR) {
+                        atomicAdd(&fmm_blocks[memory_locations[5] >> 6u].number_of_band_points, 1u);
+		    }
 		}
             }
 	}

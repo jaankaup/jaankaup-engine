@@ -15,10 +15,10 @@ use crate::gpu_debugger::GpuDebugger;
 use crate::histogram::Histogram;
 use crate::gpu_timer::GpuTimer;
 
-/// Tag value for a known cell.
+/// Tag value for a unknow cell.
 const OTHER: u32  = 0;
 
-/// Tag value for a band cell.
+/// Tag value for a remedy cell.
 const REMEDY: u32 = 1;
 
 /// Tag value for active cell.
@@ -27,7 +27,7 @@ const ACTIVE: u32 = 2;
 /// Tag value for Source cell.
 const SOURCE: u32 = 3;
 
-/// Tag value for Source cell.
+/// Tag value for outside cell.
 const OUTSIDE: u32 = 4;
 
 // #[allow(dead_code)]
@@ -129,14 +129,6 @@ pub struct FastIterativeMethod {
     #[allow(dead_code)]
     prefix_temp_array: wgpu::Buffer,
 
-    /// Temporary data for prefix sum.
-    #[allow(dead_code)]
-    update_band_counts_compute_object: ComputeObject,
-
-    /// Temporary data for prefix sum.
-    #[allow(dead_code)]
-    update_band_counts_compute_object_bind_groups: Vec<wgpu::BindGroup>,
-
     /// A histogram for fmm purposes.
     #[allow(dead_code)]
     fim_histogram: Histogram,
@@ -146,9 +138,10 @@ pub struct FastIterativeMethod {
 
     count_source_cells: ComputeObject,
     // _count_source_cells_bg: Vec<wgpu::BindGroup>,
-    // count_band_cells: ComputeObject,
+    // count_active_cells: ComputeObject,
     // _count_band_cells_bg: Vec<wgpu::BindGroup>,
-    // create_init_band: ComputeObject,
+    initial_active_cells: ComputeObject,
+    update_phase: ComputeObject,
     // _create_init_band_gb: Vec<wgpu::BindGroup>,
     // solve_quadratic: ComputeObject,
     // solve_quadratic2: ComputeObject,
@@ -407,67 +400,67 @@ impl FastIterativeMethod {
 
         // Update band counts shader.
 
-        let update_band_counts_compute_object =
-                ComputeObject::init(
-                    &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: Some("calculate_band_point_counts.wgsl"),
-                        source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/calculate_band_point_counts.wgsl"))),
+        // let update_band_counts_compute_object =
+        //         ComputeObject::init(
+        //             &device,
+        //             &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //                 label: Some("calculate_band_point_counts.wgsl"),
+        //                 source: wgpu::ShaderSource::Wgsl(
+        //                     Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/calculate_band_point_counts.wgsl"))),
 
-                    }),
-                    Some("calculate_band_point_counts Compute objec"),
-                    &vec![
-                        vec![
-                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
-                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+        //             }),
+        //             Some("calculate_band_point_counts Compute objec"),
+        //             &vec![
+        //                 vec![
+        //                     // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+        //                     create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
  
-                            // @group(0) @binding(1) var<storage,read_write> fim_data: array<FmmCellPc>;
-                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+        //                     // @group(0) @binding(1) var<storage,read_write> fim_data: array<FmmCellPc>;
+        //                     create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
  
-                            // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
-                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
-                        ],
-                        vec![
-                            // @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
+        //                     // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
+        //                     create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+        //                 ],
+        //                 vec![
+        //                     // @group(1) @binding(0) var<storage, read_write> counter: array<atomic<u32>>;
+        //                     create_buffer_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
-                            create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
+        //                     // @group(1) @binding(1) var<storage,read_write>  output_char: array<Char>;
+        //                     create_buffer_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
-                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+        //                     // @group(1) @binding(2) var<storage,read_write>  output_arrow: array<Arrow>;
+        //                     create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+        //                     // @group(1) @binding(3) var<storage,read_write>  output_aabb: array<AABB>;
+        //                     create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
-                            // @group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
-                        ],
-                    ],
-                    &"main".to_string(),
-                    None
-        );
+        //                     // @group(1) @binding(4) var<storage,read_write>  output_aabb_wire: array<AABB>;
+        //                     create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+        //                 ],
+        //             ],
+        //             &"main".to_string(),
+        //             None
+        // );
 
-        let update_band_counts_compute_object_bind_groups = create_bind_groups(
-                &device,
-                &update_band_counts_compute_object.bind_group_layout_entries,
-                &update_band_counts_compute_object.bind_group_layouts,
-                &vec![
-                    vec![
-                    &fmm_params_buffer.get_buffer().as_entire_binding(),
-                    &fim_data.as_entire_binding(),
-                    &active_list.as_entire_binding(),
-                    ],
-                    vec![
-                    &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
-                    &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
-                    &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
-                    &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
-                    &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
-                    ],
-                ]
-        );
+        // let update_band_counts_compute_object_bind_groups = create_bind_groups(
+        //         &device,
+        //         &update_band_counts_compute_object.bind_group_layout_entries,
+        //         &update_band_counts_compute_object.bind_group_layouts,
+        //         &vec![
+        //             vec![
+        //             &fmm_params_buffer.get_buffer().as_entire_binding(),
+        //             &fim_data.as_entire_binding(),
+        //             &active_list.as_entire_binding(),
+        //             ],
+        //             vec![
+        //             &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
+        //             &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
+        //             &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
+        //             &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
+        //             &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+        //             ],
+        //         ]
+        // );
 
         let count_source_cells = Self::create_gather_source_cells(
                                         &device,
@@ -480,7 +473,7 @@ impl FastIterativeMethod {
                                         &fim_histogram.get_histogram_buffer(),
         );
 
-        // let (count_band_cells, count_band_cells_bg) = Self::create_gather_band_cells_co(
+        // let count_active_cells = Self::create_gather_active_cells_co(
         //                                 &device,
         //                                 &fmm_prefix_params,
         //                                 &fmm_params_buffer.get_buffer(),
@@ -488,19 +481,30 @@ impl FastIterativeMethod {
         //                                 &prefix_temp_array,
         //                                 &remedy_list,
         //                                 &fim_data,
-        //                                 &fim_histogram.get_histogram_buffer()
+        //                                 &fim_histogram.get_histogram_buffer(),
         // );
 
-        // let (create_init_band, create_init_band_gb) = Self::create_initial_band_co(
-        //                                 &device,
-        //                                 &fmm_prefix_params,
-        //                                 &fmm_params_buffer.get_buffer(),
-        //                                 &active_list,
-        //                                 &prefix_temp_array,
-        //                                 &remedy_list,
-        //                                 &fim_data,
-        //                                 &fim_histogram.get_histogram_buffer()
-        // );
+        let initial_active_cells = Self::create_initial_active_cells(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &active_list,
+                                        &prefix_temp_array,
+                                        &remedy_list,
+                                        &fim_data,
+                                        &fim_histogram.get_histogram_buffer(),
+        );
+
+        let update_phase = Self::create_update_phase(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &active_list,
+                                        &prefix_temp_array,
+                                        &remedy_list,
+                                        &fim_data,
+                                        &fim_histogram.get_histogram_buffer(),
+        );
 
         // let (solve_quadratic, _) = Self::create_solve_quadratic_co(
         //                                 &device,
@@ -616,12 +620,12 @@ impl FastIterativeMethod {
             fmm_value_fixer: fmm_value_fixer,
             fmm_prefix_params: fmm_prefix_params,
             prefix_temp_array: prefix_temp_array,
-            update_band_counts_compute_object: update_band_counts_compute_object,
-            update_band_counts_compute_object_bind_groups: update_band_counts_compute_object_bind_groups,
             fim_histogram: fim_histogram,
             first_time: true,
             // fmm_state: fmm_state,
             count_source_cells: count_source_cells,
+            initial_active_cells: initial_active_cells,
+            update_phase: update_phase,
             //_count_source_cells_bg: count_source_cells_bg,
             // count_band_cells: count_band_cells,
             // _count_band_cells_bg: count_band_cells_bg,
@@ -670,7 +674,7 @@ impl FastIterativeMethod {
     //     pass
     // }
 
-    pub fn fmm_iteration(&mut self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut Option<GpuTimer>) {
+    pub fn fim_iteration(&mut self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut Option<GpuTimer>) {
 
         let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count(), 1024);
         let number_of_dispatches_64 = udiv_up_safe32(self.calculate_cell_count(), 64);
@@ -700,15 +704,18 @@ impl FastIterativeMethod {
         if self.first_time {
 
             // Collect all known cells.
-            pass.set_pipeline(&self.count_source_cells.pipeline);
-            //pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
-            pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: create dispatch_indirect
+            //++ pass.set_pipeline(&self.count_source_cells.pipeline);
+            //++ //pass.set_push_constants(0, bytemuck::cast_slice(&[3]));
+            //++ pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: create dispatch_indirect
             //timer gpu_timer.end_pass(&mut pass);
 
             // // Create initial band.
             // //timer gpu_timer.start_pass(&mut pass);
-            // pass.set_pipeline(&self.create_init_band.pipeline);
-            // pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: dispatch_indirect
+            pass.set_pipeline(&self.initial_active_cells.pipeline);
+            pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: dispatch_indirect
+
+            pass.set_pipeline(&self.update_phase.pipeline);
+            pass.dispatch_workgroups(1, 1, 1); // TODO: dispatch_indirect
             // //timer gpu_timer.end_pass(&mut pass);
 
             // // Collect all band cells.
@@ -901,6 +908,57 @@ impl FastIterativeMethod {
         compute_object
     }
 
+    // fn create_gather_active_cells(device: &wgpu::Device,
+    //                               prefix_params: &wgpu::Buffer,
+    //                               fmm_params: &wgpu::Buffer,
+    //                               active_list: &wgpu::Buffer,
+    //                               temp_prefix_sum: &wgpu::Buffer,
+    //                               filtered_blocks: &wgpu::Buffer,
+    //                               fim_data: &wgpu::Buffer,
+    //                               fmm_counter: &wgpu::Buffer) -> ComputeObject {
+    //     let compute_object =
+    //             ComputeObject::init(
+    //                 &device,
+    //                 &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+    //                     label: Some("collect_source_cells.wgsl"),
+    //                     source: wgpu::ShaderSource::Wgsl(
+    //                         Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/collect_source_cells.wgsl"))),
+
+    //                 }),
+    //                 Some("Collect source cells ComputeObject"),
+    //                 &vec![
+    //                     vec![
+    //                         // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+    //                         create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+    //                         // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+    //                         create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+    //                         // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
+    //                         create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+    //                           
+    //                         // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+    //                         create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+    //                           
+    //                         // @group(0) @binding(4) var<storage,read_write> remedy_list: array<FmmBlock>;
+    //                         create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+    //                         // @group(0) @binding(5) var<storage,read_write> source_list: array<FmmBlock>;
+    //                         create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+    //                         // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
+    //                         create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+    //                         // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
+    //                         create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+    //                     ],
+    //                 ],
+    //                 &"main".to_string(),
+    //                 None,
+    //     );
+    //     compute_object
+    // }
+
     // fn create_gather_band_cells_co(device: &wgpu::Device,
     //                                prefix_params: &wgpu::Buffer,
     //                                fmm_params: &wgpu::Buffer,
@@ -968,74 +1026,107 @@ impl FastIterativeMethod {
     //     (compute_object, bind_groups)
     // }
 
-    // fn create_initial_band_co(device: &wgpu::Device,
-    //                                 prefix_params: &wgpu::Buffer,
-    //                                 fmm_params: &wgpu::Buffer,
-    //                                 active_list: &wgpu::Buffer,
-    //                                 temp_prefix_sum: &wgpu::Buffer,
-    //                                 filtered_blocks: &wgpu::Buffer,
-    //                                 fim_data: &wgpu::Buffer,
-    //                                 fmm_counter: &wgpu::Buffer) -> (ComputeObject, Vec<wgpu::BindGroup>) {
-    //     let compute_object =
-    //             ComputeObject::init(
-    //                 &device,
-    //                 &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-    //                     label: Some("create_initial_band_points.wgsl"),
-    //                     source: wgpu::ShaderSource::Wgsl(
-    //                         Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/create_initial_band_points.wgsl"))),
+    fn create_initial_active_cells(device: &wgpu::Device,
+                                    prefix_params: &wgpu::Buffer,
+                                    fmm_params: &wgpu::Buffer,
+                                    active_list: &wgpu::Buffer,
+                                    temp_prefix_sum: &wgpu::Buffer,
+                                    filtered_blocks: &wgpu::Buffer,
+                                    fim_data: &wgpu::Buffer,
+                                    fmm_counter: &wgpu::Buffer) -> ComputeObject {
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: Some("create_initial_active_cells.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/create_initial_active_cells.wgsl"))),
 
-    //                 }),
-    //                 Some("Create initial band points ComputeObject"),
-    //                 &vec![
-    //                     vec![
-    //                         // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
-    //                         create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+                    }),
+                    Some("Create initial active cells ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
 
-    //                         // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
-    //                         create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
 
-    //                         // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
-    //                         create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
-    //                           
-    //                         // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-    //                         create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
-    //                           
-    //                         // @group(0) @binding(4) var<storage,read_write> filtered_blocks: array<FmmBlock>;
-    //                         create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> remedy_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
 
-    //                         // @group(0) @binding(5) var<storage,read_write>  fim_data: array<TempData>;
-    //                         create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(5) var<storage,read_write> source_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
 
-    //                         // @group(0) @binding(6) var<storage,read_write> fmm_counter: array<atomic<u32>>;
-    //                         create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
-    //                     ],
-    //                 ],
-    //                 &"main".to_string(),
-    //                 None,
-    //                 // Some(vec![wgpu::PushConstantRange {
-    //                 //     stages: wgpu::ShaderStages::COMPUTE,
-    //                 //     range: 0..4,
-    //                 // }]),
-    //     );
-    //     let bind_groups = create_bind_groups(
-    //             &device,
-    //             &compute_object.bind_group_layout_entries,
-    //             &compute_object.bind_group_layouts,
-    //             &vec![
-    //                 vec![
-    //                     &prefix_params.as_entire_binding(),
-    //                     &fmm_params.as_entire_binding(),
-    //                     &active_list.as_entire_binding(),
-    //                     &temp_prefix_sum.as_entire_binding(),
-    //                     &filtered_blocks.as_entire_binding(),
-    //                     &fim_data.as_entire_binding(),
-    //                     &fmm_counter.as_entire_binding(),
-    //                 ],
-    //             ]
-    //     );
-    //     (compute_object, bind_groups)
-    // }
+                            // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
 
+                            // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None,
+        );
+        compute_object
+    }
+
+    fn create_update_phase(device: &wgpu::Device,
+                           prefix_params: &wgpu::Buffer,
+                           fmm_params: &wgpu::Buffer,
+                           active_list: &wgpu::Buffer,
+                           temp_prefix_sum: &wgpu::Buffer,
+                           filtered_blocks: &wgpu::Buffer,
+                           fim_data: &wgpu::Buffer,
+                           fmm_counter: &wgpu::Buffer) -> ComputeObject {
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: Some("update_phase.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/update_phase.wgsl"))),
+
+                    }),
+                    Some("Update phase ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> remedy_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write> source_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None,
+        );
+        compute_object
+    }
     // fn create_solve_quadratic_co(device: &wgpu::Device,
     //                                 prefix_params: &wgpu::Buffer,
     //                                 fmm_params: &wgpu::Buffer,
