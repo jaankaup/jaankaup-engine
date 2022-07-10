@@ -247,20 +247,21 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	//storageBarrier();
 	workgroupBarrier();
 
-        let buffer_offset = total_cell_count() / 2u;
+        let buffer_offset = total_cell_count();
+        //let buffer_offset = total_cell_count() / 2u;
 	var buffer_swap_id = 0u;
 
-	// while (items_to_process > 0u) {
+	while (items_to_process > 0u) {
+	    workgroupBarrier();
 
             var chunks = udiv_up_safe32(items_to_process, 1024u);
 
 	    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
-	        workgroupBarrier();
+                // workgroupBarrier();
 
 	        var actual_index = local_index + i * 1024u; // + buffer_swap_id * buffer_offset;
 	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
 
-                //if (actual_index < 785000u) {
                 if (actual_index < items_to_process) {
 	            var t = active_list[swap_index]; // The location of fim active cell.
 	            var fim_cell = fim_data[t]; // The actual fim active cell.
@@ -277,78 +278,63 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     private_neighbors[5] = fim_data[neighbor_mem_locations[5]];
 
                     var updated_value = solve_quadratic();
+		    let next_buffer_swap = (buffer_swap_id + 1u) & 1u;
 
 		    // The value didn't change. Add the active cell to the source. Add all non SOURCE/ACTIVE/OUTSIDE neighbors to the active list.
 		    if (abs(updated_value - fim_cell.value) < 0.0001) {
                         fim_cell.tag = SOURCE;
 
                         if (!(private_neighbors[0].tag == SOURCE || private_neighbors[0].tag == ACTIVE || private_neighbors[0].tag == OUTSIDE)) {
-                            // Add the new cell to the active list.
-                            // private_neighbors[0].tag = ACTIVE;
 			    fim_data[neighbor_mem_locations[0]].tag = ACTIVE; 
 
 			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + ((buffer_swap_id + 1u) & 1u) * buffer_offset] = neighbor_mem_locations[0];
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[0];
 			}
                         if (!(private_neighbors[1].tag == SOURCE || private_neighbors[1].tag == ACTIVE || private_neighbors[1].tag == OUTSIDE)) {
-                            // Add the new cell to the active list.
-                            // private_neighbors[0].tag = ACTIVE;
 			    fim_data[neighbor_mem_locations[1]].tag = ACTIVE; 
 
 			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + ((buffer_swap_id + 1u) & 1u) * buffer_offset] = neighbor_mem_locations[1];
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[1];
 			}
                         if (!(private_neighbors[2].tag == SOURCE || private_neighbors[2].tag == ACTIVE || private_neighbors[2].tag == OUTSIDE)) {
-                            // Add the new cell to the active list.
-                            // private_neighbors[2].tag = ACTIVE;
 			    fim_data[neighbor_mem_locations[2]].tag = ACTIVE; 
 
 			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + ((buffer_swap_id + 1u) & 1u) * buffer_offset] = neighbor_mem_locations[2];
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[2];
 			}
                         if (!(private_neighbors[3].tag == SOURCE || private_neighbors[3].tag == ACTIVE || private_neighbors[3].tag == OUTSIDE)) {
-                            // Add the new cell to the active list.
-                            // private_neighbors[3].tag = ACTIVE;
 			    fim_data[neighbor_mem_locations[3]].tag = ACTIVE; 
 
 			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + ((buffer_swap_id + 1u) & 1u) * buffer_offset] = neighbor_mem_locations[3];
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[3];
 			}
                         if (!(private_neighbors[4].tag == SOURCE || private_neighbors[4].tag == ACTIVE || private_neighbors[4].tag == OUTSIDE)) {
-                            // Add the new cell to the active list.
-                            // private_neighbors[4].tag = ACTIVE;
 			    fim_data[neighbor_mem_locations[4]].tag = ACTIVE; 
 
 			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + ((buffer_swap_id + 1u) & 1u) * buffer_offset] = neighbor_mem_locations[4];
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[4];
 			}
                         if (!(private_neighbors[5].tag == SOURCE || private_neighbors[5].tag == ACTIVE || private_neighbors[5].tag == OUTSIDE)) {
-                            // Add the new cell to the active list.
-                            // private_neighbors[5].tag = ACTIVE;
 			    fim_data[neighbor_mem_locations[5]].tag = ACTIVE; 
 
 			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + ((buffer_swap_id + 1u) & 1u) * buffer_offset] = neighbor_mem_locations[5];
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[5];
 			}
 		    }
 		    // The value changed. Update the fim active cell value.
 		    else {
                         fim_cell.value = updated_value;
-                        active_list[atomicAdd(&wg_mem_offset, 1u) + ((buffer_swap_id + 1u) & 1u) * buffer_offset] = t;
+                        active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = t;
 		    }
+	            fim_data[t] = fim_cell;
 	        }
-                //fim_cell.value = f32(items_to_process);
-	        fim_data[t] = fim_cell; 
-
-                // Swap buffers.
-		workgroupBarrier();
-
             } // for
-                if (global_id.x == 0u) {
-		    buffer_swap_id = (buffer_swap_id + 1u) & 1u;
-                    items_to_process = wg_mem_offset;
-	            wg_mem_offset = 0u;
-                    // cell_counter = 0u;
-                }
-        // } // while
+
+            workgroupBarrier();
+            if (local_index == 0u) {
+                items_to_process = wg_mem_offset;
+                atomicStore(&wg_mem_offset, 0u);
+            }
+            buffer_swap_id = (buffer_swap_id + 1u) & 1u;
+        } // while
 }

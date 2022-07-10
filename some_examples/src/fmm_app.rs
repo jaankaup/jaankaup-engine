@@ -48,7 +48,7 @@ use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_ARROWS:     usize = 3 * 262144;
+const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]
@@ -67,17 +67,19 @@ const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
 #[allow(dead_code)]
+//const TOTAL_INDICES: usize = 64*16*54*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-/// Mc global dimensions. 
-const FMM_GLOBAL_X: usize = 62;
-const FMM_GLOBAL_Y: usize = 16;
-const FMM_GLOBAL_Z: usize = 54;
+const FMM_GLOBAL_X: usize = 32;
+const FMM_GLOBAL_Y: usize = 8;
+const FMM_GLOBAL_Z: usize = 27;
+//const FMM_GLOBAL_X: usize = 62;
+//const FMM_GLOBAL_Y: usize = 16;
+//const FMM_GLOBAL_Z: usize = 54;
 
-/// Mc inner dimensions.
 const FMM_INNER_X: usize = 4; 
 const FMM_INNER_Y: usize = 4; 
 const FMM_INNER_Z: usize = 4; 
@@ -470,7 +472,8 @@ impl Application for FmmApp {
                 [128, 192],
                 //[192, 320],
                 fmm.get_fmm_params_buffer(),
-                fmm.get_fmm_data_buffer(),
+                fim.get_fim_data_buffer(),
+                //fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),
                 &Some(&gpu_debugger)
         );

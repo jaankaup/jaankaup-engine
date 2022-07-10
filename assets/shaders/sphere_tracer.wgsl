@@ -958,7 +958,8 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     var t_near: f32;
     var t_far: f32;
     let intersects = aabb_intersect(&p0, &p1, ray, &p_near, &p_far, &t_near, &t_far);
-
+    (*ray).rMin = t_near; // TODO: now useless.
+    (*ray).rMax = t_far;
     // if ((private_global_index.x & 63u) == 0u && intersects) {
     //     // let result = boxIntersection(&ray, vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension));
     //     output_arrow[atomicAdd(&counter[1], 1u)] =  
@@ -1024,8 +1025,8 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         //     }
              return;
         }
-        distance_to_interface = fmm_value(p, true) * 0.25; // max(min(0.01 * dist, 0.2), 0.001);
-        if (distance_to_interface < 0.03) {
+        distance_to_interface = fmm_value(p, false); // max(min(0.01 * dist, 0.2), 0.001);
+        if (abs(distance_to_interface) < 0.03) {
             (*payload).intersection_point = p;
             hit(ray, payload);
             return;
