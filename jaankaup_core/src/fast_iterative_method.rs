@@ -142,6 +142,7 @@ pub struct FastIterativeMethod {
     // _count_band_cells_bg: Vec<wgpu::BindGroup>,
     initial_active_cells: ComputeObject,
     update_phase: ComputeObject,
+    pre_remedy: ComputeObject,
     // _create_init_band_gb: Vec<wgpu::BindGroup>,
     // solve_quadratic: ComputeObject,
     // solve_quadratic2: ComputeObject,
@@ -506,6 +507,17 @@ impl FastIterativeMethod {
                                         &fim_histogram.get_histogram_buffer(),
         );
 
+        let pre_remedy = Self::create_pre_remedy(
+                                        &device,
+                                        &fmm_prefix_params,
+                                        &fmm_params_buffer.get_buffer(),
+                                        &active_list,
+                                        &prefix_temp_array,
+                                        &remedy_list,
+                                        &fim_data,
+                                        &fim_histogram.get_histogram_buffer(),
+        );
+
         // let (solve_quadratic, _) = Self::create_solve_quadratic_co(
         //                                 &device,
         //                                 &fmm_prefix_params,
@@ -626,6 +638,7 @@ impl FastIterativeMethod {
             count_source_cells: count_source_cells,
             initial_active_cells: initial_active_cells,
             update_phase: update_phase,
+            pre_remedy: pre_remedy,
             //_count_source_cells_bg: count_source_cells_bg,
             // count_band_cells: count_band_cells,
             // _count_band_cells_bg: count_band_cells_bg,
@@ -712,10 +725,13 @@ impl FastIterativeMethod {
             // // Create initial band.
             // //timer gpu_timer.start_pass(&mut pass);
             pass.set_pipeline(&self.initial_active_cells.pipeline);
-            pass.dispatch_workgroups(number_of_dispatches_128, 1, 1); // TODO: dispatch_indirect
+            pass.dispatch_workgroups(number_of_dispatches_256, 1, 1); // TODO: dispatch_indirect
 
             pass.set_pipeline(&self.update_phase.pipeline);
             pass.dispatch_workgroups(1, 1, 1); // TODO: dispatch_indirect
+
+            pass.set_pipeline(&self.pre_remedy.pipeline);
+            pass.dispatch_workgroups(number_of_dispatches_256, 1, 1); // TODO: dispatch_indirect
             // //timer gpu_timer.end_pass(&mut pass);
 
             // // Collect all band cells.
@@ -1095,6 +1111,57 @@ impl FastIterativeMethod {
 
                     }),
                     Some("Update phase ComputeObject"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+
+                            // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                              
+                            // @group(0) @binding(4) var<storage,read_write> remedy_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(5) var<storage,read_write> source_list: array<FmmBlock>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None,
+        );
+        compute_object
+    }
+
+    fn create_pre_remedy(device: &wgpu::Device,
+                           prefix_params: &wgpu::Buffer,
+                           fmm_params: &wgpu::Buffer,
+                           active_list: &wgpu::Buffer,
+                           temp_prefix_sum: &wgpu::Buffer,
+                           filtered_blocks: &wgpu::Buffer,
+                           fim_data: &wgpu::Buffer,
+                           fmm_counter: &wgpu::Buffer) -> ComputeObject {
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: Some("pre_remedy.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/pre_remedy.wgsl"))),
+
+                    }),
+                    Some("Pre-remedy ComputeObject"),
                     &vec![
                         vec![
                             // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;

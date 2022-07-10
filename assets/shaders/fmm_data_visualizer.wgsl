@@ -358,7 +358,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         }
     }
 
-    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND) {
+    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND || cell.tag == BAND_NEW ) {
         visualize_cell(position, col);
 
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
