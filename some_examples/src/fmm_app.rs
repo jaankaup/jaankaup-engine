@@ -73,12 +73,18 @@ const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-const FMM_GLOBAL_X: usize = 32;
-const FMM_GLOBAL_Y: usize = 8;
-const FMM_GLOBAL_Z: usize = 27;
+// const FMM_GLOBAL_X: usize = 32;
+// const FMM_GLOBAL_Y: usize = 8;
+// const FMM_GLOBAL_Z: usize = 27;
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
+//const FMM_GLOBAL_X: usize = 70;
+//const FMM_GLOBAL_Y: usize = 18;
+//const FMM_GLOBAL_Z: usize = 60;
+const FMM_GLOBAL_X: usize = 90;
+const FMM_GLOBAL_Y: usize = 18;
+const FMM_GLOBAL_Z: usize = 81;
 
 const FMM_INNER_X: usize = 4; 
 const FMM_INNER_Y: usize = 4; 
@@ -300,7 +306,18 @@ impl Application for FmmApp {
         let point_cloud_scale_factor_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32 / pc_max_coord[1];
         let point_cloud_scale_factor_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32 / pc_max_coord[2];
 
+        // let point_cloud_scale_factor_x = pc_max_coord[0] / (FMM_GLOBAL_X * FMM_INNER_X) as f32;
+        // let point_cloud_scale_factor_y = pc_max_coord[1] / (FMM_GLOBAL_Y * FMM_INNER_Y) as f32;
+        // let point_cloud_scale_factor_z = pc_max_coord[2] / (FMM_GLOBAL_Z * FMM_INNER_Z) as f32;
+
+        println!("point_cloud_scale_factor_x == {}", point_cloud_scale_factor_x);
+        println!("point_cloud_scale_factor_y == {}", point_cloud_scale_factor_y);
+        println!("point_cloud_scale_factor_z == {}", point_cloud_scale_factor_z);
+        println!("point_cloud.get_max_coord() == {:?}", point_cloud.get_max_coord());
+
         let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
+
+        println!("pc_scale_factor == {}", pc_scale_factor);
 
         let pc_params = PointCloudParamsBuffer::create(
             &configuration.device,

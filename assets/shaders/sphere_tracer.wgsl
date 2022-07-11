@@ -676,14 +676,14 @@ fn fmm_color_6(p: vec3<f32>) -> u32 {
 
 fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
 
-   // load_neighbors_private(vec3<u32>(p));
+   load_neighbors_private(vec3<u32>(p));
 
    //++++let pah = p; // * 4.0;
 
    //++++// fn my_modf(f: f32) -> ModF {
-   //++++let tx = fract(p.x);
-   //++++let ty = fract(p.y);
-   //++++let tz = fract(p.z);
+   let tx = fract(p.x);
+   let ty = fract(p.y);
+   let tz = fract(p.z);
 
    //++++let min_value = min(private_neighbors[0].value,  
    //++++                min(private_neighbors[1].value, 
@@ -759,73 +759,73 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    //++++       tx * ty * tz * c111; 
 
  
-   var point_counter = 0u;
-   let base_point = vec3<i32>(floor(p));
+   //++ var point_counter = 0u;
+   //++ let base_point = vec3<i32>(floor(p));
 
-   let tcc = total_cell_count();
-   var weight = 0.0;
-   var val = 0.0;
+   //++ let tcc = total_cell_count();
+   //++ var weight = 0.0;
+   //++ var val = 0.0;
 
-   // for (var i:u32 = 0u ; i < 64u ; i = i + 1u) {
-   for (var i:u32 = 0u ; i < 27u ; i = i + 1u) {
-       
-       let temp_point = vec3<i32>(index_to_uvec3(i, 3u, 3u)) - vec3<i32>(1, 1, 1) + base_point;
-       //let temp_point = vec3<i32>(index_to_uvec3(i, 4u, 4u)) - vec3<i32>(1, 1, 1) + base_point;
-       let dist = distance(vec3<f32>(temp_point), p); 
-       //if (dist < 1.41421356237 && isInside(temp_point)) {
-       if (dist < 1.0 && isInside(temp_point)) {
-       //if (dist < 2.0 && isInside(temp_point)) {
-	   let t_w = abs(dist - 1.0);
-	   //let t_w = abs(dist - 1.41421356237);
-	   let mem = get_cell_mem_location(vec3<u32>(temp_point));
-           let fmm_cell= fmm_data[mem];
-	   val = val + t_w * fmm_cell.value;
-	   weight = weight + t_w;
+   //++ // for (var i:u32 = 0u ; i < 64u ; i = i + 1u) {
+   //++ for (var i:u32 = 0u ; i < 27u ; i = i + 1u) {
+   //++     
+   //++     let temp_point = vec3<i32>(index_to_uvec3(i, 3u, 3u)) - vec3<i32>(1, 1, 1) + base_point;
+   //++     //let temp_point = vec3<i32>(index_to_uvec3(i, 4u, 4u)) - vec3<i32>(1, 1, 1) + base_point;
+   //++     let dist = distance(vec3<f32>(temp_point), p); 
+   //++     //if (dist < 1.41421356237 && isInside(temp_point)) {
+   //++     if (dist < 1.0 && isInside(temp_point)) {
+   //++     //if (dist < 2.0 && isInside(temp_point)) {
+   //++         let t_w = abs(dist - 1.0);
+   //++         //let t_w = abs(dist - 1.41421356237);
+   //++         let mem = get_cell_mem_location(vec3<u32>(temp_point));
+   //++         let fmm_cell= fmm_data[mem];
+   //++         val = val + t_w * fmm_cell.value;
+   //++         weight = weight + t_w;
 
-           // if (private_global_index.x == 0u) {
-           //     output_arrow[atomicAdd(&counter[1], 1u)] =  
-           //           Arrow (
-           //               vec4<f32>(p * 4.0, 0.0),
-           //               vec4<f32>(vec3<f32>(temp_point) * 4.0, 0.0),
-           //               //vec4<f32>(tMins, 0.0),
-           //               //vec4<f32>(tMaxes, 0.0),
-           //               rgba_u32(155u, 0u, 1550u, 255u),
-           //               0.1
-           //     );
-           // }
-       }
-   }
+   //++         // if (private_global_index.x == 0u) {
+   //++         //     output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //++         //           Arrow (
+   //++         //               vec4<f32>(p * 4.0, 0.0),
+   //++         //               vec4<f32>(vec3<f32>(temp_point) * 4.0, 0.0),
+   //++         //               //vec4<f32>(tMins, 0.0),
+   //++         //               //vec4<f32>(tMaxes, 0.0),
+   //++         //               rgba_u32(155u, 0u, 1550u, 255u),
+   //++         //               0.1
+   //++         //     );
+   //++         // }
+   //++     }
+   //++ }
 
-   return val / weight;
+   //++ return val / weight;
 
-   //++ var neighbors: array<vec3<i32>, 8> = array<vec3<i32>, 8>(
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  1),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  1),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  1),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  1),
-   //++ );
+   var neighbors: array<vec3<i32>, 8> = array<vec3<i32>, 8>(
+       vec3<i32>(floor(p)) + vec3<i32>(0,  0,  0),
+       vec3<i32>(floor(p)) + vec3<i32>(1,  0,  0),
+       vec3<i32>(floor(p)) + vec3<i32>(0,  1,  0),
+       vec3<i32>(floor(p)) + vec3<i32>(1,  1,  0),
+       vec3<i32>(floor(p)) + vec3<i32>(0,  0,  1),
+       vec3<i32>(floor(p)) + vec3<i32>(1,  0,  1),
+       vec3<i32>(floor(p)) + vec3<i32>(0,  1,  1),
+       vec3<i32>(floor(p)) + vec3<i32>(1,  1,  1),
+   );
 
-   //++ let w0 = distance(p, vec3<f32>(neighbors[0])); 
-   //++ let w1 = distance(p, vec3<f32>(neighbors[1])); 
-   //++ let w2 = distance(p, vec3<f32>(neighbors[2])); 
-   //++ let w3 = distance(p, vec3<f32>(neighbors[3])); 
-   //++ let w4 = distance(p, vec3<f32>(neighbors[4])); 
-   //++ let w5 = distance(p, vec3<f32>(neighbors[5])); 
-   //++ let w6 = distance(p, vec3<f32>(neighbors[6])); 
-   //++ let w7 = distance(p, vec3<f32>(neighbors[7])); 
+   // let w0 = distance(p, vec3<f32>(neighbors[0])); 
+   // let w1 = distance(p, vec3<f32>(neighbors[1])); 
+   // let w2 = distance(p, vec3<f32>(neighbors[2])); 
+   // let w3 = distance(p, vec3<f32>(neighbors[3])); 
+   // let w4 = distance(p, vec3<f32>(neighbors[4])); 
+   // let w5 = distance(p, vec3<f32>(neighbors[5])); 
+   // let w6 = distance(p, vec3<f32>(neighbors[6])); 
+   // let w7 = distance(p, vec3<f32>(neighbors[7])); 
 
-   //++ let factor0 = select(1.0, 0.0, private_neighbors[0].tag == OUTSIDE);
-   //++ let factor1 = select(1.0, 0.0, private_neighbors[1].tag == OUTSIDE);
-   //++ let factor2 = select(1.0, 0.0, private_neighbors[2].tag == OUTSIDE);
-   //++ let factor3 = select(1.0, 0.0, private_neighbors[3].tag == OUTSIDE);
-   //++ let factor4 = select(1.0, 0.0, private_neighbors[4].tag == OUTSIDE);
-   //++ let factor5 = select(1.0, 0.0, private_neighbors[5].tag == OUTSIDE);
-   //++ let factor6 = select(1.0, 0.0, private_neighbors[6].tag == OUTSIDE);
-   //++ let factor7 = select(1.0, 0.0, private_neighbors[7].tag == OUTSIDE);
+   // let factor0 = select(1.0, 0.0, private_neighbors[0].tag == OUTSIDE);
+   // let factor1 = select(1.0, 0.0, private_neighbors[1].tag == OUTSIDE);
+   // let factor2 = select(1.0, 0.0, private_neighbors[2].tag == OUTSIDE);
+   // let factor3 = select(1.0, 0.0, private_neighbors[3].tag == OUTSIDE);
+   // let factor4 = select(1.0, 0.0, private_neighbors[4].tag == OUTSIDE);
+   // let factor5 = select(1.0, 0.0, private_neighbors[5].tag == OUTSIDE);
+   // let factor6 = select(1.0, 0.0, private_neighbors[6].tag == OUTSIDE);
+   // let factor7 = select(1.0, 0.0, private_neighbors[7].tag == OUTSIDE);
 
    //++ var w = private_neighbors[0].value * (sqrt(2.0) - w0) * factor0 + // * factor0 +
    //++         private_neighbors[1].value * (sqrt(2.0) - w1) * factor1 + // * factor1 +
@@ -838,14 +838,22 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
 
    //++ return w / (w0 * factor0 + w1 * factor1 + w2 * factor2 + w3 * factor3 + w4 * factor4 + w5 * factor5 + w6 * factor6 + w7 * factor7); // Zero? 
 
-   //++ //return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value + // * c000_factor + 
-   //++ //       tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value + // * c100_factor+ 
-   //++ //       (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value + // * c010_factor+ 
-   //++ //       tx * ty * (1.0 - tz) * private_neighbors[3].value + // * c110_factor+ 
-   //++ //       (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value + // * c001_factor+ 
-   //++ //       tx * (1.0 - ty) * tz * private_neighbors[5].value + // * c101_factor+ 
-   //++ //       (1.0 - tx) * ty * tz * private_neighbors[6].value + // * c011_factor+ 
-   //++ //       tx * ty * tz * private_neighbors[7].value; // * c111_factor; 
+   return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value + // * c000_factor + 
+          tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value + // * c100_factor+ 
+          (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value + // * c010_factor+ 
+          tx * ty * (1.0 - tz) * private_neighbors[3].value + // * c110_factor+ 
+          (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value + // * c001_factor+ 
+          tx * (1.0 - ty) * tz * private_neighbors[5].value + // * c101_factor+ 
+          (1.0 - tx) * ty * tz * private_neighbors[6].value + // * c011_factor+ 
+          tx * ty * tz * private_neighbors[7].value; // * c111_factor; 
+   // return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value * factor0 + // * c000_factor + 
+   //        tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value * factor1 + // * c100_factor+ 
+   //        (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value * factor2 + // * c010_factor+ 
+   //        tx * ty * (1.0 - tz) * private_neighbors[3].value * factor3 + // * c110_factor+ 
+   //        (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value * factor4 + // * c001_factor+ 
+   //        tx * (1.0 - ty) * tz * private_neighbors[5].value * factor5 + // * c101_factor+ 
+   //        (1.0 - tx) * ty * tz * private_neighbors[6].value * factor6 + // * c011_factor+ 
+   //        tx * ty * tz * private_neighbors[7].value * factor7; // * c111_factor; 
 }
 
 /// Calculate normal using fmm neighbors.

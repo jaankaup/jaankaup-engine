@@ -31,7 +31,7 @@ struct FmmParams {
 @group(0) @binding(4) var<storage,read_write> remedy_list: array<u32>; // temp_data
 @group(0) @binding(5) var<storage,read_write> source_list: array<u32>; // temp_data
 @group(0) @binding(6) var<storage,read_write> fim_data: array<FimCellPc>;
-@group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
+@group(0) @binding(7) var<storage,read_write> fim_counter: array<u32>; // 5 placeholders
 
 var<workgroup> buffer_id: u32;
 var<workgroup> wg_mem_offset: atomic<u32>;
@@ -181,14 +181,19 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
 fn solve_quadratic() -> f32 {
 
     var phis: array<f32, 6> = array<f32, 6>(
-                                  select(10000.0, private_neighbors[0].value, private_neighbors[0].tag == SOURCE),
-                                  select(10000.0, private_neighbors[1].value, private_neighbors[1].tag == SOURCE),
-                                  select(10000.0, private_neighbors[2].value, private_neighbors[2].tag == SOURCE),
-                                  select(10000.0, private_neighbors[3].value, private_neighbors[3].tag == SOURCE),
-                                  select(10000.0, private_neighbors[4].value, private_neighbors[4].tag == SOURCE),
-                                  select(10000.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE) 
+                                  private_neighbors[0].value,
+                                  private_neighbors[1].value,
+                                  private_neighbors[2].value,
+                                  private_neighbors[3].value,
+                                  private_neighbors[4].value,
+                                  private_neighbors[5].value 
+                                  //select(10000.0, private_neighbors[0].value, private_neighbors[0].tag == SOURCE),
+                                  //select(10000.0, private_neighbors[1].value, private_neighbors[1].tag == SOURCE),
+                                  //select(10000.0, private_neighbors[2].value, private_neighbors[2].tag == SOURCE),
+                                  //select(10000.0, private_neighbors[3].value, private_neighbors[3].tag == SOURCE),
+                                  //select(10000.0, private_neighbors[4].value, private_neighbors[4].tag == SOURCE),
+                                  //select(10000.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE) 
     );
-
 
     var p = vec3<f32>(min(phis[0], phis[1]), min(phis[2], phis[3]), min(phis[4], phis[5]));
 
@@ -240,14 +245,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         if (local_index == 0u) {
 	    wg_mem_offset = 0u;
             buffer_id = 0u;	
-            items_to_process = 0u;
+            items_to_process = fim_counter[2];
         }
-	//storageBarrier();
 	workgroupBarrier();
 
         let buffer_offset = total_cell_count();
-        //let buffer_offset = total_cell_count() / 2u;
 	var buffer_swap_id = 0u;
+
+	var count = 0u;
 
 	while (items_to_process > 0u) {
 	    workgroupBarrier();
@@ -256,7 +261,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 	    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
 
-	        var actual_index = local_index + i * 1024u; // + buffer_swap_id * buffer_offset;
+	        var actual_index = local_index + i * 1024u;
 	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
 
                 if (actual_index < items_to_process) {
@@ -278,50 +283,51 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		    let next_buffer_swap = (buffer_swap_id + 1u) & 1u;
 
 		    // The value didn't change. Add the active cell to the source. Add all non SOURCE/ACTIVE/OUTSIDE neighbors to the active list.
-		    if (abs(updated_value - fim_cell.value) < 0.0001) {
-                        fim_cell.tag = SOURCE;
-
-                        if (!(private_neighbors[0].tag == SOURCE || private_neighbors[0].tag == ACTIVE || private_neighbors[0].tag == OUTSIDE)) {
-			    fim_data[neighbor_mem_locations[0]].tag = ACTIVE; 
-
-			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[0];
-			}
-                        if (!(private_neighbors[1].tag == SOURCE || private_neighbors[1].tag == ACTIVE || private_neighbors[1].tag == OUTSIDE)) {
-			    fim_data[neighbor_mem_locations[1]].tag = ACTIVE; 
-
-			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[1];
-			}
-                        if (!(private_neighbors[2].tag == SOURCE || private_neighbors[2].tag == ACTIVE || private_neighbors[2].tag == OUTSIDE)) {
-			    fim_data[neighbor_mem_locations[2]].tag = ACTIVE; 
-
-			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[2];
-			}
-                        if (!(private_neighbors[3].tag == SOURCE || private_neighbors[3].tag == ACTIVE || private_neighbors[3].tag == OUTSIDE)) {
-			    fim_data[neighbor_mem_locations[3]].tag = ACTIVE; 
-
-			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[3];
-			}
-                        if (!(private_neighbors[4].tag == SOURCE || private_neighbors[4].tag == ACTIVE || private_neighbors[4].tag == OUTSIDE)) {
-			    fim_data[neighbor_mem_locations[4]].tag = ACTIVE; 
-
-			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[4];
-			}
-                        if (!(private_neighbors[5].tag == SOURCE || private_neighbors[5].tag == ACTIVE || private_neighbors[5].tag == OUTSIDE)) {
-			    fim_data[neighbor_mem_locations[5]].tag = ACTIVE; 
-
-			    // TODO: first to the workgroup memomy, then scatter.
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[5];
-			}
-		    }
 		    // The value changed. Update the fim active cell value.
-		    else {
+		    if (updated_value < fim_cell.value) {
+
                         fim_cell.value = updated_value;
                         active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = t;
+
+                        if (private_neighbors[0].tag != REMEDY && private_neighbors[0].tag != OUTSIDE) {
+			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, REMEDY);
+	                    if (old_tag != REMEDY) {
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[0];
+	                    }
+			}
+                        if (private_neighbors[1].tag != REMEDY && private_neighbors[1].tag != OUTSIDE) {
+			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, REMEDY);
+	                    if (old_tag != REMEDY) {
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[1];
+	                    }
+			}
+                        if (private_neighbors[2].tag != REMEDY && private_neighbors[2].tag != OUTSIDE) {
+			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, REMEDY);
+	                    if (old_tag != REMEDY) {
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[2];
+	                    }
+			}
+                        if (private_neighbors[3].tag != REMEDY && private_neighbors[3].tag != OUTSIDE) {
+			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, REMEDY);
+	                    if (old_tag != REMEDY) {
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[3];
+	                    }
+			}
+                        if (private_neighbors[4].tag != REMEDY && private_neighbors[4].tag != OUTSIDE) {
+			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, REMEDY);
+	                    if (old_tag != REMEDY) {
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[4];
+	                    }
+			}
+                        if (private_neighbors[5].tag != REMEDY && private_neighbors[5].tag != OUTSIDE) {
+			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, REMEDY);
+	                    if (old_tag != REMEDY) {
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[5];
+	                    }
+			}
+		    }
+		    else {
+                        fim_cell.tag = SOURCE;
 		    }
 	            fim_data[t] = fim_cell;
 	        }
@@ -329,9 +335,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
             workgroupBarrier();
             if (local_index == 0u) {
-                items_to_process = wg_mem_offset;
-                atomicStore(&wg_mem_offset, 0u);
+                items_to_process = atomicExchange(&wg_mem_offset, 0u);
+		fim_counter[3] = items_to_process;
+		fim_counter[4] = count;
             }
             buffer_swap_id = (buffer_swap_id + 1u) & 1u;
+	    count = count + 1u;
         } // while
 }

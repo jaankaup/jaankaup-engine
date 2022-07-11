@@ -7,7 +7,8 @@ let SOURCE  = 3u;
 let OUTSIDE = 4u;
 
 struct FimCellPc {
-    tag: atomic<u32>,
+    //tag: atomic<u32>,
+    tag: u32,
     value: f32,
     color: u32,
 };
@@ -255,6 +256,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
 		if (!(abs(updated_value - fim_cell.value) < 0.0001)) {
                     fim_data[global_id.x].tag = REMEDY;
+		    active_list[atomicAdd(&fim_counter[2], 1u)] = global_id.x;
 	        }
 	}
 }
