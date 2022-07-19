@@ -73,9 +73,9 @@ const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-//const FMM_GLOBAL_X: usize = 32;
-//const FMM_GLOBAL_Y: usize = 8;
-//const FMM_GLOBAL_Z: usize = 27;
+const FMM_GLOBAL_X: usize = 32;
+const FMM_GLOBAL_Y: usize = 8;
+const FMM_GLOBAL_Z: usize = 27;
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
@@ -85,9 +85,6 @@ const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM
 // const FMM_GLOBAL_X: usize = 80;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 56;
-const FMM_GLOBAL_X: usize = 90;
-const FMM_GLOBAL_Y: usize = 18;
-const FMM_GLOBAL_Z: usize = 62;
 
 const FMM_INNER_X: usize = 4;
 const FMM_INNER_Y: usize = 4;

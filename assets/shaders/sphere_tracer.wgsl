@@ -886,6 +886,25 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    // let c011 = private_neighbors[2].value; 
    // let c111 = private_neighbors[3].value; 
 
+   // var min_value0 = select(private_neighbors[1].value, private_neighbors[0].value, private_neighbors[0].value < private_neighbors[1].value);
+   // var min_value1 = select(private_neighbors[3].value, private_neighbors[2].value, private_neighbors[2].value < private_neighbors[3].value);
+   // var min_value2 = select(private_neighbors[5].value, private_neighbors[4].value, private_neighbors[4].value < private_neighbors[5].value);
+   // var min_value3 = select(private_neighbors[7].value, private_neighbors[6].value, private_neighbors[6].value < private_neighbors[7].value);
+
+   // var min_value4 = select(min_value1, min_value0, min_value0 < min_value1);
+   // var min_value5 = select(min_value3, min_value2, min_value2 < min_value3);
+
+   // var min_value = select(min_value5, min_value4, min_value4 < min_value5);
+
+   // let c000 = select(private_neighbors[0].value, min_value, private_neighbors[0].tag != KNOWN);
+   // let c100 = select(private_neighbors[1].value, min_value, private_neighbors[1].tag != KNOWN); 
+   // let c010 = select(private_neighbors[2].value, min_value, private_neighbors[2].tag != KNOWN);
+   // let c110 = select(private_neighbors[3].value, min_value, private_neighbors[3].tag != KNOWN); 
+   // let c001 = select(private_neighbors[4].value, min_value, private_neighbors[4].tag != KNOWN);
+   // let c101 = select(private_neighbors[5].value, min_value, private_neighbors[5].tag != KNOWN); 
+   // let c011 = select(private_neighbors[6].value, min_value, private_neighbors[6].tag != KNOWN); 
+   // let c111 = select(private_neighbors[7].value, min_value, private_neighbors[7].tag != KNOWN); 
+
    let c000 = private_neighbors[0].value;
    let c100 = private_neighbors[1].value; 
    let c010 = private_neighbors[2].value;

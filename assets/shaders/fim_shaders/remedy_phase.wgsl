@@ -27,9 +27,7 @@ struct FmmParams {
 @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
 @group(0) @binding(2) var<storage,read_write> active_list: array<u32>; //fmm_blocks
-@group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-// @group(0) @binding(4) var<storage,read_write> remedy_list: array<u32>; // temp_data
-// @group(0) @binding(5) var<storage,read_write> source_list: array<u32>; // temp_data
+@group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>; // USELESS
 @group(0) @binding(4) var<storage,read_write> fim_data: array<FimCellPc>;
 @group(0) @binding(5) var<storage,read_write> fim_counter: array<u32>; // 5 placeholders
 
@@ -216,20 +214,25 @@ fn solve_quadratic() -> f32 {
     }
 
     var result: f32 = 777.0;
+    
+    // The speed information.
+    let speed = 1.0;
+    let fpow2_inv = 1.0; // / (speed * speed);
 
     if (abs(p[0] - p[2]) < 1.0) {
         var phi_sum = p[0] + p[1] + p[2];
         var phi_sum2 = pow(p[0], 2.0) + pow(p[1], 2.0) + pow(p[2], 2.0);
         var phi_sum_pow2 = pow(phi_sum, 2.0);
-        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum2 - 1.0)));
+        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum2 - 1.0 * fpow2_inv)));
     }
 
     else if (abs(p[0] - p[1]) < 1.0) {
-        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
+        //result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
+        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * fpow2_inv - pow((p[0] - p[1]), 2.0)));
     }
  
     else {
-        result = p[0] + 1.0;
+        result = p[0] + 1.0 * fpow2_inv;
     }
 
     return result;
