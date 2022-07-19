@@ -9,8 +9,8 @@ use cgmath::Vector3;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct VVVC {
-    position: [f32; 3],
-    color: u32,
+    pub position: [f32; 3],
+    pub color: u32,
 }
 
 // #[repr(C)]
@@ -21,7 +21,7 @@ pub struct VVVC64 {
 }
 
 /// Read space separated pppccc data from file. Returns (aabb_min, aabb_max, VVVC data)
-pub fn read_pc_data(file: &String) -> ([f32; 3], [f32; 3], Vec<VVVC>) {
+pub fn read_pc_data(file: &String, scene_x: f32, scene_y: f32, scene_z: f32) -> ([f32; 3], [f32; 3], Vec<VVVC>) {
 
     let mut result: Vec<VVVC64> = Vec::with_capacity(7000000);
     let mut result2: Vec<VVVC> = Vec::with_capacity(7000000);
@@ -68,6 +68,16 @@ pub fn read_pc_data(file: &String) -> ([f32; 3], [f32; 3], Vec<VVVC>) {
     aabb.min.x = 0.0;
     aabb.min.y = 0.0;
     aabb.min.z = 0.0;
+
+    let point_cloud_scale_factor_x = scene_x / aabb.max[0] as f32;
+    let point_cloud_scale_factor_y = scene_y / aabb.max[1] as f32;
+    let point_cloud_scale_factor_z = scene_z / aabb.max[2] as f32;
+
+    for i in 0..result2.len() {
+        result2[i].position[0] = result2[i].position[0] * point_cloud_scale_factor_x;
+        result2[i].position[1] = result2[i].position[1] * point_cloud_scale_factor_y;
+        result2[i].position[2] = result2[i].position[2] * point_cloud_scale_factor_z;
+    }
 
     ([aabb.min.x as f32, aabb.min.y as f32, aabb.min.z as f32], [aabb.max.x as f32, aabb.max.y as f32, aabb.max.z as f32], result2)
 }

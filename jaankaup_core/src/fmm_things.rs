@@ -307,34 +307,29 @@ impl DomainTester {
     }
 
     pub fn update_show_numbers(&mut self, queue: &wgpu::Queue, show_numbers: bool) {
-        self.computational_domain_buffer.computational_domain.show_numbers = if show_numbers { 1 } else { 0 }; 
-        self.computational_domain_buffer.update(queue);
-    }
+        self.computational_domain_buffer.computational_domain.show_numbers = if show_numbers { 1 }
+        else { 0 }; self.computational_domain_buffer.update(queue); }
 
     pub fn dispatch(&self, encoder: &mut wgpu::CommandEncoder) {
 
-        let global_dimension = self.computational_domain_buffer.get_computational_domain().global_dimension;
-        let local_dimension = self.computational_domain_buffer.get_computational_domain().local_dimension;
+        let global_dimension =
+            self.computational_domain_buffer.get_computational_domain().global_dimension; let
+            local_dimension =
+            self.computational_domain_buffer.get_computational_domain().local_dimension;
 
-        let total_grid_count =
-                        global_dimension[0] *
-                        global_dimension[1] *
-                        global_dimension[2] *
-                        local_dimension[0] *
-                        local_dimension[1] *
-                        local_dimension[2];
+        let total_grid_count = global_dimension[0] * global_dimension[1] * global_dimension[2] *
+            local_dimension[0] * local_dimension[1] * local_dimension[2];
 
-        self.compute_object.dispatch(
-            &self.bind_groups,
-            encoder,
-            udiv_up_safe32(total_grid_count, 1024) + 1, 1, 1, Some("Domain tester dispatch")
-        );
-    }
-}
+        self.compute_object.dispatch( &self.bind_groups, encoder, udiv_up_safe32(total_grid_count,
+                                                                                 1024) + 1, 1, 1,
+                                                                                 Some("Domain
+                                                                                 tester
+                                                                                 dispatch")); } }
 
-fn load_pc_data(device: &wgpu::Device, src_file: &String) -> (u32, [f32; 3], [f32; 3], wgpu::Buffer) {
+fn load_pc_data(device: &wgpu::Device, src_file: &String, scene_x: f32, scene_y: f32, scene_z: f32)
+    -> (u32, [f32; 3], [f32; 3], wgpu::Buffer) {
 
-    let (aabb_min, aabb_max, pc_data) = read_pc_data(src_file);
+    let (aabb_min, aabb_max, pc_data) = read_pc_data(src_file, scene_x, scene_y, scene_z);
 
     (pc_data.len() as u32,
      aabb_min,
@@ -363,10 +358,10 @@ pub struct PointCloudParams {
     min_point: [f32; 3],
     point_count: u32,
     max_point: [f32; 3],
-    scale_factor: f32,
     thread_group_number: u32,
+    scale_factor: [f32; 3],
     show_numbers: u32,
-    padding: [u32; 2],
+    //padding: [u32; 2],
 }
 
 /// A Struct for PointCloudParams.
@@ -376,7 +371,7 @@ pub struct PointCloudParamsBuffer {
 }
 
 impl PointCloudParamsBuffer {
-    pub fn create(device: &wgpu::Device, point_count: u32, aabb_min: [f32; 3], aabb_max: [f32; 3], scale_factor: f32, thread_group_number: u32, show_numbers: bool) -> Self {
+    pub fn create(device: &wgpu::Device, point_count: u32, aabb_min: [f32; 3], aabb_max: [f32; 3], scale_factor: [f32 ; 3], thread_group_number: u32, show_numbers: bool) -> Self {
 
         let params = PointCloudParams {
             min_point: aabb_min,
@@ -385,7 +380,7 @@ impl PointCloudParamsBuffer {
             scale_factor: scale_factor,
             thread_group_number: thread_group_number,
             show_numbers: if show_numbers { 1 } else { 0 }, 
-            padding: [0, 0],
+            // padding: [0, 0],
         };
 
         let buf = buffer_from_data::<PointCloudParams>(
@@ -422,9 +417,9 @@ impl PointCloud {
 
     /// Creates PointCloud structure from given v v v c c c data.
     /// TODO: Check if file_location exists.
-    pub fn init(device: &wgpu::Device, file_location: &String) -> Self {
+    pub fn init(device: &wgpu::Device, file_location: &String, scene_x: f32, scene_y: f32, scene_z: f32) -> Self {
 
-        let (point_count, aabb_min, aabb_max, buffer) = load_pc_data(device, file_location);
+        let (point_count, aabb_min, aabb_max, buffer) = load_pc_data(device, file_location, scene_x,  scene_y,  scene_z);
 
         println!("POINT COUNT = {}", point_count);
 
@@ -474,7 +469,7 @@ impl PointCloudHandler {
                 point_count: u32,
                 aabb_min: [f32 ; 3],
                 aabb_max: [f32 ; 3],
-                scale_factor: f32,
+                scale_factor: [f32 ; 3],
                 thread_group_number: u32,
                 show_numbers: bool,
                 fmm_data: &wgpu::Buffer,

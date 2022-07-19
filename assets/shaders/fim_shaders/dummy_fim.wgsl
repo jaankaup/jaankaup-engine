@@ -74,10 +74,10 @@ let OUTSIDE  = 4u;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
 @group(0) @binding(2) var<storage,read_write> active_list: array<TempData>; //fmm_blocks
 @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-@group(0) @binding(4) var<storage,read_write> remedy_list: array<TempData>; // temp_data
-@group(0) @binding(5) var<storage,read_write> source_list: array<TempData>; // temp_data
-@group(0) @binding(6) var<storage,read_write> fim_data: array<FimCellPc>;
-@group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
+// @group(0) @binding(4) var<storage,read_write> remedy_list: array<TempData>; // temp_data
+// @group(0) @binding(5) var<storage,read_write> source_list: array<TempData>; // temp_data
+@group(0) @binding(4) var<storage,read_write> fim_data: array<FimCellPc>;
+@group(0) @binding(5) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
 
 // GpuDebugger.
 @group(1) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;

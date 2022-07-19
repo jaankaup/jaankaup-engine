@@ -1,5 +1,3 @@
-/// Find the neighbor cells from SOURCE points, update them to ACTIVE cells, save the count to fim_counter[1] and store the memomry locations to source_list.
-
 let OTHER   = 0u;
 let REMEDY  = 1u;
 let ACTIVE  = 2u;
@@ -17,10 +15,6 @@ struct TempData {
     data0: u32,
     data1: u32,
 };
-
-// struct PushConstants {
-//     tag: u32,    
-// };
 
 struct PrefixParams {
     data_start_index: u32,
@@ -40,10 +34,10 @@ struct FmmParams {
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
 @group(0) @binding(2) var<storage,read_write> active_list: array<u32>; //fmm_blocks
 @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-@group(0) @binding(4) var<storage,read_write> remedy_list: array<TempData>; // temp_data
-@group(0) @binding(5) var<storage,read_write> source_list: array<u32>; // temp_data
-@group(0) @binding(6) var<storage,read_write> fim_data: array<FimCellPc>;
-@group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
+// @group(0) @binding(4) var<storage,read_write> remedy_list: array<TempData>; // temp_data
+// @group(0) @binding(5) var<storage,read_write> source_list: array<u32>; // temp_data
+@group(0) @binding(4) var<storage,read_write> fim_data: array<FimCellPc>;
+@group(0) @binding(5) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
 
 var<private> private_neighbors:     array<FimCellPc, 6>;
 
@@ -254,7 +248,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
                 var updated_value = solve_quadratic();
 
-		if (!(abs(updated_value - fim_cell.value) < 0.0001)) {
+		if (!(abs(updated_value - fim_cell.value) < 0.00001)) {
                     fim_data[global_id.x].tag = REMEDY;
 		    active_list[atomicAdd(&fim_counter[2], 1u)] = global_id.x;
 	        }

@@ -38,28 +38,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if (global_id.x >= total_count) { return; }
 
     var cell = fmm_data[global_id.x];
-    //++ let the_sign = select(1.0, -1.0, (cell.value >> 31u) != 0u); 
-    // let the_sign = select(1.0, -1.0, (cell.value & (1u << 31u)) != 0u); 
-
-    //mc // Convert value back to f32.
-    //mc if (cell.tag == KNOWN) {
-    //mc     cell.value = bitcast<u32>(f32(cell.value) * (-1.0) * 0.0001);
-    //mc }
-    //mc else {
-    //mc     cell.value = bitcast<u32>(1.0);
-    //mc }
 
     // Convert value back to f32.
     if (cell.tag == KNOWN) {
-        // cell.value = bitcast<i32>(-0.005);
-        //cell.value = fmm_temp_data[global_id.x];
         fmm_data[global_id.x].value = bitcast<i32>(f32(cell.value) * 0.000001); 
-        //fmm_data[global_id.x].value = bitcast<i32>(-0.666); 
-        //cell.value = bitcast<u32>(f32(cell.value & (!(1u << 31u))) * 0.000001 * the_sign);
     }
-    // else {
-    //     cell.value = 100000.0;
-    // }
-
-    // atomicExchange(&fmm_data[global_id.x].value, bitcast<i32>(0.666)); //cell.value; 
 }

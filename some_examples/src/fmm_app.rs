@@ -73,22 +73,25 @@ const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-// const FMM_GLOBAL_X: usize = 32;
-// const FMM_GLOBAL_Y: usize = 8;
-// const FMM_GLOBAL_Z: usize = 27;
+//const FMM_GLOBAL_X: usize = 32;
+//const FMM_GLOBAL_Y: usize = 8;
+//const FMM_GLOBAL_Z: usize = 27;
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
-//const FMM_GLOBAL_X: usize = 70;
-//const FMM_GLOBAL_Y: usize = 18;
-//const FMM_GLOBAL_Z: usize = 60;
+// const FMM_GLOBAL_X: usize = 70;
+// const FMM_GLOBAL_Y: usize = 18;
+// const FMM_GLOBAL_Z: usize = 60;
+// const FMM_GLOBAL_X: usize = 80;
+// const FMM_GLOBAL_Y: usize = 16;
+// const FMM_GLOBAL_Z: usize = 56;
 const FMM_GLOBAL_X: usize = 90;
 const FMM_GLOBAL_Y: usize = 18;
-const FMM_GLOBAL_Z: usize = 81;
+const FMM_GLOBAL_Z: usize = 62;
 
-const FMM_INNER_X: usize = 4; 
-const FMM_INNER_Y: usize = 4; 
-const FMM_INNER_Z: usize = 4; 
+const FMM_INNER_X: usize = 4;
+const FMM_INNER_Y: usize = 4;
+const FMM_INNER_Z: usize = 4;
 
 struct AppRenderParams {
     draw_point_cloud: bool,
@@ -137,7 +140,7 @@ impl WGPUFeatures for FmmAppFeatures {
         limits.max_push_constant_size = 4;
         limits.max_push_constant_size = 4;
         // limits.max_compute_workgroup_size_x = 65536 * 2;
-        // limits.max_storage_buffer_binding_size = (2560 * 1560 * size_of::<u32>()) as u32;
+        limits.max_storage_buffer_binding_size = 154275840; 
         println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
         limits
     }
@@ -295,7 +298,11 @@ impl Application for FmmApp {
 
 
         // Generate the point cloud.
-        let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
+        let scene_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32;
+        let scene_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32;
+        let scene_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32;
+
+        let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string(), scene_x, scene_y, scene_z);
 
         let pc_max_coord = point_cloud.get_max_coord();
 
@@ -324,13 +331,15 @@ impl Application for FmmApp {
             point_cloud.get_point_count(),
             point_cloud.get_min_coord(),
             point_cloud.get_max_coord(),
-            pc_scale_factor,
+            //[1.0, 1.0, 1.0],
+            [point_cloud_scale_factor_x, point_cloud_scale_factor_y, point_cloud_scale_factor_z],
+            //pc_scale_factor,
             123, // useless
             false); // useless
 
         let render_params_point_cloud = RenderParamBuffer::create(
                     &configuration.device,
-                    pc_scale_factor
+                    1.0, //pc_scale_factor
         );
 
         let render_bind_groups_vvvc = create_bind_groups(
