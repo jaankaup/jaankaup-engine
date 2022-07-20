@@ -56,7 +56,7 @@ const MAX_NUMBER_OF_AABBS:      usize = 3 * TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_AABB_WIRES: usize = 40960;
+const MAX_NUMBER_OF_AABB_WIRES: usize = 262144;
 
 /// Max number of renderable char elements (f32, vec3, vec4, ...) for gpu debugger.
 #[allow(dead_code)]
@@ -154,8 +154,8 @@ struct FmmApp {
     screen: ScreenTexture, 
     _light: LightBuffer,
     _render_params: RenderParamBuffer,
-    _triangle_mesh_renderer: RenderVvvvnnnnCamera,
-    _triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+    triangle_mesh_renderer: RenderVvvvnnnnCamera,
+    triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     point_cloud: PointCloud,
     compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
@@ -512,8 +512,8 @@ impl Application for FmmApp {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             _light: light,
             _render_params: render_params,
-            _triangle_mesh_renderer: triangle_mesh_renderer,
-            _triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+            triangle_mesh_renderer: triangle_mesh_renderer,
+            triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
             //radix radix_sort: radix_sort,
             point_cloud: point_cloud,
@@ -614,7 +614,7 @@ impl Application for FmmApp {
         self.gpu_debugger.reset_chars(&device, &queue);
         self.gpu_debugger.reset_arrows(&device, &queue);
         self.gpu_debugger.reset_aabbs(&device, &queue);
-        // self.gpu_debugger.reset_aabb_wires(&device, &queue);
+        self.gpu_debugger.reset_aabb_wires(&device, &queue);
 
         self.screen.prepare_for_rendering();
     }

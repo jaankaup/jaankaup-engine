@@ -1,5 +1,3 @@
-// Debugging.
-
 let FAR      = 0u;
 let BAND_NEW = 1u;
 let BAND     = 2u;
@@ -149,9 +147,9 @@ fn isInside(coord: vec3<i32>) -> bool {
 
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside_f32(coord: vec3<f32>) -> bool {
-    return (coord.x >= 0.0 && coord.x < f32(fmm_params.local_dimension.x * fmm_params.global_dimension.x) - 1.0) &&
-           (coord.y >= 0.0 && coord.y < f32(fmm_params.local_dimension.y * fmm_params.global_dimension.y) - 1.0) &&
-           (coord.z >= 0.0 && coord.z < f32(fmm_params.local_dimension.z * fmm_params.global_dimension.z) - 1.0); 
+    return (coord.x >= 0.0 && coord.x < f32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
+           (coord.y >= 0.0 && coord.y < f32(fmm_params.local_dimension.y * fmm_params.global_dimension.y)) &&
+           (coord.z >= 0.0 && coord.z < f32(fmm_params.local_dimension.z * fmm_params.global_dimension.z)); 
 }
 
 /// xy-plane indexing. (x,y,z) => index
@@ -359,16 +357,24 @@ fn load_trilinear_neighbors(coord: vec3<u32>, render: bool) -> array<u32, 8> {
         vec3<i32>(coord) + vec3<i32>(1,  1,  1),
     );
 
-    //if (render && ((private_global_index.x & 2047u) == 0u)) {
-    if (render && ((private_global_index.x & 127u) == 0u)) {
-        output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+    if (render) {
+        output_aabb[atomicAdd(&counter[2], 1u)] =  
               AABB (
-                  vec4<f32>(vec3<f32>(neighbors[0]) * 4.0,
-                            bitcast<f32>(rgba_u32(255u, 0u, 1550u, 255u))),
-                  vec4<f32>(vec3<f32>(neighbors[7]) * 4.0,
-                            0.1)
+                  vec4<f32>(vec3<f32>(neihgbors[0]),
+                            bitcast<f32>(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(vec3<f32>(neihgbors[7]),
+                            0.0)
         );
     }
+
+    //     output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+    //           AABB (
+    //               vec4<f32>(vec3<f32>(neihgbors[0]),
+    //                         bitcast<f32>(rgba_u32(255u, 0u, 2550u, 255u))),
+    //               vec4<f32>(vec3<f32>(neihgbors[7]) * 4.0,
+    //                         3.4)
+    //     );
+    // }
 
     let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
     let i1 = get_cell_mem_location(vec3<u32>(neighbors[1]));
@@ -848,22 +854,22 @@ fn fmm_color_6(p: vec3<f32>) -> u32 {
         vec3<i32>(p) - vec3<i32>(0,  0,  1),
     );
 
-   load_neighbors_private(vec3<u32>(neighbors[0]), false);
+   load_neighbors_private(vec3<u32>(neighbors[0]));
    let c0 = decode_color(fmm_color(p + vec3<f32>(1.0, 0.0, 0.0))); 
 
-   load_neighbors_private(vec3<u32>(neighbors[1]), false);
+   load_neighbors_private(vec3<u32>(neighbors[1]));
    let c1 = decode_color(fmm_color(p + vec3<f32>(-1.0, 0.0, 0.0))); 
 
-   load_neighbors_private(vec3<u32>(neighbors[2]), false);
+   load_neighbors_private(vec3<u32>(neighbors[2]));
    let c2 = decode_color(fmm_color(p + vec3<f32>(0.0, 1.0, 0.0))); 
 
-   load_neighbors_private(vec3<u32>(neighbors[3]), false);
+   load_neighbors_private(vec3<u32>(neighbors[3]));
    let c3 = decode_color(fmm_color(p + vec3<f32>(0.0, -1.0, 0.0))); 
 
-   load_neighbors_private(vec3<u32>(neighbors[4]), false);
+   load_neighbors_private(vec3<u32>(neighbors[4]));
    let c4 = decode_color(fmm_color(p + vec3<f32>(0.0, 0.0, 1.0))); 
 
-   load_neighbors_private(vec3<u32>(neighbors[5]), false);
+   load_neighbors_private(vec3<u32>(neighbors[5]));
    let c5 = decode_color(fmm_color(p + vec3<f32>(0.0, 0.0, -1.0))); 
 
    let x = 1.0/6.0 * f32(c0.x + c1.x + c2.x + c3.x + c4.x + c5.x); 
@@ -879,7 +885,7 @@ fn fmm_color_6(p: vec3<f32>) -> u32 {
 
 fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
 
-   load_neighbors_private(vec3<u32>(floor(p)), render);
+   load_neighbors_private(vec3<u32>(p), render);
 
    //++++let pah = p; // * 4.0;
 
@@ -1153,7 +1159,6 @@ fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
 /// Function tha is called on ray hit. TODO: separate gradien calculation to another function.
 fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
     (*payload).color = fmm_color((*payload).intersection_point);
     //(*payload).color = fmm_color_nearest((*payload).intersection_point);
@@ -1300,6 +1305,8 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         distance_to_interface = fmm_value(p, false); // max(min(0.01 * dist, 0.2), 0.001);
         if (abs(distance_to_interface) < 0.03) {
 
+            // Debuggin.
+
 	    // var temp_distance = dist;
 	    //var temp_p = p;
             //var nearest_color = fmm_color_nearest(p);
@@ -1323,6 +1330,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     } // while
 
     (*payload).intersection_point = p;
+    distance_to_interface = fmm_value(p, true);
 }
 
 // fn box_intersect(aabb_min: vec<f32>, aabb_max: vec<f32>, result: ptr<function, f32>, canStartInBox: bool) -> bool {
@@ -1461,7 +1469,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
               AABB (
                   vec4<f32>(aabbmin * 4.0,
-                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                            bitcast<f32>(rgba_u32(255u, 0u, 2550u, 255u))),
                   vec4<f32>(aabbmax * 4.0,
                             0.5)
         );

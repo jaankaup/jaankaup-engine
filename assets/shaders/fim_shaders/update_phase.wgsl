@@ -179,12 +179,6 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
 fn solve_quadratic() -> f32 {
 
     var phis: array<f32, 6> = array<f32, 6>(
-                                  // select(10000.0, private_neighbors[0].value, private_neighbors[0].tag == SOURCE),
-                                  // select(10000.0, private_neighbors[1].value, private_neighbors[1].tag == SOURCE),
-                                  // select(10000.0, private_neighbors[2].value, private_neighbors[2].tag == SOURCE),
-                                  // select(10000.0, private_neighbors[3].value, private_neighbors[3].tag == SOURCE),
-                                  // select(10000.0, private_neighbors[4].value, private_neighbors[4].tag == SOURCE),
-                                  // select(10000.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE) 
                                   private_neighbors[0].value,
                                   private_neighbors[1].value,
                                   private_neighbors[2].value,
@@ -284,8 +278,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     var updated_value = solve_quadratic();
 		    let next_buffer_swap = (buffer_swap_id + 1u) & 1u;
 
-		    //if (abs(updated_value - fim_cell.value) < 0.000001) {
-		    //}
 		    if (updated_value < fim_cell.value) {
                         fim_cell.value = updated_value;
                         active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = t;
