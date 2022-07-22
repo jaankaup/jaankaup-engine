@@ -398,23 +398,21 @@ impl FastIterativeMethod {
         let mut pass = encoder.begin_compute_pass(
             &wgpu::ComputePassDescriptor { label: Some("Fim compute pass.")}
         );
-        // pass.set_pipeline(&self.compute_object.pipeline);
-        // for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
-        //     pass.set_bind_group(e as u32, &bgs, &[]);
-        // }
 
         // if !gpu_timer.is_none() {
         //     gpu_timer.as_mut().unwrap().start_pass(&mut pass);
         // }
+
         for (e, bgs) in self.initial_active_cells_bind_groups.iter().enumerate() {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }
 
         if self.first_time {
 
-            pass.set_pipeline(&self.initial_active_cells.pipeline);
+            pass.set_pipeline(&self.initial_active_cells.pipeline); 
             pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
 
+            // wasm needs this.
             for (e, bgs) in self.update_phase_bind_groups.iter().enumerate() {
                 pass.set_bind_group(e as u32, &bgs, &[]);
             }
@@ -422,6 +420,7 @@ impl FastIterativeMethod {
             pass.set_pipeline(&self.update_phase.pipeline);
             pass.dispatch_workgroups(1, 1, 1);
 
+            // wasm needs this.
             for (e, bgs) in self.pre_remedy_bind_groups.iter().enumerate() {
                 pass.set_bind_group(e as u32, &bgs, &[]);
             }
@@ -429,6 +428,7 @@ impl FastIterativeMethod {
             pass.set_pipeline(&self.pre_remedy.pipeline);
             pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
 
+            // wasm needs this.
             for (e, bgs) in self.remedy_phase_bind_groups.iter().enumerate() {
                 pass.set_bind_group(e as u32, &bgs, &[]);
             }
