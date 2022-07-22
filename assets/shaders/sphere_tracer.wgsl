@@ -87,6 +87,8 @@ struct RayCamera {
 struct SphereTracerParams {
     inner_dim: vec2<u32>,
     outer_dim: vec2<u32>,
+    render_rays: u32,
+    render_samplers: u32,
 };
 
 @group(0) @binding(0) var<uniform>            fmm_params: FmmParams;
@@ -108,6 +110,8 @@ var<private> private_neighbors:     array<FmmCellPc, 8>;
 var<private> private_neighbors_loc: array<u32, 8>;
 var<private> this_aabb: AABB;
 var<private> private_global_index: vec3<u32>;
+var<private> private_workgroup_index: vec3<u32>;
+var<private> private_local_index: vec3<u32>;
 var<private> step_counter: u32;
 
 fn total_cell_count() -> u32 {
@@ -359,8 +363,9 @@ fn load_trilinear_neighbors(coord: vec3<u32>, render: bool) -> array<u32, 8> {
         vec3<i32>(coord) + vec3<i32>(1,  1,  1),
     );
 
-    //if (render && ((private_global_index.x & 2047u) == 0u)) {
-    if (render && ((private_global_index.x & 127u) == 0u)) {
+    if (sphere_tracer_params.render_samplers == 1u && render && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
+    // if (render && (((private_global_index.x + 32u) & 2047u) == 0u)) {
+    //if (render && ((private_global_index.x & 127u) == 0u)) {
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
               AABB (
                   vec4<f32>(vec3<f32>(neighbors[0]) * 4.0,
@@ -711,7 +716,9 @@ fn fmm_color(p: vec3<f32>) -> u32 {
 
    let size = 0.1;
 
-   if ((private_global_index.x & 2047u) == 0u) {
+   //if ((private_global_index.x & 2047u) == 0u) {
+   if (sphere_tracer_params.render_samplers == 1u && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
+   //if (((private_global_index.x + 32u) & 2047u) == 0u) {
    output_arrow[atomicAdd(&counter[1], 1u)] =  
          Arrow (
              vec4<f32>(p * 4.0, 0.0),
@@ -1353,6 +1360,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // );
 
     private_global_index = global_id;
+    private_workgroup_index = workgroup_id;
+    private_local_index = local_id;
     step_counter = 0u;
 
     let screen_coord = vec2<f32>(index_to_screen(global_id.x,
@@ -1435,7 +1444,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         // output_char[atomicAdd(&counter[0], 1u)] = renderable_element; 
     }
 
-    if ((global_id.x & 2047u) == 0u) {
+    //if ((global_id.x & 2047u) == 0u) {
+    if (sphere_tracer_params.render_rays == 1u && (local_index == 0u) && (workgroup_id.x % 44u) == 0u) {
     //++ if (payload.visibility > 0.0) {
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (

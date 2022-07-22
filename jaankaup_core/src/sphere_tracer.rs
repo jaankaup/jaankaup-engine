@@ -11,6 +11,9 @@ use std::borrow::Cow;
 struct SphereTracerParams {
     inner_dim: [u32; 2],
     outer_dim: [u32; 2],
+    render_rays: u32,
+    render_samplers: u32,
+    padding: [u32; 2],
 }
 
 #[repr(C)]
@@ -40,6 +43,8 @@ impl SphereTracer {
     pub fn init(device: &wgpu::Device,
                 inner_dimension: [u32; 2],
                 outer_dimension: [u32; 2],
+                render_rays: bool,
+                render_samplers: bool,
                 fmm_params: &wgpu::Buffer,
                 fmm_data: &wgpu::Buffer,
                 camera_buffer: &wgpu::Buffer,
@@ -102,6 +107,9 @@ impl SphereTracer {
         let sphere_tracer_params = SphereTracerParams {
             inner_dim: inner_dimension,
             outer_dim: outer_dimension,
+            render_rays: if render_rays { 1 } else { 0 },
+            render_samplers: if render_samplers { 1 } else { 0 },
+            padding: [0, 0],
         };
 
         let sphere_tracer_buffer = buffer_from_data::<SphereTracerParams>(
@@ -157,6 +165,18 @@ impl SphereTracer {
             sphere_tracer_buffer: sphere_tracer_buffer,
         }
     }
+
+    pub fn show_rays(&mut self, queue: &wgpu::Queue, value: bool) {
+
+        self.sphere_tracer_params.render_rays = if value { 1 } else { 0 };
+
+        queue.write_buffer(
+            &self.sphere_tracer_buffer,
+            0,
+            bytemuck::cast_slice(&[self.sphere_tracer_params])
+        );
+    }
+
     pub fn get_color_buffer(&self) -> &wgpu::Buffer {
         &self.output_buffer_color
     }

@@ -192,7 +192,7 @@ impl Application for FmmApp {
 
         let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 0.0), -89.0, 0.0);
         ray_camera.set_rotation_sensitivity(0.4);
-        ray_camera.set_movement_sensitivity(0.25);
+        ray_camera.set_movement_sensitivity(0.05);
 
         let camera_mode = CameraMode::Camera;
 
@@ -493,6 +493,8 @@ impl Application for FmmApp {
                 &configuration.device,
                 [8, 8],
                 [128, 192],
+                true,
+                true,
                 //[192, 320],
                 fmm.get_fmm_params_buffer(),
                 fim.get_fim_data_buffer(),

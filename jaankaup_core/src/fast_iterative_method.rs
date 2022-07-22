@@ -117,6 +117,8 @@ pub struct FastIterativeMethod {
     #[allow(dead_code)]
     pc_to_interface_bind_groups: Option<Vec<wgpu::BindGroup>>,
 
+    sample_data: wgpu::Buffer,
+
     /// Preprocessor for fmm values.
     #[allow(dead_code)]
     fmm_value_fixer: FmmValueFixer,
@@ -162,6 +164,18 @@ impl FastIterativeMethod {
 
         // Fmm histogram.
         let fim_histogram = Histogram::init(&device, &vec![0; 5]);
+
+        let cell_count = global_dimension[0] * global_dimension[1] * global_dimension[2] * local_dimension[0]  * local_dimension[1]  * local_dimension[2];
+
+        print!("Creating sample_data buffer.");
+        // Prefix temp array.
+        let sample_data = buffer_from_data::<f32>(
+                &device,
+                &vec![0.0 ; (cell_count * 3).try_into().unwrap()],
+                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                None
+        );
+        println!("OK");
 
         // Create fim shader template. Only for binding resources.
         let compute_object =
@@ -320,6 +334,9 @@ impl FastIterativeMethod {
  
                             // @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
                             create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+
+                            // @group(0) @binding(4) var<storage, read_write> sample_data: array<SamplerCell>;
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
  
                             // // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
                             // create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
@@ -363,6 +380,7 @@ impl FastIterativeMethod {
             fim_data: fim_data,
             pc_to_interface_compute_object: pc_to_interface_compute_object,
             pc_to_interface_bind_groups: None,
+            sample_data: sample_data,
             fmm_value_fixer: fmm_value_fixer,
             fmm_prefix_params: fmm_prefix_params,
             prefix_temp_array: prefix_temp_array,
@@ -464,7 +482,7 @@ impl FastIterativeMethod {
                     &point_cloud_params_buffer.get_buffer().as_entire_binding(),
                     &self.fim_data.as_entire_binding(),
                     &pc_data.as_entire_binding(),
-                    &self.prefix_temp_array.as_entire_binding(),
+                    &self.sample_data.as_entire_binding(),
                     //&gpu_debugger.get_element_counter_buffer().as_entire_binding(),
                     // &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
                     // &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
@@ -474,7 +492,6 @@ impl FastIterativeMethod {
                 ]
         );
         self.pc_to_interface_bind_groups = Some(pc_to_interface_bind_groups);
-
     }
 
     fn calculate_cell_count(&self) -> u32 {

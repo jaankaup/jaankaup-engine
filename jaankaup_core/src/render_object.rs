@@ -435,6 +435,7 @@ fn create_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder,
                 stencil_ops: None,
                 }),
     });
+
     render_pass
 }
 

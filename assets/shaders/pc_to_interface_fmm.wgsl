@@ -63,10 +63,18 @@ struct FmmCellPc {
 //     size:  f32,
 // };
 // 
+
+struct SamplerCell {
+    weight: f32,
+    dist: f32,
+    col: f32,
+};
+
 @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
 @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
 @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
+@group(0) @binding(4) var<storage, read_write> sample_data: array<SamplerCell>;
 
 // Debug. Disabled.
 // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
