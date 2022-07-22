@@ -4,6 +4,8 @@ let ACTIVE  = 2u;
 let SOURCE  = 3u;
 let OUTSIDE = 4u;
 
+let THREAD_COUNT = 256u;
+
 struct FimCellPc {
     tag: atomic<u32>,
     value: f32,
@@ -24,12 +26,12 @@ struct FmmParams {
     future_usage2: u32,
 };
 
-@group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
-@group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage,read_write> active_list: array<u32>; //fmm_blocks
-@group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-@group(0) @binding(4) var<storage,read_write> fim_data: array<FimCellPc>;
-@group(0) @binding(5) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
+// @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
+@group(0) @binding(0) var<uniform>            fmm_params:    FmmParams;
+@group(0) @binding(1) var<storage,read_write> active_list: array<u32>; //fmm_blocks
+// @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
+@group(0) @binding(2) var<storage,read_write> fim_data: array<FimCellPc>;
+@group(0) @binding(3) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
 
 var<workgroup> buffer_id: u32;
 var<workgroup> wg_mem_offset: atomic<u32>;
@@ -229,7 +231,8 @@ fn solve_quadratic() -> f32 {
 }
 
 @compute
-@workgroup_size(1024,1,1)
+//@workgroup_size(1024,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,
@@ -252,12 +255,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	while (items_to_process > 0u) {
 	    workgroupBarrier();
 
-            var chunks = udiv_up_safe32(items_to_process, 1024u);
+            var chunks = udiv_up_safe32(items_to_process, THREAD_COUNT);
 
 	    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
                 // workgroupBarrier();
 
-	        var actual_index = local_index + i * 1024u; // + buffer_swap_id * buffer_offset;
+	        var actual_index = local_index + i * THREAD_COUNT; // + buffer_swap_id * buffer_offset;
 	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
 
                 if (actual_index < items_to_process) {

@@ -238,27 +238,40 @@ impl RenderObject {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
+            // fragment: Some(wgpu::FragmentState {
+            //     module: &wgsl_module,
+            //     entry_point: "fs_main",
+            //     targets: &[Some(wgpu::ColorTargetState {
+            //         format: sc_desc.format,
+            //         blend: None, //Some(wgpu::BlendState {
+            //                //     color: wgpu::BlendComponent {
+            //                //          src_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            //                //          dst_factor: wgpu::BlendFactor::OneMinusDstAlpha,
+            //                //          operation: wgpu::BlendOperation::Max,
+            //                //     },
+            //                //     alpha: wgpu::BlendComponent {
+            //                //          src_factor: wgpu::BlendFactor::SrcAlpha,
+            //                //          dst_factor: wgpu::BlendFactor::One,
+            //                //          operation: wgpu::BlendOperation::Add,
+            //                //     },
+            //                // }),
+            //         // alpha_blend: wgpu::BlendState::REPLACE,
+            //         // color_blend: wgpu::BlendState::REPLACE,
+            //         write_mask: wgpu::ColorWrites::COLOR,
+            //     })],
             fragment: Some(wgpu::FragmentState {
                 module: &wgsl_module,
                 entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
+                targets: &[wgpu::ColorTargetState {
                     format: sc_desc.format,
                     blend: None, //Some(wgpu::BlendState {
-                           //     color: wgpu::BlendComponent {
-                           //          src_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                           //          dst_factor: wgpu::BlendFactor::OneMinusDstAlpha,
-                           //          operation: wgpu::BlendOperation::Max,
-                           //     },
-                           //     alpha: wgpu::BlendComponent {
-                           //          src_factor: wgpu::BlendFactor::SrcAlpha,
-                           //          dst_factor: wgpu::BlendFactor::One,
-                           //          operation: wgpu::BlendOperation::Add,
-                           //     },
-                           // }),
-                    // alpha_blend: wgpu::BlendState::REPLACE,
-                    // color_blend: wgpu::BlendState::REPLACE,
                     write_mask: wgpu::ColorWrites::COLOR,
-                })],
+                }],
+                // targets: &[Some(wgpu::ColorTargetState {
+                //     format: sc_desc.format,
+                //     blend: None, //Some(wgpu::BlendState {
+                //     write_mask: wgpu::ColorWrites::COLOR,
+                // })],
             }),
             multiview: None,
         });
@@ -405,7 +418,7 @@ fn create_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder,
             &wgpu::RenderPassDescriptor {
                 label: Some("Render pass descriptor"),
                 color_attachments: &[
-                    Some(wgpu::RenderPassColorAttachment {
+                    wgpu::RenderPassColorAttachment {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
@@ -424,7 +437,7 @@ fn create_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder,
                                 },
                                 store: true,
                             },
-                    })
+                    }
                 ],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &depth_texture.view,
@@ -435,6 +448,41 @@ fn create_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder,
                 stencil_ops: None,
                 }),
     });
+
+    // let render_pass = encoder.begin_render_pass(
+    //         &wgpu::RenderPassDescriptor {
+    //             label: Some("Render pass descriptor"),
+    //             color_attachments: &[
+    //                 Some(wgpu::RenderPassColorAttachment {
+    //                         view: &view,
+    //                         resolve_target: None,
+    //                         ops: wgpu::Operations {
+    //                             load: match clear {
+    //                                 true => {
+    //                                     wgpu::LoadOp::Clear(wgpu::Color {
+    //                                         r: 0.0,
+    //                                         g: 0.0,
+    //                                         b: 0.0,
+    //                                         a: 1.0,
+    //                                     })
+    //                                 }
+    //                                 false => {
+    //                                     wgpu::LoadOp::Load
+    //                                 }
+    //                             },
+    //                             store: true,
+    //                         },
+    //                 })
+    //             ],
+    //         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+    //             view: &depth_texture.view,
+    //             depth_ops: Some(wgpu::Operations {
+    //                     load: match clear { true => wgpu::LoadOp::Clear(1.0), false => wgpu::LoadOp::Load },
+    //                     store: true,
+    //             }),
+    //             stencil_ops: None,
+    //             }),
+    // });
 
     render_pass
 }

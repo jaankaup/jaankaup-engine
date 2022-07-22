@@ -28,10 +28,14 @@ pub fn read_pc_data(file: &String, scene_x: f32, scene_y: f32, scene_z: f32) -> 
 
     let mut aabb = BBox64 { min: Vector3::<f64>::new(0.0, 0.0, 0.0), max: Vector3::<f64>::new(0.0, 0.0, 0.0), };
 
-    if let Ok(lines) = read_lines(file) {
+
+    let data = &include_str!("../../../../cloud_data.asc")[..];
+
+    //if let Ok(lines) = read_lines(file) {
+
         let mut first_time = true;
-        for line in lines {
-            if let Ok(li) = line {
+        for li in data.lines() {
+            //if let Ok(li) = line {
                 let sp = li.split(" ").collect::<Vec<&str>>();
 
                 let x = sp[0].parse::<f64>().unwrap();
@@ -51,9 +55,9 @@ pub fn read_pc_data(file: &String, scene_x: f32, scene_y: f32, scene_z: f32) -> 
                     position: [x, y, z],
                     color: encode_rgba_u32(sp[3].parse::<u32>().unwrap(), sp[4].parse::<u32>().unwrap(), sp[5].parse::<u32>().unwrap(), 255),
                 });
-            }
+            //}
         }
-    }
+    //}
 
     for i in 0..result.len() {
         result2.push(VVVC {

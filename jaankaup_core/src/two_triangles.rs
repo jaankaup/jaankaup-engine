@@ -39,7 +39,8 @@ impl TwoTriangles {
         let two_triangles_ro = RenderObject::init(
                                    &device,
                                    &sc_desc,
-                                   &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                                   //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                                   &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                                        label: Some("sphere_tracer_renderer.wgsl"),
                                        source: wgpu::ShaderSource::Wgsl(
                                            Cow::Borrowed(include_str!("../../assets/shaders/sphere_tracer_renderer.wgsl"))),

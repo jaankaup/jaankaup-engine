@@ -20,13 +20,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "android_system_properties"
-version = "0.1.2"
+name = "android-properties"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a20ae67ce26261f218e2b3f2f0d01887a9818283ca6fb260fa7c67e253d61c92"
-dependencies = [
- "libc",
-]
+checksum = "fc7eb209b1518d6bb87b283c20095f5228ecda460da70b44f0802523dea6da04"
 
 [[package]]
 name = "anyhow"
@@ -417,9 +414,8 @@ checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
 name = "d3d12"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "827914e1f53b1e0e025ecd3d967a7836b7bcb54520f90e21ef8df7b4d88a2759"
+version = "0.4.1"
+source = "git+https://github.com/gfx-rs/d3d12-rs.git?rev=ffe5e261da0a6cb85332b82ab310abd2a7e849f6#ffe5e261da0a6cb85332b82ab310abd2a7e849f6"
 dependencies = [
  "bitflags",
  "libloading",
@@ -988,9 +984,8 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.24.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de11355d1f6781482d027a3b4d4de7825dcedb197bf573e0596d00008402d060"
+version = "0.23.1"
+source = "git+https://github.com/gfx-rs/metal-rs?rev=1aaa903#1aaa9033a22b2af7ff8cae2ed412a4733799c3d3"
 dependencies = [
  "bitflags",
  "block",
@@ -1029,9 +1024,8 @@ dependencies = [
 
 [[package]]
 name = "naga"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f50357e1167a3ab92d6b3c7f4bf5f7fd13fde3f4b28bf0d5ea07b5100fdb6c0"
+version = "0.8.0"
+source = "git+https://github.com/gfx-rs/naga?rev=89bed99#89bed99bcc995bc5068c9c112fd9b7d7896bb148"
 dependencies = [
  "bit-set",
  "bitflags",
@@ -1960,9 +1954,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.58"
+version = "0.3.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fed94beee57daf8dd7d51f2b15dc2bcde92d7a72304cdf662a4371008b71b90"
+checksum = "7b17e741662c70c8bd24ac5c5b18de314a2c26c32bf8346ee1e6f53de919c283"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -1970,8 +1964,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=537c6bed4e579a5cd99196ad4d3b1b952455d08a#537c6bed4e579a5cd99196ad4d3b1b952455d08a"
+version = "0.12.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=191537021e6f7504beee9961c16b3245b72e194b#191537021e6f7504beee9961c16b3245b72e194b"
 dependencies = [
  "arrayvec 0.7.2",
  "js-sys",
@@ -1990,8 +1984,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-core"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=537c6bed4e579a5cd99196ad4d3b1b952455d08a#537c6bed4e579a5cd99196ad4d3b1b952455d08a"
+version = "0.12.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=191537021e6f7504beee9961c16b3245b72e194b#191537021e6f7504beee9961c16b3245b72e194b"
 dependencies = [
  "arrayvec 0.7.2",
  "bit-vec",
@@ -2014,10 +2008,10 @@ dependencies = [
 
 [[package]]
 name = "wgpu-hal"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=537c6bed4e579a5cd99196ad4d3b1b952455d08a#537c6bed4e579a5cd99196ad4d3b1b952455d08a"
+version = "0.12.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=191537021e6f7504beee9961c16b3245b72e194b#191537021e6f7504beee9961c16b3245b72e194b"
 dependencies = [
- "android_system_properties",
+ "android-properties",
  "arrayvec 0.7.2",
  "ash",
  "bit-set",
@@ -2052,8 +2046,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-types"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=537c6bed4e579a5cd99196ad4d3b1b952455d08a#537c6bed4e579a5cd99196ad4d3b1b952455d08a"
+version = "0.12.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=191537021e6f7504beee9961c16b3245b72e194b#191537021e6f7504beee9961c16b3245b72e194b"
 dependencies = [
  "bitflags",
 ]

@@ -186,7 +186,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fast_marching_method.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/fast_marching_method.wgsl"))),
@@ -345,7 +346,8 @@ impl FastMarchingMethod {
         let pc_to_interface_compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("pc_to_interface_fmm.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/pc_to_interface_fmm.wgsl"))),
@@ -388,8 +390,8 @@ impl FastMarchingMethod {
 
         let fmm_value_fixer = FmmValueFixer::init(&device,
                                                   &fmm_params_buffer.get_buffer(),
-                                                  &fmm_data,
-                                                  &prefix_temp_array,
+                                                  &fmm_data
+        //                                          &prefix_temp_array,
         );
 
         // Update band counts shader.
@@ -397,7 +399,8 @@ impl FastMarchingMethod {
         let update_band_counts_compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("calculate_band_point_counts.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/calculate_band_point_counts.wgsl"))),
@@ -914,7 +917,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("collect_known_points.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/collect_known_points.wgsl"))),
@@ -981,7 +985,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("collect_band_points.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/collect_band_points.wgsl"))),
@@ -1048,7 +1053,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("create_initial_band_points.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/create_initial_band_points.wgsl"))),
@@ -1116,7 +1122,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("solve_quadratic.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/solve_quadratic.wgsl"))),
@@ -1184,7 +1191,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("solve_quadratic2.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/solve_quadratic2.wgsl"))),
@@ -1253,7 +1261,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("filter_active_blocks.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/filter_active_blocks.wgsl"))),
@@ -1318,7 +1327,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("filter_active_blocks2.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/filter_active_blocks2.wgsl"))),
@@ -1383,7 +1393,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("filter_active_blocks_gather.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/filter_active_blocks_gather.wgsl"))),
@@ -1448,7 +1459,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("filter_active_blocks_sum_aux.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/filter_active_blocks_sum_aux.wgsl"))),
@@ -1513,7 +1525,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("reduce.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/reduce.wgsl"))),
@@ -1578,7 +1591,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("find_neighbors.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/find_neighbors.wgsl"))),
@@ -1643,7 +1657,8 @@ impl FastMarchingMethod {
         let compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("fmm_alg_visualizer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_shaders/fmm_alg_visualizer.wgsl"))),

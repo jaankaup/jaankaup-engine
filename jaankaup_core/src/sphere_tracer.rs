@@ -54,7 +54,8 @@ impl SphereTracer {
         let st_compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("sphere_tracer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/sphere_tracer.wgsl"))),

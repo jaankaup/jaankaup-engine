@@ -108,7 +108,8 @@ impl RadixSort {
         let radix_sort_compute_object =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("counting.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/radix/counting.wgsl"))),

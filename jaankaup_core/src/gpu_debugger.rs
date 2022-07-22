@@ -314,7 +314,8 @@ impl GpuDebugger {
                 RenderObject::init(
                     &device,
                     &sc_desc,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_debug_visualizator.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
@@ -350,7 +351,8 @@ impl GpuDebugger {
                 RenderObject::init(
                     &device,
                     &sc_desc,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v3c1.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1.wgsl"))),
@@ -384,7 +386,8 @@ impl GpuDebugger {
         let compute_object_char =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("numbers.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/numbers.wgsl"))),
@@ -431,7 +434,8 @@ impl GpuDebugger {
         let compute_object_char_preprocessor =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("char_preprocessor.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/char_preprocessor.wgsl"))),
@@ -483,7 +487,8 @@ impl GpuDebugger {
         let compute_object_arrow =
                 ComputeObject::init(
                     &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("arrow_aabb.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/arrow_aabb.wgsl"))),

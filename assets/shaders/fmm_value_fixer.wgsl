@@ -19,10 +19,10 @@ let OUTSIDE  = 4u;
 
 @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
 @group(0) @binding(1) var<storage, read_write> fmm_data: array<FmmCellPc>;
-@group(0) @binding(2) var<storage, read_write> fmm_temp_data: array<f32>;
 
 @compute
-@workgroup_size(1024,1,1)
+//@workgroup_size(1024,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) work_group_id: vec3<u32>,

@@ -59,32 +59,25 @@ struct FimCellPc {
     color: u32,
 };
 
-struct TempData {
-    data0: u32,
-    data1: u32,
-};
-
 let FAR      = 0u;
 let BAND_NEW = 1u;
 let BAND     = 2u;
 let KNOWN    = 3u;
 let OUTSIDE  = 4u;
 
-@group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
-@group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage,read_write> active_list: array<TempData>; //fmm_blocks
-@group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
-// @group(0) @binding(4) var<storage,read_write> remedy_list: array<TempData>; // temp_data
-// @group(0) @binding(5) var<storage,read_write> source_list: array<TempData>; // temp_data
-@group(0) @binding(4) var<storage,read_write> fim_data: array<FimCellPc>;
-@group(0) @binding(5) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
+// @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
+@group(0) @binding(0) var<uniform>            fmm_params:    FmmParams;
+@group(0) @binding(1) var<storage,read_write> active_list: array<u32>; //fmm_blocks
+// @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
+@group(0) @binding(2) var<storage,read_write> fim_data: array<FimCellPc>;
+@group(0) @binding(3) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
 
 // GpuDebugger.
-@group(1) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;
-@group(1) @binding(1) var<storage,read_write> output_char: array<Char>;
-@group(1) @binding(2) var<storage,read_write> output_arrow: array<Arrow>;
-@group(1) @binding(3) var<storage,read_write> output_aabb: array<AABB>;
-@group(1) @binding(4) var<storage,read_write> output_aabb_wire: array<AABB>;
+// @group(1) @binding(0) var<storage,read_write> counter: array<atomic<u32>>;
+// @group(1) @binding(1) var<storage,read_write> output_char: array<Char>;
+// @group(1) @binding(2) var<storage,read_write> output_arrow: array<Arrow>;
+// @group(1) @binding(3) var<storage,read_write> output_aabb: array<AABB>;
+// @group(1) @binding(4) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 // fn dummy() {
 //   _ = &active_list;
@@ -93,7 +86,8 @@ let OUTSIDE  = 4u;
 // }
 
 @compute
-@workgroup_size(1024,1,1)
+//@workgroup_size(1024,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) workgroup_id: vec3<u32>,

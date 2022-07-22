@@ -120,8 +120,8 @@ impl WGPUFeatures for FmmAppFeatures {
 
         // #[cfg(not(target_arch = "wasm32"))] {
         if cfg!(not(target_arch = "wasm32")) {
-            wgpu::Features::PUSH_CONSTANTS |
-            wgpu::Features::WRITE_TIMESTAMP_INSIDE_PASSES
+            wgpu::Features::PUSH_CONSTANTS
+            //wgpu::Features::WRITE_TIMESTAMP_INSIDE_PASSES
         }
         else {
         // #[cfg(target_arch = "wasm32"))] {
@@ -133,11 +133,11 @@ impl WGPUFeatures for FmmAppFeatures {
         let mut limits = wgpu::Limits::default();
         limits.max_compute_invocations_per_workgroup = 1024;
         limits.max_compute_workgroup_size_x = 1024;
-        limits.max_storage_buffers_per_shader_stage = 10;
+        //limits.max_storage_buffers_per_shader_stage = 10;
         limits.max_push_constant_size = 4;
         limits.max_push_constant_size = 4;
         // limits.max_compute_workgroup_size_x = 65536 * 2;
-        limits.max_storage_buffer_binding_size = 154275840; 
+        //limits.max_storage_buffer_binding_size = 154275840; 
         println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
         limits
     }
@@ -165,7 +165,7 @@ struct FmmApp {
     render_object_vvvc: RenderObject,
     render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     app_render_params: AppRenderParams,
-    fmm: FastMarchingMethod,
+    //fmm: FastMarchingMethod,
     _pc_params: PointCloudParamsBuffer,
     once: bool,
     sphere_tracer: SphereTracer,
@@ -217,7 +217,7 @@ impl Application for FmmApp {
         print!("Creating Gpu timer   ");
         // Gpu timer.
         //let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer")).unwrap();
-        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
+        let gpu_timer = None; // GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
         println!("OK");
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
@@ -258,7 +258,8 @@ impl Application for FmmApp {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+                    //&configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v3c1_x4.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v3c1_x4.wgsl"))),
@@ -353,11 +354,11 @@ impl Application for FmmApp {
 
         // The Fast marching method.
         //
-        let mut fmm = FastMarchingMethod::init(&configuration.device,
-                                           global_dimension,
-                                           local_dimension,
-                                           &Some(&gpu_debugger),
-        );
+        // let mut fmm = FastMarchingMethod::init(&configuration.device,
+        //                                    global_dimension,
+        //                                    local_dimension,
+        //                                    &Some(&gpu_debugger),
+        // );
 
         let mut fim = FastIterativeMethod::init(&configuration.device,
                                                global_dimension,
@@ -377,7 +378,8 @@ impl Application for FmmApp {
         let compute_object_fmm_visualizer =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    //&configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("fmm_data_visualizer.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/fmm_data_visualizer.wgsl"))),
@@ -464,6 +466,7 @@ impl Application for FmmApp {
         });
 
         fim.initialize_interface_pc(&mut encoder, &point_cloud);
+          
         //++ fmm.initialize_interface_pc(&mut encoder, &point_cloud);
         // fmm.update_band_point_counts(&mut encoder);
         // fmm.filter_active_blocks(&mut encoder);
@@ -496,7 +499,7 @@ impl Application for FmmApp {
                 true,
                 true,
                 //[192, 320],
-                fmm.get_fmm_params_buffer(),
+                fim.get_fmm_params_buffer(),
                 fim.get_fim_data_buffer(),
                 //fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),
@@ -526,12 +529,12 @@ impl Application for FmmApp {
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             app_render_params: app_render_params,
-            fmm: fmm,
+            //fmm: fmm,
             _pc_params: pc_params,
             once: once,
             sphere_tracer: sphere_tracer,
             sphere_tracer_renderer: sphere_tracer_renderer,
-            draw_two_triangles: false,
+            draw_two_triangles: true,
             fim: fim,
          }
     }
@@ -601,22 +604,22 @@ impl Application for FmmApp {
 
         queue.submit(Some(encoder.finish())); 
 
-        if !self.draw_two_triangles {
-            self.gpu_debugger.render(
-                      &device,
-                      &queue,
-                      &view,
-                      self.screen.depth_texture.as_ref().unwrap(),
-                      &mut clear,
-                      spawner
-            );
-        }
+        // if !self.draw_two_triangles {
+        //     self.gpu_debugger.render(
+        //               &device,
+        //               &queue,
+        //               &view,
+        //               self.screen.depth_texture.as_ref().unwrap(),
+        //               &mut clear,
+        //               spawner
+        //     );
+        // }
     
-        //self.gpu_debugger.reset_element_counters(&queue);
-        self.gpu_debugger.reset_chars(&device, &queue);
-        self.gpu_debugger.reset_arrows(&device, &queue);
-        self.gpu_debugger.reset_aabbs(&device, &queue);
-        self.gpu_debugger.reset_aabb_wires(&device, &queue);
+        self.gpu_debugger.reset_element_counters(&queue);
+        //self.gpu_debugger.reset_chars(&device, &queue);
+        //self.gpu_debugger.reset_arrows(&device, &queue);
+        //self.gpu_debugger.reset_aabbs(&device, &queue);
+        //self.gpu_debugger.reset_aabb_wires(&device, &queue);
 
         self.screen.prepare_for_rendering();
     }
@@ -709,15 +712,6 @@ impl Application for FmmApp {
     #[allow(unused)]
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
 
-        // Step fmm.
-        // if self.keyboard_manager.test_key(&Key::B, input) {
-        //     self.once = true;
-        //     if self.fmm.get_fmm_state() == FmmState::FilterActiveBlocks {
-        //         self.gpu_debugger.reset_aabb_wires(&device, &queue);
-        //         // self.gpu_debugger.reset_chars(&device, &queue);
-        //     }
-        // }
-
         let total_grid_count = FMM_GLOBAL_X *
                                FMM_GLOBAL_Y *
                                FMM_GLOBAL_Z *
@@ -729,40 +723,7 @@ impl Application for FmmApp {
 
         // Fast marching method.
         if self.once {
-            // self.fmm.fmm_iteration(&mut encoder, &mut self.gpu_timer);
             self.fim.fim_iteration(&mut encoder, &mut self.gpu_timer);
-            // let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
-
-            // self.gpu_timer.start_pass(&mut pass);
-            // self.fmm.collect_known_cells(&mut pass);
-            // self.gpu_timer.end_pass(&mut pass);
-
-            // self.gpu_timer.start_pass(&mut pass);
-            // self.fmm.create_initial_band(&mut pass);
-            // self.gpu_timer.end_pass(&mut pass);
-
-            // self.gpu_timer.start_pass(&mut pass);
-            // self.fmm.fmm(&mut pass);
-            // self.gpu_timer.end_pass(&mut pass);
-
-            // self.gpu_timer.start_pass(&mut pass);
-            // self.fmm.filter_active_blocks(&mut pass);
-            // self.gpu_timer.end_pass(&mut pass);
-
-            // self.gpu_timer.start_pass(&mut pass);
-            // pass.set_pipeline(&self.fmm.get_pipeline1());
-            // self.gpu_timer.end_pass(&mut pass);
-
-            // self.gpu_timer.start_pass(&mut pass);
-            // pass.set_pipeline(&self.fmm.get_pipeline2());
-            // self.gpu_timer.end_pass(&mut pass);
-
-            // self.gpu_timer.start_pass(&mut pass);
-            // self.fmm.switch_pipeline2(&mut pass);
-            // self.gpu_timer.end_pass(&mut pass);
-
-            // self.fmm.visualize_active_blocs(&mut pass);
-            //drop(pass);
         }
 
         let total_block_count = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32;
@@ -773,16 +734,16 @@ impl Application for FmmApp {
         // println!("disp_x == {}, disp_y == {}", disp_x, disp_y);
 
         // Cell visualizer.
-        if self.app_render_params.visualization_method != 0 {
-            self.compute_object_fmm_visualizer.dispatch(
-                &self.compute_bind_groups_fmm_visualizer,
-                &mut encoder,
-                // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-                disp_x, disp_y, 1,
-                Some("fmm visualizer dispatch")
-            );
-            self.app_render_params.update = false;
-        }
+        // if self.app_render_params.visualization_method != 0 {
+        //     self.compute_object_fmm_visualizer.dispatch(
+        //         &self.compute_bind_groups_fmm_visualizer,
+        //         &mut encoder,
+        //         // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
+        //         disp_x, disp_y, 1,
+        //         Some("fmm visualizer dispatch")
+        //     );
+        //     self.app_render_params.update = false;
+        // }
 
         // self.gpu_timer.resolve_timestamps(&mut encoder);
         self.sphere_tracer.dispatch(&mut encoder);
@@ -816,10 +777,10 @@ impl Application for FmmApp {
         if self.once {
 
         // TODO: something better.
-        if !self.gpu_timer.is_none() {
-            self.gpu_timer.as_mut().unwrap().create_timestamp_data(&device, &queue);
-            self.gpu_timer.as_mut().unwrap().print_data();
-        }
+        // if !self.gpu_timer.is_none() {
+        //     self.gpu_timer.as_mut().unwrap().create_timestamp_data(&device, &queue);
+        //     self.gpu_timer.as_mut().unwrap().print_data();
+        // }
 
             //let gpu_timer_result = self.gpu_timer.get_data(); 
 

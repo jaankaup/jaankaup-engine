@@ -6,6 +6,8 @@ let BAND     = 2u;
 let KNOWN    = 3u;
 let OUTSIDE  = 4u;
 
+let THREAD_COUNT = 256u;
+
 struct VVVC {
     position: vec3<f32>,
     color: u32,
@@ -74,7 +76,7 @@ struct SamplerCell {
 @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
 @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
-@group(0) @binding(4) var<storage, read_write> sample_data: array<SamplerCell>;
+// @group(0) @binding(4) var<storage, read_write> sample_data: array<SamplerCell>;
 
 // Debug. Disabled.
 // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
@@ -197,7 +199,8 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
 }
 
 @compute
-@workgroup_size(1024,1,1)
+@workgroup_size(256,1,1)
+//@workgroup_size(1024,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
@@ -220,13 +223,14 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //           );
     // }
 
-    let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
+    let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, THREAD_COUNT);
+    //let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
 
     let min_distance = 0.70710678;
 
     for (var i: u32 = 0u; i < number_of_chunks; i = i + 1u) { 
 
-        let actual_index = i * 1024u + local_index;
+        let actual_index = i * THREAD_COUNT + local_index;
 
         var nearest_cell: vec3<i32>;
 
