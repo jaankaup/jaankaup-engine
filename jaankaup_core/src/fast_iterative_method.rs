@@ -123,9 +123,13 @@ pub struct FastIterativeMethod {
     // fmm_state: FmmState,
 
     initial_active_cells: ComputeObject,
+    initial_active_cells_bind_groups: Vec<wgpu::BindGroup>,
     update_phase: ComputeObject,
+    update_phase_bind_groups: Vec<wgpu::BindGroup>,
     pre_remedy: ComputeObject,
+    pre_remedy_bind_groups: Vec<wgpu::BindGroup>,
     remedy_phase: ComputeObject,
+    remedy_phase_bind_groups: Vec<wgpu::BindGroup>,
 }
 
 impl FastIterativeMethod {
@@ -250,13 +254,6 @@ impl FastIterativeMethod {
                         &fim_data.as_entire_binding(),
                         &fim_histogram.get_histogram_buffer().as_entire_binding(),
                     ],
-                    // vec![
-                    //     &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
-                    //     &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
-                    // ],
                 ]
         );
 
@@ -314,10 +311,31 @@ impl FastIterativeMethod {
         );
 
         // Create FIM compute objects. 
-        let initial_active_cells = Self::create_initial_active_cells( &device);
-        let update_phase = Self::create_update_phase( &device);
-        let pre_remedy = Self::create_pre_remedy( &device);
-        let remedy_phase = Self::create_remedy_phase( &device);
+        let (initial_active_cells, initial_active_cells_bind_groups) =
+            Self::create_initial_active_cells(&device,
+                                              &fmm_params_buffer.get_buffer(),
+                                              &active_list,
+                                              &fim_data,
+                                              &fim_histogram.get_histogram_buffer()
+        );
+        let (update_phase, update_phase_bind_groups) = Self::create_update_phase(&device,
+                                              &fmm_params_buffer.get_buffer(),
+                                              &active_list,
+                                              &fim_data,
+                                              &fim_histogram.get_histogram_buffer()
+        );
+        let (pre_remedy, pre_remedy_bind_groups) = Self::create_pre_remedy(&device,
+                                              &fmm_params_buffer.get_buffer(),
+                                              &active_list,
+                                              &fim_data,
+                                              &fim_histogram.get_histogram_buffer()
+        );
+        let (remedy_phase, remedy_phase_bind_groups) = Self::create_remedy_phase(&device,
+                                              &fmm_params_buffer.get_buffer(),
+                                              &active_list,
+                                              &fim_data,
+                                              &fim_histogram.get_histogram_buffer()
+        );
 
         Self {
             compute_object: compute_object,
@@ -336,9 +354,13 @@ impl FastIterativeMethod {
             // fmm_state: fmm_state,
             //count_source_cells: count_source_cells,
             initial_active_cells: initial_active_cells,
+            initial_active_cells_bind_groups: initial_active_cells_bind_groups,
             update_phase: update_phase,
+            update_phase_bind_groups: update_phase_bind_groups,
             pre_remedy: pre_remedy,
+            pre_remedy_bind_groups: pre_remedy_bind_groups,
             remedy_phase: remedy_phase,
+            remedy_phase_bind_groups: remedy_phase_bind_groups,
         }
     }
 
@@ -377,14 +399,14 @@ impl FastIterativeMethod {
             &wgpu::ComputePassDescriptor { label: Some("Fim compute pass.")}
         );
         // pass.set_pipeline(&self.compute_object.pipeline);
-        for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
-            pass.set_bind_group(e as u32, &bgs, &[]);
-        }
+        // for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
+        //     pass.set_bind_group(e as u32, &bgs, &[]);
+        // }
 
         // if !gpu_timer.is_none() {
         //     gpu_timer.as_mut().unwrap().start_pass(&mut pass);
         // }
-        for (e, bgs) in self.compute_object_bind_groups.iter().enumerate() {
+        for (e, bgs) in self.initial_active_cells_bind_groups.iter().enumerate() {
             pass.set_bind_group(e as u32, &bgs, &[]);
         }
 
@@ -393,11 +415,23 @@ impl FastIterativeMethod {
             pass.set_pipeline(&self.initial_active_cells.pipeline);
             pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
 
+            for (e, bgs) in self.update_phase_bind_groups.iter().enumerate() {
+                pass.set_bind_group(e as u32, &bgs, &[]);
+            }
+
             pass.set_pipeline(&self.update_phase.pipeline);
             pass.dispatch_workgroups(1, 1, 1);
 
+            for (e, bgs) in self.pre_remedy_bind_groups.iter().enumerate() {
+                pass.set_bind_group(e as u32, &bgs, &[]);
+            }
+
             pass.set_pipeline(&self.pre_remedy.pipeline);
             pass.dispatch_workgroups(number_of_dispatches_256, 1, 1);
+
+            for (e, bgs) in self.remedy_phase_bind_groups.iter().enumerate() {
+                pass.set_bind_group(e as u32, &bgs, &[]);
+            }
 
             pass.set_pipeline(&self.remedy_phase.pipeline);
             pass.dispatch_workgroups(1, 1, 1);
@@ -463,7 +497,12 @@ impl FastIterativeMethod {
         &self.fmm_params_buffer.get_buffer()
     }
 
-    fn create_initial_active_cells(device: &wgpu::Device) -> ComputeObject {
+    fn create_initial_active_cells(device: &wgpu::Device,
+                                   fmm_params_buffer: &wgpu::Buffer,
+                                   active_list: &wgpu::Buffer,
+                                   fim_data: &wgpu::Buffer,
+                                   fim_histogram: &wgpu::Buffer
+                                   ) -> (ComputeObject, Vec<wgpu::BindGroup>) {
         let compute_object =
                 ComputeObject::init(
                     &device,
@@ -493,10 +532,28 @@ impl FastIterativeMethod {
                     &"main".to_string(),
                     None,
         );
-        compute_object
+        let compute_object_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_params_buffer.as_entire_binding(),
+                        &active_list.as_entire_binding(),
+                        &fim_data.as_entire_binding(),
+                        &fim_histogram.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, compute_object_bind_groups)
     }
 
-    fn create_update_phase(device: &wgpu::Device) -> ComputeObject {
+    fn create_update_phase(device: &wgpu::Device,
+                           fmm_params_buffer: &wgpu::Buffer,
+                           active_list: &wgpu::Buffer,
+                           fim_data: &wgpu::Buffer,
+                           fim_histogram: &wgpu::Buffer
+                           ) -> (ComputeObject, Vec<wgpu::BindGroup>) {
 
         let compute_object =
                 ComputeObject::init(
@@ -527,10 +584,28 @@ impl FastIterativeMethod {
                     &"main".to_string(),
                     None,
         );
-        compute_object
+        let compute_object_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_params_buffer.as_entire_binding(),
+                        &active_list.as_entire_binding(),
+                        &fim_data.as_entire_binding(),
+                        &fim_histogram.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, compute_object_bind_groups)
     }
 
-    fn create_pre_remedy(device: &wgpu::Device) -> ComputeObject {
+    fn create_pre_remedy(device: &wgpu::Device,
+                         fmm_params_buffer: &wgpu::Buffer,
+                         active_list: &wgpu::Buffer,
+                         fim_data: &wgpu::Buffer,
+                         fim_histogram: &wgpu::Buffer
+                         ) -> (ComputeObject, Vec<wgpu::BindGroup>) {
         let compute_object =
                 ComputeObject::init(
                     &device,
@@ -560,10 +635,28 @@ impl FastIterativeMethod {
                     &"main".to_string(),
                     None,
         );
-        compute_object
+        let compute_object_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_params_buffer.as_entire_binding(),
+                        &active_list.as_entire_binding(),
+                        &fim_data.as_entire_binding(),
+                        &fim_histogram.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, compute_object_bind_groups)
     }
 
-    fn create_remedy_phase(device: &wgpu::Device) -> ComputeObject {
+    fn create_remedy_phase(device: &wgpu::Device,
+                           fmm_params_buffer: &wgpu::Buffer,
+                           active_list: &wgpu::Buffer,
+                           fim_data: &wgpu::Buffer,
+                           fim_histogram: &wgpu::Buffer
+                           ) -> (ComputeObject, Vec<wgpu::BindGroup>) {
 
         let compute_object =
                 ComputeObject::init(
@@ -594,6 +687,19 @@ impl FastIterativeMethod {
                     &"main".to_string(),
                     None,
         );
-        compute_object
+        let compute_object_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_params_buffer.as_entire_binding(),
+                        &active_list.as_entire_binding(),
+                        &fim_data.as_entire_binding(),
+                        &fim_histogram.as_entire_binding(),
+                    ],
+                ]
+        );
+        (compute_object, compute_object_bind_groups)
     }
 }
