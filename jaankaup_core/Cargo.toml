@@ -15,8 +15,8 @@ texture_debug = []
 # Downgrade.
 #wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="191537021e6f7504beee9961c16b3245b72e194b" }
 
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="537c6bed4e579a5cd99196ad4d3b1b952455d08a" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="e49ef973111265eb4f6de65a75ee701a90cfa4fb" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="a420e453c3d9c93dfb1a8526bf11c000d895c916" }
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="537c6bed4e579a5cd99196ad4d3b1b952455d08a" }
 winit = { version = "0.26"}
 futures-intrusive = "0.4"
 async-executor = "1.0"
