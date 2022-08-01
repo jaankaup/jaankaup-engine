@@ -52,7 +52,7 @@ const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_AABBS:      usize = 3 * TOTAL_INDICES;
+const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
 #[allow(dead_code)]
@@ -68,23 +68,23 @@ const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
 
 #[allow(dead_code)]
 //const TOTAL_INDICES: usize = 64*16*54*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
-const TOTAL_INDICES: usize = 32*8*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
+const TOTAL_INDICES: usize = 32*16*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
 
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-const FMM_GLOBAL_X: usize = 32;
-const FMM_GLOBAL_Y: usize = 8;
-const FMM_GLOBAL_Z: usize = 27;
+// const FMM_GLOBAL_X: usize = 32;
+// const FMM_GLOBAL_Y: usize = 8;
+// const FMM_GLOBAL_Z: usize = 27;
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
 // const FMM_GLOBAL_X: usize = 70;
 // const FMM_GLOBAL_Y: usize = 18;
 // const FMM_GLOBAL_Z: usize = 60;
-// const FMM_GLOBAL_X: usize = 80;
-// const FMM_GLOBAL_Y: usize = 16;
-// const FMM_GLOBAL_Z: usize = 56;
+const FMM_GLOBAL_X: usize = 82;
+const FMM_GLOBAL_Y: usize = 17;
+const FMM_GLOBAL_Z: usize = 58;
 
 const FMM_INNER_X: usize = 4;
 const FMM_INNER_Y: usize = 4;
@@ -136,9 +136,10 @@ impl WGPUFeatures for FmmAppFeatures {
         limits.max_storage_buffers_per_shader_stage = 10;
         limits.max_push_constant_size = 4;
         limits.max_push_constant_size = 4;
-        // limits.max_compute_workgroup_size_x = 65536 * 2;
+        //limits.max_compute_workgroup_size_x = 65536 * 2;
         limits.max_storage_buffer_binding_size = 154275840; 
-        println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
+        // limits.max_compute_workgroups_per_dimension = 65536 * 2;
+        // println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
         limits
     }
 }
@@ -165,7 +166,7 @@ struct FmmApp {
     render_object_vvvc: RenderObject,
     render_bind_groups_vvvc: Vec<wgpu::BindGroup>,
     app_render_params: AppRenderParams,
-    fmm: FastMarchingMethod,
+    // fmm: FastMarchingMethod,
     _pc_params: PointCloudParamsBuffer,
     once: bool,
     sphere_tracer: SphereTracer,
@@ -353,11 +354,11 @@ impl Application for FmmApp {
 
         // The Fast marching method.
         //
-        let mut fmm = FastMarchingMethod::init(&configuration.device,
-                                           global_dimension,
-                                           local_dimension,
-                                           &Some(&gpu_debugger),
-        );
+        // let mut fmm = FastMarchingMethod::init(&configuration.device,
+        //                                    global_dimension,
+        //                                    local_dimension,
+        //                                    &Some(&gpu_debugger),
+        // );
 
         let mut fim = FastIterativeMethod::init(&configuration.device,
                                                global_dimension,
@@ -496,7 +497,7 @@ impl Application for FmmApp {
                 true,
                 true,
                 //[192, 320],
-                fmm.get_fmm_params_buffer(),
+                fim.get_fmm_params_buffer(),
                 fim.get_fim_data_buffer(),
                 //fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),
@@ -526,7 +527,7 @@ impl Application for FmmApp {
             render_object_vvvc: render_object_vvvc,
             render_bind_groups_vvvc: render_bind_groups_vvvc,
             app_render_params: app_render_params,
-            fmm: fmm,
+            // fmm: fmm,
             _pc_params: pc_params,
             once: once,
             sphere_tracer: sphere_tracer,
@@ -768,6 +769,9 @@ impl Application for FmmApp {
         let total_block_count = (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32;
         let disp_y = udiv_up_safe32(total_block_count.try_into().unwrap(), 65535);  
         let disp_x = total_block_count / disp_y; 
+        let dispatch_x = udiv_up_safe32(total_grid_count.try_into().unwrap(), 128);  
+
+        // println!("dispatch_x == {}", dispatch_x);
 
         // println!("total_block_count == {}", total_block_count);
         // println!("disp_x == {}, disp_y == {}", disp_x, disp_y);
@@ -778,7 +782,8 @@ impl Application for FmmApp {
                 &self.compute_bind_groups_fmm_visualizer,
                 &mut encoder,
                 // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
-                disp_x, disp_y, 1,
+                dispatch_x, 1, 1,
+                //disp_x, disp_y, 1,
                 Some("fmm visualizer dispatch")
             );
             self.app_render_params.update = false;

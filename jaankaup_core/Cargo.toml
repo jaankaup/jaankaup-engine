@@ -2,7 +2,6 @@
 name = "jaankaup_core"
 version = "0.1.0"
 authors = ["jaankaup <janne.a.kauppinen@student.jyu.fi>"]
-#edition = "2018"
 edition = "2021"
 
 [lib]
@@ -12,39 +11,41 @@ input_debug = []
 texture_debug = []
 
 [dependencies]
-# Downgrade.
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="191537021e6f7504beee9961c16b3245b72e194b" }
 
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="a420e453c3d9c93dfb1a8526bf11c000d895c916" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="537c6bed4e579a5cd99196ad4d3b1b952455d08a" }
 winit = { version = "0.26"}
-futures-intrusive = "0.4"
-async-executor = "1.0"
 cgmath = "0.18"
-bytemuck = { version = "1.4", features = ["derive"] }
-png = "0.16"
-instant = {version = "0.1.12", features = ["wasm-bindgen"]}
 log = "0.4"
 wavefront_obj = "10.0.0"
+instant = {version = "0.1.12", features = ["wasm-bindgen"]}
+png = "0.16"
+bytemuck = { version = "1.4", features = ["derive"] }
+
+#[target.'cfg(not(target_arch = "wasm32"))'.dependencies.wgpu]
+#[dependencies.wgpu]
+#git = "https://github.com/gfx-rs/wgpu"
+#rev = "a420e453c3d9c93dfb1a8526bf11c000d895c916"
+#
+#[target.'cfg(target_arch = "wasm32")'.dependencies.wgpu]
+#git = "https://github.com/gfx-rs/wgpu"
+#rev = "191537021e6f7504beee9961c16b3245b72e194b"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="a420e453c3d9c93dfb1a8526bf11c000d895c916" }
+futures-intrusive = "0.4"
+async-executor = "1.0"
 pollster = "0.2"
 simple_logger = "1.16.0"
 #env_logger = "0.8.2"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="191537021e6f7504beee9961c16b3245b72e194b" }
 getrandom = { version = "0.2.7", features = ["js"] }
-
-#web-sys = "0.3.57"
-#js-sys = "0.3.57"
-#wasm-bindgen = "0.2.80"
-#wasm-bindgen-futures = "0.4.30"
-
-web-sys = "0.3.58"
-wasm-bindgen = "0.2.81"
-js-sys = "0.3.58"
-wasm-bindgen-futures = "0.4.31"
-
+web-sys = "0.3.57"
+js-sys = "0.3.57"
+wasm-bindgen = "0.2.80"
+wasm-bindgen-futures = "0.4.30"
 wasm-timer = "0.2.5"
 console_error_panic_hook = "0.1.6"
 console_log = "0.1.2"

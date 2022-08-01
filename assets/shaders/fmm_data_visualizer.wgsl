@@ -67,9 +67,17 @@ struct FmmVisualizationParams {
 @group(0) @binding(5) var<storage,read_write> output_aabb: array<AABB>;
 @group(0) @binding(6) var<storage,read_write> output_aabb_wire: array<AABB>;
 
-let THREAD_COUNT = 64u;
-
 //////// Common function  ////////
+
+fn total_cell_count() -> u32 {
+
+    return fmm_visualization_params.fmm_global_dimension.x *
+           fmm_visualization_params.fmm_global_dimension.y *
+           fmm_visualization_params.fmm_global_dimension.z *
+           fmm_visualization_params.fmm_inner_dimension.x *
+           fmm_visualization_params.fmm_inner_dimension.y *
+           fmm_visualization_params.fmm_inner_dimension.z;
+};
 
 /**
  * [a1] from range min
@@ -308,7 +316,7 @@ fn visualize_cell(position: vec3<f32>, color: u32) {
 }
 
 @compute
-@workgroup_size(64,1,1)
+@workgroup_size(128,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         // @builtin(workgroup_id) workgroup_id: vec3<u32>,
@@ -316,6 +324,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(global_invocation_id)   global_id: vec3<u32>) {
 
     // let color = bitcast<f32>(rgba_u32(222u, 0u, 150u, 255u));
+    let cell_count = total_cell_count();
+
+    if (global_id.x >= cell_count) { return; }
 
     let cell = fmm_data[global_id.x];
 
@@ -370,7 +381,9 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
                            
         // visualize_cell(position, cell.color);
-        visualize_cell(position, col);
+	if (cell.color ==  rgba_u32(0u, 0u, 0u, 255u)) { return; }  
+        visualize_cell(position, cell.color);
+        //visualize_cell(position, col);
 
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 

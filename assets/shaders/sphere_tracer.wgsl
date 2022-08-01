@@ -302,14 +302,22 @@ fn screen_to_index(v: vec2<u32>) -> u32 {
 
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    let light_pos = vec3<f32>(150.0,70.0,150.0);
+
+    let light_pos = vec3<f32>(
+                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x),
+                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y),
+                        f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) * 0.5 +
+			vec3<f32>(0.0, f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y), 0.0);
+
+
+    // let light_pos = vec3<f32>(150.0,70.0,150.0);
     //let light_pos = camera.pos; // vec3<f32>(150.0,70.0,150.0);
     let lightColor = vec3<f32>(1.0,1.0,1.0);
-    let lightPower = 1550.0;
+    let lightPower = 1000.0;
     
     // Material properties
     let materialDiffuseColor = decode_color((*payload).color).xyz; //vec3<f32>(1.0, 0.0, 0.0);
-    let materialAmbientColor = vec3<f32>(0.8,0.8,0.8) * materialDiffuseColor;
+    let materialAmbientColor = vec3<f32>(0.4,0.4,0.4) * materialDiffuseColor;
     let materialSpecularColor = vec3<f32>(0.5,0.5,0.5);
     
     // Distance to the light
@@ -364,6 +372,7 @@ fn load_trilinear_neighbors(coord: vec3<u32>, render: bool) -> array<u32, 8> {
     );
 
     if (sphere_tracer_params.render_samplers == 1u && render && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
+    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_cell_count() / 2u)) {
     // if (render && (((private_global_index.x + 32u) & 2047u) == 0u)) {
     //if (render && ((private_global_index.x & 127u) == 0u)) {
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
@@ -570,81 +579,15 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    let ty = fract(p.y);
    let tz = fract(p.z);
 
-   //++ var neighbors: array<vec3<i32>, 8> = array<vec3<i32>, 8>(
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  0),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  1),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  1),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  1),
-   //++     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  1),
-   //++ );
+   let loc0 = get_cell_index(private_neighbors_loc[0]);
+   let loc1 = get_cell_index(private_neighbors_loc[1]);
+   let loc2 = get_cell_index(private_neighbors_loc[2]);
+   let loc3 = get_cell_index(private_neighbors_loc[3]);
+   let loc4 = get_cell_index(private_neighbors_loc[4]);
+   let loc5 = get_cell_index(private_neighbors_loc[5]);
+   let loc6 = get_cell_index(private_neighbors_loc[6]);
+   let loc7 = get_cell_index(private_neighbors_loc[7]);
 
-   //++ let d0 = distance(p, vec3<f32>(neighbors[0])); 
-   //++ let d1 = distance(p, vec3<f32>(neighbors[1])); 
-   //++ let d2 = distance(p, vec3<f32>(neighbors[2])); 
-   //++ let d3 = distance(p, vec3<f32>(neighbors[3])); 
-   //++ let d4 = distance(p, vec3<f32>(neighbors[4])); 
-   //++ let d5 = distance(p, vec3<f32>(neighbors[5])); 
-   //++ let d6 = distance(p, vec3<f32>(neighbors[6])); 
-   //++ let d7 = distance(p, vec3<f32>(neighbors[7])); 
-
-   // let c001_factor = select(1.0, 0.0, private_neighbors[0].color == 0u || private_neighbors[0].tag == OUTSIDE);
-   // let c101_factor = select(1.0, 0.0, private_neighbors[1].color == 0u || private_neighbors[1].tag == OUTSIDE);
-   // let c011_factor = select(1.0, 0.0, private_neighbors[2].color == 0u || private_neighbors[2].tag == OUTSIDE);
-   // let c111_factor = select(1.0, 0.0, private_neighbors[3].color == 0u || private_neighbors[3].tag == OUTSIDE);
-   // let c000_factor = select(1.0, 0.0, private_neighbors[4].color == 0u || private_neighbors[4].tag == OUTSIDE);
-   // let c100_factor = select(1.0, 0.0, private_neighbors[5].color == 0u || private_neighbors[5].tag == OUTSIDE);
-   // let c010_factor = select(1.0, 0.0, private_neighbors[6].color == 0u || private_neighbors[6].tag == OUTSIDE);
-   // let c110_factor = select(1.0, 0.0, private_neighbors[7].color == 0u || private_neighbors[7].tag == OUTSIDE);
-
-   // let c000_factor = select(1.0, 0.0, private_neighbors[0].color == 0u || private_neighbors[0].tag == OUTSIDE);
-   // let c100_factor = select(1.0, 0.0, private_neighbors[1].color == 0u || private_neighbors[1].tag == OUTSIDE);
-   // let c010_factor = select(1.0, 0.0, private_neighbors[2].color == 0u || private_neighbors[2].tag == OUTSIDE);
-   // let c110_factor = select(1.0, 0.0, private_neighbors[3].color == 0u || private_neighbors[3].tag == OUTSIDE);
-   // let c001_factor = select(1.0, 0.0, private_neighbors[4].color == 0u || private_neighbors[4].tag == OUTSIDE);
-   // let c101_factor = select(1.0, 0.0, private_neighbors[5].color == 0u || private_neighbors[5].tag == OUTSIDE);
-   // let c011_factor = select(1.0, 0.0, private_neighbors[6].color == 0u || private_neighbors[6].tag == OUTSIDE);
-   // let c111_factor = select(1.0, 0.0, private_neighbors[7].color == 0u || private_neighbors[7].tag == OUTSIDE);
-
-   // let c001 = decode_color(private_neighbors[0].color);
-   // let c101 = decode_color(private_neighbors[1].color); 
-   // let c011 = decode_color(private_neighbors[2].color);
-   // let c111 = decode_color(private_neighbors[3].color); 
-   // let c000 = decode_color(private_neighbors[4].color);
-   // let c100 = decode_color(private_neighbors[5].color); 
-   // let c010 = decode_color(private_neighbors[6].color); 
-   // let c110 = decode_color(private_neighbors[7].color); 
-
-   //        c011 : 2                 c111 : 3
-   //         +------------------------+
-   //        /|                       /|
-   //       / |                      / |
-   //      /  |                     /  |
-   //     /   |                    /   |
-   //    /    |                   /    |
-   //   +------------------------+c101 |
-   //   |c001 |                  | :7  |
-   //   | :6  |                  |     |
-   //   |     |                  |     |
-   //   |     +------------------|-----+ c110 : 1 
-   //   |    / c010 : 0          |    /
-   //   |   /                    |   /
-   //   |  /                     |  /
-   //   | /                      | /
-   //   |/                       |/
-   //   +------------------------+
-   //  c000 : 4                  c100 : 5
-
-   // let c100 = decode_color(private_neighbors[0].color);
-   // let c000 = decode_color(private_neighbors[1].color); 
-   // let c110 = decode_color(private_neighbors[3].color); 
-   // let c010 = decode_color(private_neighbors[2].color);
-   // let c101 = decode_color(private_neighbors[5].color); 
-   // let c001 = decode_color(private_neighbors[4].color);
-   // let c111 = decode_color(private_neighbors[7].color); 
-   // let c011 = decode_color(private_neighbors[6].color); 
    let c000 = decode_color(private_neighbors[0].color);
    let c100 = decode_color(private_neighbors[1].color); 
    let c010 = decode_color(private_neighbors[2].color);
@@ -653,72 +596,47 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    let c101 = decode_color(private_neighbors[5].color); 
    let c011 = decode_color(private_neighbors[6].color); 
    let c111 = decode_color(private_neighbors[7].color); 
-   //++ let c000 = decode_color(private_neighbors[4].color);
-   //++ let c100 = decode_color(private_neighbors[5].color); 
-   //++ let c010 = decode_color(private_neighbors[0].color);
-   //++ let c110 = decode_color(private_neighbors[1].color); 
-   //++ let c001 = decode_color(private_neighbors[6].color);
-   //++ let c101 = decode_color(private_neighbors[7].color); 
-   //++ let c011 = decode_color(private_neighbors[2].color); 
-   //++ let c111 = decode_color(private_neighbors[3].color); 
-   //let c010 = decode_color(private_neighbors[0].color);
-   //let c110 = decode_color(private_neighbors[1].color); 
-   //let c011 = decode_color(private_neighbors[2].color);
-   //let c111 = decode_color(private_neighbors[3].color); 
-   //let c000 = decode_color(private_neighbors[4].color);
-   //let c100 = decode_color(private_neighbors[5].color); 
-   //let c001 = decode_color(private_neighbors[6].color); 
-   //let c101 = decode_color(private_neighbors[7].color); 
 
-   let loc0 = get_cell_index(private_neighbors_loc[4]);
-   let loc1 = get_cell_index(private_neighbors_loc[5]);
-   let loc2 = get_cell_index(private_neighbors_loc[0]);
-   let loc3 = get_cell_index(private_neighbors_loc[1]);
-   let loc4 = get_cell_index(private_neighbors_loc[6]);
-   let loc5 = get_cell_index(private_neighbors_loc[7]);
-   let loc6 = get_cell_index(private_neighbors_loc[2]);
-   let loc7 = get_cell_index(private_neighbors_loc[3]);
+   //        c010 : (0,1,0) : 2       c110 : (1,1,0) 3 
+   //         +------------------------+
+   //        /|                       /|
+   //       / |                      / |
+   //      /  |                     /  |
+   //     /   |                    /   |
+   //    /    |                   /    |
+   //   +------------------------+c111 |
+   //   |c011 (0, 1, 0) 6        | (1,1,1) 7
+   //   |     |                  |     |
+   //   |     |                  |     |
+   //   |     +------------------|-----+ c100 : (1,0,0) 1 
+   //   |    / c000 : (0,0,0) 0  |    /
+   //   |   /                    |   /
+   //   |  /                     |  /
+   //   | /                      | /
+   //   |/                       |/
+   //   +------------------------+
+   //  c001 : (0, 0, 1) 4       c101 : (1, 0, 1) 5 
 
+   let gamma = 1.2;
 
-   // if ((private_global_index.x & 1023u) == 0u) {
-   //     output_aabb[atomicAdd(&counter[2], 1u)] =  
-   //           AABB (
-   //               vec4<f32>(pah.x - 0.3,
-   //                         pah.y - 0.3,
-   //                         pah.z - 0.3,
-   //                         bitcast<f32>(c)),
-   //               vec4<f32>(pah.x + 0.3,
-   //                         pah.y + 0.3,
-   //                         pah.z + 0.3,
-   //                         0.0),
-   //     );
-   // }
+   let c00 = pow(c000 * (1.0 - tx) + c100 * tx, vec4<f32>(1.0 / gamma)); 
+   let c01 = pow(c010 * (1.0 - tx) + c110 * tx, vec4<f32>(1.0 / gamma)); 
+   let c10 = pow(c001 * (1.0 - tx) + c101 * tx, vec4<f32>(1.0 / gamma)); 
+   let c11 = pow(c011 * (1.0 - tx) + c111 * tx, vec4<f32>(1.0 / gamma)); 
 
-   let c00 = c000 * (1.0 - tx) + c100 * tx; 
-   let c01 = c001 * (1.0 - tx) + c101 * tx; 
-   let c10 = c010 * (1.0 - tx) + c110 * tx; 
-   let c11 = c011 * (1.0 - tx) + c111 * tx; 
+   let c0 = pow(c00 * (1.0 - ty) + c01 * ty, vec4<f32>(1.0 / gamma));
+   let c1 = pow(c10 * (1.0 - ty) + c11 * ty, vec4<f32>(1.0 / gamma));
 
-   // let c0 = c00 * (1.0 - ty) + c10 * ty;
-   // let c1 = c01 * (1.0 - ty) + c11 * ty;
-
-   // let c = c0 * (1.0 - tz) + c1 * tz; 
-
-   // let c00 = c100 * (1.0 - tx) + c000 * tx; 
-   // let c01 = c101 * (1.0 - tx) + c001 * tx; 
-   // let c10 = c110 * (1.0 - tx) + c010 * tx; 
-   // let c11 = c111 * (1.0 - tx) + c011 * tx; 
-
-   let c0 = c00 * (1.0 - ty) + c10 * ty;
-   let c1 = c01 * (1.0 - ty) + c11 * ty;
-
-   let c = c0 * (1.0 - tz) + c1 * tz; 
+   //let c = c1 * (1.0 - tz) + c0 * tz; 
+   let c = pow(c0 * (1.0 - tz) + c1 * tz, vec4<f32>(1.0 / gamma)); 
 
    let size = 0.1;
 
    //if ((private_global_index.x & 2047u) == 0u) {
+   //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_cell_count() / 2u)) {
    if (sphere_tracer_params.render_samplers == 1u && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
    //if (((private_global_index.x + 32u) & 2047u) == 0u) {
+
    output_arrow[atomicAdd(&counter[1], 1u)] =  
          Arrow (
              vec4<f32>(p * 4.0, 0.0),
@@ -737,28 +655,28 @@ fn fmm_color(p: vec3<f32>) -> u32 {
          Arrow (
              vec4<f32>(p * 4.0, 0.0),
              vec4<f32>(vec3<f32>(loc2) * 4.0, 0.0),
-    	     vec4_to_rgba(c001),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc3) * 4.0, 0.0),
-    	     vec4_to_rgba(c101),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc4) * 4.0, 0.0),
     	     vec4_to_rgba(c010),
              size
    );
    output_arrow[atomicAdd(&counter[1], 1u)] =  
          Arrow (
              vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc5) * 4.0, 0.0),
+             vec4<f32>(vec3<f32>(loc3) * 4.0, 0.0),
     	     vec4_to_rgba(c110),
+             size
+   );
+   output_arrow[atomicAdd(&counter[1], 1u)] =  
+         Arrow (
+             vec4<f32>(p * 4.0, 0.0),
+             vec4<f32>(vec3<f32>(loc4) * 4.0, 0.0),
+    	     vec4_to_rgba(c001),
+             size
+   );
+   output_arrow[atomicAdd(&counter[1], 1u)] =  
+         Arrow (
+             vec4<f32>(p * 4.0, 0.0),
+             vec4<f32>(vec3<f32>(loc5) * 4.0, 0.0),
+    	     vec4_to_rgba(c101),
              size
    );
    output_arrow[atomicAdd(&counter[1], 1u)] =  
@@ -774,6 +692,13 @@ fn fmm_color(p: vec3<f32>) -> u32 {
              vec4<f32>(vec3<f32>(loc7) * 4.0, 0.0),
     	     vec4_to_rgba(c111),
              size
+   );
+   output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+         AABB (
+             vec4<f32>(vec3<f32>(loc0) * 4.0,
+                       bitcast<f32>(rgba_u32(255u, 0u, 1550u, 255u))),
+             vec4<f32>(vec3<f32>(loc7) * 4.0,
+                       0.1)
    );
    }
 
@@ -831,7 +756,7 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    //        tx * (1.0 - ty) * tz * c101 * c101_factor + 
    //        (1.0 - tx) * ty * tz * c011 * c011_factor + 
    //        tx * ty * tz * c111 * c111_factor;
-   return vec4_to_rgba(c);
+   return vec4_to_rgba(vec4<f32>(c.x, c.y, c.z, 1.0));
 
    //++ // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[0].color) * c000_factor + 
    //++ //        tx * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[1].color) * c100_factor + 
@@ -844,84 +769,74 @@ fn fmm_color(p: vec3<f32>) -> u32 {
 }
 
 
-fn fmm_color_6(p: vec3<f32>) -> u32 {
-
-    var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
-        vec3<i32>(p) + vec3<i32>(1,  0,  0),
-        vec3<i32>(p) - vec3<i32>(1,  0,  0),
-        vec3<i32>(p) + vec3<i32>(0,  1,  0),
-        vec3<i32>(p) - vec3<i32>(0,  1,  0),
-        vec3<i32>(p) + vec3<i32>(0,  0,  1),
-        vec3<i32>(p) - vec3<i32>(0,  0,  1),
-    );
-
-   load_neighbors_private(vec3<u32>(neighbors[0]), false);
-   let c0 = decode_color(fmm_color(p + vec3<f32>(1.0, 0.0, 0.0))); 
-
-   load_neighbors_private(vec3<u32>(neighbors[1]), false);
-   let c1 = decode_color(fmm_color(p + vec3<f32>(-1.0, 0.0, 0.0))); 
-
-   load_neighbors_private(vec3<u32>(neighbors[2]), false);
-   let c2 = decode_color(fmm_color(p + vec3<f32>(0.0, 1.0, 0.0))); 
-
-   load_neighbors_private(vec3<u32>(neighbors[3]), false);
-   let c3 = decode_color(fmm_color(p + vec3<f32>(0.0, -1.0, 0.0))); 
-
-   load_neighbors_private(vec3<u32>(neighbors[4]), false);
-   let c4 = decode_color(fmm_color(p + vec3<f32>(0.0, 0.0, 1.0))); 
-
-   load_neighbors_private(vec3<u32>(neighbors[5]), false);
-   let c5 = decode_color(fmm_color(p + vec3<f32>(0.0, 0.0, -1.0))); 
-
-   let x = 1.0/6.0 * f32(c0.x + c1.x + c2.x + c3.x + c4.x + c5.x); 
-   let y = 1.0/6.0 * f32(c0.y + c1.y + c2.y + c3.y + c4.y + c5.y); 
-   let z = 1.0/6.0 * f32(c0.z + c1.z + c2.z + c3.z + c4.z + c5.z); 
-
-   return rgba_u32(u32(min(255.0, x)),
-                   u32(min(255.0, y)),
-		   u32(min(255.0, z)),
-		   255u);
-}
+// fn fmm_color_6(p: vec3<f32>) -> u32 {
+// 
+//     var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
+//         vec3<i32>(p) + vec3<i32>(1,  0,  0),
+//         vec3<i32>(p) - vec3<i32>(1,  0,  0),
+//         vec3<i32>(p) + vec3<i32>(0,  1,  0),
+//         vec3<i32>(p) - vec3<i32>(0,  1,  0),
+//         vec3<i32>(p) + vec3<i32>(0,  0,  1),
+//         vec3<i32>(p) - vec3<i32>(0,  0,  1),
+//     );
+// 
+//    load_neighbors_private(vec3<u32>(neighbors[0]), false);
+//    let c0 = decode_color(fmm_color(p + vec3<f32>(1.0, 0.0, 0.0))); 
+// 
+//    load_neighbors_private(vec3<u32>(neighbors[1]), false);
+//    let c1 = decode_color(fmm_color(p + vec3<f32>(-1.0, 0.0, 0.0))); 
+// 
+//    load_neighbors_private(vec3<u32>(neighbors[2]), false);
+//    let c2 = decode_color(fmm_color(p + vec3<f32>(0.0, 1.0, 0.0))); 
+// 
+//    load_neighbors_private(vec3<u32>(neighbors[3]), false);
+//    let c3 = decode_color(fmm_color(p + vec3<f32>(0.0, -1.0, 0.0))); 
+// 
+//    load_neighbors_private(vec3<u32>(neighbors[4]), false);
+//    let c4 = decode_color(fmm_color(p + vec3<f32>(0.0, 0.0, 1.0))); 
+// 
+//    load_neighbors_private(vec3<u32>(neighbors[5]), false);
+//    let c5 = decode_color(fmm_color(p + vec3<f32>(0.0, 0.0, -1.0))); 
+// 
+//    let x = 1.0/6.0 * f32(c0.x + c1.x + c2.x + c3.x + c4.x + c5.x); 
+//    let y = 1.0/6.0 * f32(c0.y + c1.y + c2.y + c3.y + c4.y + c5.y); 
+//    let z = 1.0/6.0 * f32(c0.z + c1.z + c2.z + c3.z + c4.z + c5.z); 
+// 
+//    return rgba_u32(u32(min(255.0, x)),
+//                    u32(min(255.0, y)),
+// 		   u32(min(255.0, z)),
+// 		   255u);
+// }
 
 
 fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
 
    load_neighbors_private(vec3<u32>(floor(p)), render);
 
-   //++++let pah = p; // * 4.0;
-
-   //++++// fn my_modf(f: f32) -> ModF {
    let tx = fract(p.x);
    let ty = fract(p.y);
    let tz = fract(p.z);
 
-   // let c000 = private_neighbors[4].value;
-   // let c100 = private_neighbors[5].value; 
-   // let c010 = private_neighbors[0].value;
-   // let c110 = private_neighbors[1].value; 
-   // let c001 = private_neighbors[6].value;
-   // let c101 = private_neighbors[7].value; 
-   // let c011 = private_neighbors[2].value; 
-   // let c111 = private_neighbors[3].value; 
+   // let c000 = private_neighbors[0].value;
+   // let c100 = private_neighbors[1].value; 
+   // let c010 = private_neighbors[2].value;
+   // let c110 = private_neighbors[3].value; 
+   // let c001 = private_neighbors[4].value;
+   // let c101 = private_neighbors[5].value; 
+   // let c011 = private_neighbors[6].value; 
+   // let c111 = private_neighbors[7].value; 
 
-   // var min_value0 = select(private_neighbors[1].value, private_neighbors[0].value, private_neighbors[0].value < private_neighbors[1].value);
-   // var min_value1 = select(private_neighbors[3].value, private_neighbors[2].value, private_neighbors[2].value < private_neighbors[3].value);
-   // var min_value2 = select(private_neighbors[5].value, private_neighbors[4].value, private_neighbors[4].value < private_neighbors[5].value);
-   // var min_value3 = select(private_neighbors[7].value, private_neighbors[6].value, private_neighbors[6].value < private_neighbors[7].value);
+   // let c00 = c000 * (1.0 - tx) + c100 * tx; 
+   // let c01 = c001 * (1.0 - tx) + c101 * tx; 
+   // let c10 = c010 * (1.0 - tx) + c110 * tx; 
+   // let c11 = c011 * (1.0 - tx) + c111 * tx; 
 
-   // var min_value4 = select(min_value1, min_value0, min_value0 < min_value1);
-   // var min_value5 = select(min_value3, min_value2, min_value2 < min_value3);
+   // let c0 = c00 * (1.0 - ty) + c10 * ty;
+   // let c1 = c01 * (1.0 - ty) + c11 * ty;
 
-   // var min_value = select(min_value5, min_value4, min_value4 < min_value5);
+   // let c = c0 * (1.0 - tz) + c1 * tz; 
 
-   // let c000 = select(private_neighbors[0].value, min_value, private_neighbors[0].tag != KNOWN);
-   // let c100 = select(private_neighbors[1].value, min_value, private_neighbors[1].tag != KNOWN); 
-   // let c010 = select(private_neighbors[2].value, min_value, private_neighbors[2].tag != KNOWN);
-   // let c110 = select(private_neighbors[3].value, min_value, private_neighbors[3].tag != KNOWN); 
-   // let c001 = select(private_neighbors[4].value, min_value, private_neighbors[4].tag != KNOWN);
-   // let c101 = select(private_neighbors[5].value, min_value, private_neighbors[5].tag != KNOWN); 
-   // let c011 = select(private_neighbors[6].value, min_value, private_neighbors[6].tag != KNOWN); 
-   // let c111 = select(private_neighbors[7].value, min_value, private_neighbors[7].tag != KNOWN); 
+   // return c;
 
    let c000 = private_neighbors[0].value;
    let c100 = private_neighbors[1].value; 
@@ -933,23 +848,14 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    let c111 = private_neighbors[7].value; 
 
    let c00 = c000 * (1.0 - tx) + c100 * tx; 
-   let c01 = c001 * (1.0 - tx) + c101 * tx; 
-   let c10 = c010 * (1.0 - tx) + c110 * tx; 
+   let c01 = c010 * (1.0 - tx) + c110 * tx; 
+   let c10 = c001 * (1.0 - tx) + c101 * tx; 
    let c11 = c011 * (1.0 - tx) + c111 * tx; 
 
-   // let c0 = c00 * (1.0 - ty) + c10 * ty;
-   // let c1 = c01 * (1.0 - ty) + c11 * ty;
+   let c0 = c00 * (1.0 - ty) + c01 * ty;
+   let c1 = c10 * (1.0 - ty) + c11 * ty;
 
-   // let c = c0 * (1.0 - tz) + c1 * tz; 
-
-   // let c00 = c100 * (1.0 - tx) + c000 * tx; 
-   // let c01 = c101 * (1.0 - tx) + c001 * tx; 
-   // let c10 = c110 * (1.0 - tx) + c010 * tx; 
-   // let c11 = c111 * (1.0 - tx) + c011 * tx; 
-
-   let c0 = c00 * (1.0 - ty) + c10 * ty;
-   let c1 = c01 * (1.0 - ty) + c11 * ty;
-
+   //let c = c1 * (1.0 - tz) + c0 * tz; 
    let c = c0 * (1.0 - tz) + c1 * tz; 
 
    return c;
@@ -1446,6 +1352,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     //if ((global_id.x & 2047u) == 0u) {
     if (sphere_tracer_params.render_rays == 1u && (local_index == 0u) && (workgroup_id.x % 44u) == 0u) {
+    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_cell_count() / 2u)) {
     //++ if (payload.visibility > 0.0) {
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (

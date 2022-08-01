@@ -159,6 +159,7 @@ impl GpuDebugger {
                 ) -> Self {
 
         println!("max_number_of_vertices == {}", max_number_of_vertices);
+        // println!("max_number_of_aabbs == {}", max_number_of_aabbs);
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
@@ -602,6 +603,8 @@ impl GpuDebugger {
         let total_number_of_aabbs = elem_counter[2];
         let total_number_of_aabb_wires = elem_counter[3];
 
+        println!("total_number_of_aabbs == {}", total_number_of_aabbs);
+
         let vertices_per_element_arrow = 72;
         let vertices_per_element_aabb = 36;
         let vertices_per_element_aabb_wire = 432;
@@ -673,6 +676,8 @@ impl GpuDebugger {
                     &mut encoder_arrow_aabb,
                     local_dispatch, 1, 1, Some("arrow local dispatch")
                 );
+
+                // println!("local_dispatch == {}", local_dispatch);
 
                 queue.submit(Some(encoder_arrow_aabb.finish()));
 

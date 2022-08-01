@@ -199,14 +199,11 @@ impl FastIterativeMethod {
                             // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                               
-                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
-                              
                             // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(7) var<storage,read_write> fmm_counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                         vec![
 
@@ -297,7 +294,7 @@ impl FastIterativeMethod {
                         &fmm_prefix_params.as_entire_binding(),
                         &fmm_params_buffer.get_buffer().as_entire_binding(),
                         &active_list.as_entire_binding(),
-                        &prefix_temp_array.as_entire_binding(),
+                        // &prefix_temp_array.as_entire_binding(),
                         &fim_data.as_entire_binding(),
                         &fim_histogram.get_histogram_buffer().as_entire_binding(),
                     ],
@@ -452,6 +449,8 @@ impl FastIterativeMethod {
             pass.dispatch_workgroups(1, 1, 1); // TODO: dispatch_indirect
         }
 
+        // println!("FIM: number_of_dispatches_256 == {}", number_of_dispatches_256);
+
         if !gpu_timer.is_none() {
             gpu_timer.as_mut().unwrap().end_pass(&mut pass);
         }
@@ -514,51 +513,6 @@ impl FastIterativeMethod {
         &self.fmm_params_buffer.get_buffer()
     }
 
-    fn create_gather_source_cells(device: &wgpu::Device,
-                                  prefix_params: &wgpu::Buffer,
-                                  fmm_params: &wgpu::Buffer,
-                                  active_list: &wgpu::Buffer,
-                                  temp_prefix_sum: &wgpu::Buffer,
-                                  filtered_blocks: &wgpu::Buffer,
-                                  fim_data: &wgpu::Buffer,
-                                  fmm_counter: &wgpu::Buffer) -> ComputeObject {
-        let compute_object =
-                ComputeObject::init(
-                    &device,
-                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: Some("collect_source_cells.wgsl"),
-                        source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/collect_source_cells.wgsl"))),
-
-                    }),
-                    Some("Collect source cells ComputeObject"),
-                    &vec![
-                        vec![
-                            // @group(0) @binding(0) var<uniform> prefix_params: PrefixParams;
-                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
-
-                            // @group(0) @binding(1) var<uniform> fmm_params: FmmParams;
-                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
-
-                            // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
-                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
-                              
-                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
-                              
-                            // @group(0) @binding(4) var<storage,read_write>  fim_data: array<TempData>;
-                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
-
-                            // @group(0) @binding(5) var<storage,read_write> fim_counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
-                        ],
-                    ],
-                    &"main".to_string(),
-                    None,
-        );
-        compute_object
-    }
-
     fn create_initial_active_cells(device: &wgpu::Device) -> ComputeObject {
         let compute_object =
                 ComputeObject::init(
@@ -581,14 +535,11 @@ impl FastIterativeMethod {
                             // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                               
-                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
-                              
                             // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string(),
@@ -620,14 +571,11 @@ impl FastIterativeMethod {
                             // @group(0) @binding(2) var<storage, read_write> active_list: array<FmmBlock>;
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                               
-                            // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
-                              
                             // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string(),
@@ -659,13 +607,13 @@ impl FastIterativeMethod {
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                               
                             // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                            // create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                               
                             // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string(),
@@ -698,13 +646,13 @@ impl FastIterativeMethod {
                             create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
                               
                             // @group(0) @binding(3) var<storage, read_write> temp_prefix_sum: array<u32>;
-                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                            // create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
                               
                             // @group(0) @binding(6) var<storage,read_write>  fim_data: array<TempData>;
-                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
 
                             // @group(0) @binding(7) var<storage,read_write> fim_counter: array<atomic<u32>>;
-                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string(),
