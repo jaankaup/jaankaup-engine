@@ -603,8 +603,6 @@ impl GpuDebugger {
         let total_number_of_aabbs = elem_counter[2];
         let total_number_of_aabb_wires = elem_counter[3];
 
-        println!("total_number_of_aabbs == {}", total_number_of_aabbs);
-
         let vertices_per_element_arrow = 72;
         let vertices_per_element_aabb = 36;
         let vertices_per_element_aabb_wire = 432;

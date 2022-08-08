@@ -12,7 +12,12 @@ texture_debug = []
 
 [dependencies]
 
-winit = { version = "0.26"}
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="d655017439c10e8bd77ad80b353bb6b231c9d838" }
+# wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="a420e453c3d9c93dfb1a8526bf11c000d895c916" }
+# wgpu_native = { package="wgpu", git = "https://github.com/gfx-rs/wgpu", rev="a420e453c3d9c93dfb1a8526bf11c000d895c916" }
+# wgpu_wasm = { package="wgpu", git = "https://github.com/gfx-rs/wgpu", rev="191537021e6f7504beee9961c16b3245b72e194b" }
+
+winit = { version = "0.27"}
 cgmath = "0.18"
 log = "0.4"
 wavefront_obj = "10.0.0"
@@ -31,7 +36,6 @@ bytemuck = { version = "1.4", features = ["derive"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="a420e453c3d9c93dfb1a8526bf11c000d895c916" }
 futures-intrusive = "0.4"
 async-executor = "1.0"
 pollster = "0.2"
@@ -42,10 +46,14 @@ simple_logger = "1.16.0"
 
 #wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="191537021e6f7504beee9961c16b3245b72e194b" }
 getrandom = { version = "0.2.7", features = ["js"] }
-web-sys = "0.3.57"
-js-sys = "0.3.57"
-wasm-bindgen = "0.2.80"
-wasm-bindgen-futures = "0.4.30"
+# web-sys = "0.3.57"
+# js-sys = "0.3.57"
+# wasm-bindgen = "0.2.80"
+# wasm-bindgen-futures = "0.4.30"
+web-sys = "0.3.58"
+js-sys = "0.3.58"
+wasm-bindgen = "0.2.81"
+wasm-bindgen-futures = "0.4.31"
 wasm-timer = "0.2.5"
 console_error_panic_hook = "0.1.6"
 console_log = "0.1.2"

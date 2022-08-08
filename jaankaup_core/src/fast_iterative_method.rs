@@ -258,7 +258,8 @@ impl FastIterativeMethod {
         println!("OK");
 
         print!("Creating prefix_temp_array.  ");
-        // Prefix temp array.
+        // TODO: remove. Only fmm_value_fixer uses this binding. Remove this binding from
+        // fmm_value_fixer.
         let prefix_temp_array = buffer_from_data::<u32>(
                 &device,
                 &vec![0 ; number_of_fmm_cells + 4096 as usize],

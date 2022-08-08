@@ -617,7 +617,7 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    //   +------------------------+
    //  c001 : (0, 0, 1) 4       c101 : (1, 0, 1) 5 
 
-   let gamma = 1.2;
+   let gamma = 1.0;
 
    let c00 = pow(c000 * (1.0 - tx) + c100 * tx, vec4<f32>(1.0 / gamma)); 
    let c01 = pow(c010 * (1.0 - tx) + c110 * tx, vec4<f32>(1.0 / gamma)); 

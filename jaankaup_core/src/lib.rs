@@ -1,3 +1,9 @@
+// #[cfg(not(target_arch = "wasm32"))]
+// pub use wgpu_native as wgpu;
+// #[cfg(target_arch = "wasm32")]
+// pub use wgpu_wasm as wgpu;
+
+pub use wgpu;
 pub mod template;
 pub mod input;
 pub mod misc;
@@ -21,7 +27,7 @@ pub mod fast_iterative_method;
 pub mod radix;
 pub mod sphere_tracer;
 pub mod two_triangles;
-pub use wgpu;
+
 pub use winit;
 pub use log;
 pub use cgmath;
