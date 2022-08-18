@@ -43,7 +43,7 @@ use jaankaup_core::texture::Texture;
 use jaankaup_core::fmm_things::{PointCloud, FmmCellPc};
 use jaankaup_core::fast_marching_method::{FastMarchingMethod, FmmState};
 use jaankaup_core::fast_iterative_method::{FastIterativeMethod};
-use jaankaup_core::sphere_tracer::SphereTracer;
+use jaankaup_core::sphere_tracer::{SphereTracer, SphereTracerParams};
 use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
@@ -171,6 +171,7 @@ struct FmmApp {
     once: bool,
     sphere_tracer: SphereTracer,
     sphere_tracer_renderer: TwoTriangles,
+    sphere_tracer_params: SphereTracerParams,
     draw_two_triangles: bool,
     fim: FastIterativeMethod,
 }
@@ -488,14 +489,24 @@ impl Application for FmmApp {
                 //&configuration.device, &configuration.sc_desc, [1024,1024]);
                 &configuration.device, &configuration.sc_desc, [1024,1536]);
                 //&configuration.device, &configuration.sc_desc, [1536,2560]);
+                //
 
+        let sphere_tracer_params = SphereTracerParams {
+                inner_dim: [8, 8],
+                outer_dim: [128, 192],
+                render_rays: 1,
+                render_samplers: 1,
+                isovalue: 0.15,
+                padding: 0,
+        };
 
         let sphere_tracer = SphereTracer::init(
                 &configuration.device,
-                [8, 8],
-                [128, 192],
-                true,
-                true,
+                sphere_tracer_params.inner_dim,
+                sphere_tracer_params.outer_dim,
+                if sphere_tracer_params.render_rays == 0 {false} else {true},
+                if sphere_tracer_params.render_samplers == 0 {false} else {true},
+                sphere_tracer_params.isovalue,
                 //[192, 320],
                 fim.get_fmm_params_buffer(),
                 fim.get_fim_data_buffer(),
@@ -532,6 +543,7 @@ impl Application for FmmApp {
             once: once,
             sphere_tracer: sphere_tracer,
             sphere_tracer_renderer: sphere_tracer_renderer,
+            sphere_tracer_params: sphere_tracer_params,
             draw_two_triangles: false,
             fim: fim,
          }
@@ -679,6 +691,23 @@ impl Application for FmmApp {
         // Switch camera mode to camera.
         if self.keyboard_manager.test_key(&Key::Space, input) {
             self.draw_two_triangles = !self.draw_two_triangles; 
+        }
+
+        // Increase isovalue.
+        if self.keyboard_manager.test_key(&Key::NumpadAdd, input) {
+            self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue + 0.001;
+            println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
+            self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
+        }
+
+        // Decrease isovalue.
+        if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) {
+            let old_val = self.sphere_tracer_params.isovalue;
+            if old_val - 0.001 >= 0.0 { 
+                self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue - 0.001;
+                println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
+                self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
+            }
         }
 
 
@@ -921,6 +950,8 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::N, 200.0);
         keys.register_key(Key::Space, 150.0);
         keys.register_key(Key::B, 50.0);
+        keys.register_key(Key::NumpadAdd, 50.0);
+        keys.register_key(Key::NumpadSubtract, 50.0);
         
         keys
 }

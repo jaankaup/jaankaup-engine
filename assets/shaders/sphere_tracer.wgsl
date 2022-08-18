@@ -89,6 +89,7 @@ struct SphereTracerParams {
     outer_dim: vec2<u32>,
     render_rays: u32,
     render_samplers: u32,
+    isovalue: f32,
 };
 
 @group(0) @binding(0) var<uniform>            fmm_params: FmmParams;
@@ -1211,7 +1212,8 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
              return;
         }
         distance_to_interface = fmm_value(p, false); // max(min(0.01 * dist, 0.2), 0.001);
-        if (abs(distance_to_interface) < 0.03) {
+        //if (abs(distance_to_interface) < 0.03) {
+        if (abs(distance_to_interface) < sphere_tracer_params.isovalue) {
 
 	    // var temp_distance = dist;
 	    //var temp_p = p;

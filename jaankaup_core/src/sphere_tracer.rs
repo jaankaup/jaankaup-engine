@@ -8,12 +8,13 @@ use std::borrow::Cow;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-struct SphereTracerParams {
-    inner_dim: [u32; 2],
-    outer_dim: [u32; 2],
-    render_rays: u32,
-    render_samplers: u32,
-    padding: [u32; 2],
+pub struct SphereTracerParams {
+    pub inner_dim: [u32; 2],
+    pub outer_dim: [u32; 2],
+    pub render_rays: u32,
+    pub render_samplers: u32,
+    pub isovalue: f32,
+    pub padding: u32,
 }
 
 #[repr(C)]
@@ -45,6 +46,7 @@ impl SphereTracer {
                 outer_dimension: [u32; 2],
                 render_rays: bool,
                 render_samplers: bool,
+                isovalue: f32,
                 fmm_params: &wgpu::Buffer,
                 fmm_data: &wgpu::Buffer,
                 camera_buffer: &wgpu::Buffer,
@@ -109,7 +111,8 @@ impl SphereTracer {
             outer_dim: outer_dimension,
             render_rays: if render_rays { 1 } else { 0 },
             render_samplers: if render_samplers { 1 } else { 0 },
-            padding: [0, 0],
+            isovalue: isovalue,
+            padding: 0,
         };
 
         let sphere_tracer_buffer = buffer_from_data::<SphereTracerParams>(
@@ -169,6 +172,17 @@ impl SphereTracer {
     pub fn show_rays(&mut self, queue: &wgpu::Queue, value: bool) {
 
         self.sphere_tracer_params.render_rays = if value { 1 } else { 0 };
+
+        queue.write_buffer(
+            &self.sphere_tracer_buffer,
+            0,
+            bytemuck::cast_slice(&[self.sphere_tracer_params])
+        );
+    }
+
+    pub fn change_isovalue(&mut self, queue: &wgpu::Queue, value: f32) {
+
+        self.sphere_tracer_params.isovalue = value;
 
         queue.write_buffer(
             &self.sphere_tracer_buffer,

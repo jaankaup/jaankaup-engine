@@ -17,7 +17,7 @@ wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="d655017439c10e8bd77ad80b35
 # wgpu_native = { package="wgpu", git = "https://github.com/gfx-rs/wgpu", rev="a420e453c3d9c93dfb1a8526bf11c000d895c916" }
 # wgpu_wasm = { package="wgpu", git = "https://github.com/gfx-rs/wgpu", rev="191537021e6f7504beee9961c16b3245b72e194b" }
 
-winit = { version = "0.27"}
+winit = { version = "0.27" }
 cgmath = "0.18"
 log = "0.4"
 wavefront_obj = "10.0.0"
