@@ -1148,6 +1148,14 @@ fn render_circle(p: vec3<f32>, d: f32, total_d: f32) {
     var s_count = 32 * max(i32(d), 1); // i32(d);
     var t_count = 16 * max(i32(d), 1); // i32(d*0.5);
 
+    var color_r = bitcast<f32>(rgba_u32(255u, 0u, 0u, 255u));
+
+    output_aabb[atomicAdd(&counter[2], 1u)] =  
+          AABB (
+              vec4<f32>(p * 4.0 - vec3<f32>(d * 0.2), color_r),
+              vec4<f32>(p * 4.0 + vec3<f32>(d * 0.2), 0.0)
+    );
+
     var color = bitcast<f32>(rgba_u32(min(255u, u32(total_d)), 0u, max(0u, 2550u - u32(total_d)), 255u));
 
     for (var s: i32 = 0; s < s_count ; s = s + 1) {
@@ -1421,17 +1429,18 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         //           0.1
         // );
     }
-    if (global_id.x == 0u) {
-	let aabbmin = vec3<f32>(0.0, 0.0, 0.0);
-	let aabbmax = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension);
-        output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
-              AABB (
-                  vec4<f32>(aabbmin * 4.0,
-                            f32(rgba_u32(255u, 0u, 2550u, 255u))),
-                  vec4<f32>(aabbmax * 4.0,
-                            0.5)
-        );
-    }
+    // Scene aabb.
+    //++ if (global_id.x == 0u) {
+    //++     let aabbmin = vec3<f32>(0.0, 0.0, 0.0);
+    //++     let aabbmax = vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension);
+    //++     output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+    //++           AABB (
+    //++               vec4<f32>(aabbmin * 4.0,
+    //++                         f32(rgba_u32(255u, 0u, 2550u, 255u))),
+    //++               vec4<f32>(aabbmax * 4.0,
+    //++                         0.5)
+    //++     );
+    //++ }
 
     // if (global_id.x == 0u) {
     //     // let result = boxIntersection(&ray, vec3<f32>(fmm_params.global_dimension * fmm_params.local_dimension));
