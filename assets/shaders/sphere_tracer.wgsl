@@ -90,6 +90,7 @@ struct SphereTracerParams {
     render_rays: u32,
     render_samplers: u32,
     isovalue: f32,
+    draw_circles: u32,
 };
 
 @group(0) @binding(0) var<uniform>            fmm_params: FmmParams;
@@ -123,6 +124,14 @@ fn total_cell_count() -> u32 {
            fmm_params.local_dimension.x * 
            fmm_params.local_dimension.y * 
            fmm_params.local_dimension.z; 
+};
+
+fn total_sphere_block_count() -> u32 {
+
+    return sphere_tracer_params.outer_dim.x * 
+           sphere_tracer_params.outer_dim.y; 
+           //sphere_tracer_params.inner_dim.x * 
+           //sphere_tracer_params.inner_dim.y;
 };
 
 // fn mapRange(a1: f32, a2: f32, b1: f32, b2: f32, s: f32) -> f32 {
@@ -372,8 +381,9 @@ fn load_trilinear_neighbors(coord: vec3<u32>, render: bool) -> array<u32, 8> {
         vec3<i32>(coord) + vec3<i32>(1,  1,  1),
     );
 
-    if (sphere_tracer_params.render_samplers == 1u && render && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
-    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_cell_count() / 2u)) {
+    // if (sphere_tracer_params.render_samplers == 1u && render && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
+    if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u)) {
+    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
     // if (render && (((private_global_index.x + 32u) & 2047u) == 0u)) {
     //if (render && ((private_global_index.x & 127u) == 0u)) {
         output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
@@ -634,8 +644,9 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    let size = 0.1;
 
    //if ((private_global_index.x & 2047u) == 0u) {
-   //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_cell_count() / 2u)) {
-   if (sphere_tracer_params.render_samplers == 1u && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
+   // if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
+   if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u)) {
+   //if (sphere_tracer_params.render_samplers == 1u && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
    //if (((private_global_index.x + 32u) & 2047u) == 0u) {
 
    output_arrow[atomicAdd(&counter[1], 1u)] =  
@@ -1130,6 +1141,31 @@ fn aabb_intersect(p0: ptr<function, vec3<f32>>,
      return tMins.x <= tMaxes.x && tMins.y <= tMaxes.y && tMins.z <= tMaxes.z;
 }
 
+fn render_circle(p: vec3<f32>, d: f32, total_d: f32) {
+
+    // var s_count = 90 * max(i32(d), 1); // i32(d);
+    // var t_count = 45 * max(i32(d), 1); // i32(d*0.5);
+    var s_count = 32 * max(i32(d), 1); // i32(d);
+    var t_count = 16 * max(i32(d), 1); // i32(d*0.5);
+
+    var color = bitcast<f32>(rgba_u32(min(255u, u32(total_d)), 0u, max(0u, 2550u - u32(total_d)), 255u));
+
+    for (var s: i32 = 0; s < s_count ; s = s + 1) {
+    for (var t: i32 = 0; t < t_count ; t = t + 1) {
+
+        var scaled_s = f32(s) / f32(s_count) * (2.0 * 3.14159274);
+        var scaled_t = f32(t) / f32(t_count) * (3.14159274);
+        var coord = vec3<f32>(d * cos(scaled_s) * sin(scaled_t),
+                              d * sin(scaled_s) * sin(scaled_t),
+        		      d * cos(scaled_t)) + p;
+
+        output_aabb[atomicAdd(&counter[2], 1u)] =  
+              AABB (
+                  vec4<f32>(coord * 4.0 - vec3<f32>(0.002 * total_d), color),
+                  vec4<f32>(coord * 4.0 + vec3<f32>(0.002 * total_d), 0.0)
+        );
+    }}
+}
 
 /// Sphere tracing method.
 fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
@@ -1212,6 +1248,14 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
              return;
         }
         distance_to_interface = fmm_value(p, false); // max(min(0.01 * dist, 0.2), 0.001);
+
+        if (step_counter > 0u &&
+	    sphere_tracer_params.draw_circles == 1u &&
+	    private_local_index.x == 32u &&
+	    (private_workgroup_index.x == total_sphere_block_count() / 2u + sphere_tracer_params.outer_dim.x / 2u)) {
+
+	        render_circle(p, distance_to_interface, dist);
+        }
         //if (abs(distance_to_interface) < 0.03) {
         if (abs(distance_to_interface) < sphere_tracer_params.isovalue) {
 
@@ -1353,16 +1397,19 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
 
     //if ((global_id.x & 2047u) == 0u) {
-    if (sphere_tracer_params.render_rays == 1u && (local_index == 0u) && (workgroup_id.x % 44u) == 0u) {
-    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_cell_count() / 2u)) {
-    //++ if (payload.visibility > 0.0) {
+    //++++if (sphere_tracer_params.render_rays == 1u && (local_index == 0u) && (workgroup_id.x % 44u) == 0u) {
+    if (sphere_tracer_params.draw_circles == 1u &&
+        private_local_index.x == 32u &&
+        (private_workgroup_index.x == total_sphere_block_count() / 2u + sphere_tracer_params.outer_dim.x / 2u)) {
+    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (
                   vec4<f32>(ray.origin * 4.0, 0.0),
                   vec4<f32>(payload.intersection_point * 4.0, 0.0),
                   //vec4<f32>(result.intersection_point, 0.0),
-                  rgba_u32_argb(payload.color),
-                  0.1
+                  rgba_u32(255u, 1550u, 550u, 255u),
+                  //rgba_u32_argb(payload.color),
+                  0.2
         );
 
         // output_arrow[atomicAdd(&counter[1], 1u)] =  

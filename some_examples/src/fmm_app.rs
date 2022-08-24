@@ -52,7 +52,7 @@ const MAX_NUMBER_OF_ARROWS:     usize = 262144;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
+const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES * 4;
 
 /// Max number of box frames for gpu debugger.
 #[allow(dead_code)]
@@ -64,7 +64,7 @@ const MAX_NUMBER_OF_CHARS:      usize = TOTAL_INDICES;
 
 /// Max number of vvvvnnnn vertices reserved for gpu draw buffer.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_VVVVNNNN: usize = 2000000;
+const MAX_NUMBER_OF_VVVVNNNN: usize = 4000000;
 
 #[allow(dead_code)]
 //const TOTAL_INDICES: usize = 64*16*54*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z; 
@@ -495,9 +495,9 @@ impl Application for FmmApp {
                 inner_dim: [8, 8],
                 outer_dim: [128, 192],
                 render_rays: 1,
-                render_samplers: 1,
+                render_samplers: 0,
                 isovalue: 0.15,
-                padding: 0,
+                draw_circles: 0,
         };
 
         let sphere_tracer = SphereTracer::init(
@@ -507,6 +507,7 @@ impl Application for FmmApp {
                 if sphere_tracer_params.render_rays == 0 {false} else {true},
                 if sphere_tracer_params.render_samplers == 0 {false} else {true},
                 sphere_tracer_params.isovalue,
+                sphere_tracer_params.draw_circles,
                 //[192, 320],
                 fim.get_fmm_params_buffer(),
                 fim.get_fim_data_buffer(),
@@ -710,6 +711,16 @@ impl Application for FmmApp {
             }
         }
 
+        // Draw spheres.
+        if self.keyboard_manager.test_key(&Key::Key9, input) {
+                self.sphere_tracer_params.draw_circles = 1;
+                self.sphere_tracer.draw_circles(queue, self.sphere_tracer_params.draw_circles);
+        }
+        // Hide spheres.
+        if self.keyboard_manager.test_key(&Key::Key8, input) {
+                self.sphere_tracer_params.draw_circles = 0;
+                self.sphere_tracer.draw_circles(queue, self.sphere_tracer_params.draw_circles);
+        }
 
         if self.app_render_params.update {
 
@@ -946,6 +957,8 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Key3, 20.0);
         keys.register_key(Key::Key4, 20.0);
         keys.register_key(Key::Key5, 20.0);
+        keys.register_key(Key::Key8, 20.0);
+        keys.register_key(Key::Key9, 20.0);
         keys.register_key(Key::Key0, 150.0);
         keys.register_key(Key::N, 200.0);
         keys.register_key(Key::Space, 150.0);

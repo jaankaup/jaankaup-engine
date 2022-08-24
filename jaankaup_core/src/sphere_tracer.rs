@@ -14,7 +14,7 @@ pub struct SphereTracerParams {
     pub render_rays: u32,
     pub render_samplers: u32,
     pub isovalue: f32,
-    pub padding: u32,
+    pub draw_circles: u32,
 }
 
 #[repr(C)]
@@ -47,6 +47,7 @@ impl SphereTracer {
                 render_rays: bool,
                 render_samplers: bool,
                 isovalue: f32,
+                draw_circles: u32,
                 fmm_params: &wgpu::Buffer,
                 fmm_data: &wgpu::Buffer,
                 camera_buffer: &wgpu::Buffer,
@@ -112,7 +113,7 @@ impl SphereTracer {
             render_rays: if render_rays { 1 } else { 0 },
             render_samplers: if render_samplers { 1 } else { 0 },
             isovalue: isovalue,
-            padding: 0,
+            draw_circles: draw_circles,
         };
 
         let sphere_tracer_buffer = buffer_from_data::<SphereTracerParams>(
@@ -183,6 +184,17 @@ impl SphereTracer {
     pub fn change_isovalue(&mut self, queue: &wgpu::Queue, value: f32) {
 
         self.sphere_tracer_params.isovalue = value;
+
+        queue.write_buffer(
+            &self.sphere_tracer_buffer,
+            0,
+            bytemuck::cast_slice(&[self.sphere_tracer_params])
+        );
+    }
+
+    pub fn draw_circles(&mut self, queue: &wgpu::Queue, value: u32) {
+
+        self.sphere_tracer_params.draw_circles = value;
 
         queue.write_buffer(
             &self.sphere_tracer_buffer,
