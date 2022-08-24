@@ -48,7 +48,7 @@ use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_ARROWS:     usize = 262144;
+const MAX_NUMBER_OF_ARROWS:     usize = 262144 * 8;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]
@@ -79,12 +79,12 @@ const TOTAL_INDICES: usize = 32*16*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FM
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
-// const FMM_GLOBAL_X: usize = 70;
-// const FMM_GLOBAL_Y: usize = 18;
-// const FMM_GLOBAL_Z: usize = 60;
-const FMM_GLOBAL_X: usize = 82;
-const FMM_GLOBAL_Y: usize = 17;
-const FMM_GLOBAL_Z: usize = 58;
+const FMM_GLOBAL_X: usize = 70;
+const FMM_GLOBAL_Y: usize = 18;
+const FMM_GLOBAL_Z: usize = 60;
+// const FMM_GLOBAL_X: usize = 82;
+// const FMM_GLOBAL_Y: usize = 17;
+// const FMM_GLOBAL_Z: usize = 58;
 
 const FMM_INNER_X: usize = 4;
 const FMM_INNER_Y: usize = 4;
@@ -721,6 +721,16 @@ impl Application for FmmApp {
                 self.sphere_tracer_params.draw_circles = 0;
                 self.sphere_tracer.draw_circles(queue, self.sphere_tracer_params.draw_circles);
         }
+        // Render samplers.
+        if self.keyboard_manager.test_key(&Key::Key7, input) {
+                self.sphere_tracer_params.render_samplers = 1;
+                self.sphere_tracer.render_samplers(queue, self.sphere_tracer_params.render_samplers);
+        }
+        // Hide samplers.
+        if self.keyboard_manager.test_key(&Key::Key6, input) {
+                self.sphere_tracer_params.render_samplers = 0;
+                self.sphere_tracer.render_samplers(queue, self.sphere_tracer_params.render_samplers);
+        }
 
         if self.app_render_params.update {
 
@@ -957,6 +967,8 @@ fn create_keyboard_manager() -> KeyboardManager {
         keys.register_key(Key::Key3, 20.0);
         keys.register_key(Key::Key4, 20.0);
         keys.register_key(Key::Key5, 20.0);
+        keys.register_key(Key::Key6, 20.0);
+        keys.register_key(Key::Key7, 20.0);
         keys.register_key(Key::Key8, 20.0);
         keys.register_key(Key::Key9, 20.0);
         keys.register_key(Key::Key0, 150.0);

@@ -203,6 +203,17 @@ impl SphereTracer {
         );
     }
 
+    pub fn render_samplers(&mut self, queue: &wgpu::Queue, value: u32) {
+
+        self.sphere_tracer_params.render_samplers = value;
+
+        queue.write_buffer(
+            &self.sphere_tracer_buffer,
+            0,
+            bytemuck::cast_slice(&[self.sphere_tracer_params])
+        );
+    }
+
     pub fn get_color_buffer(&self) -> &wgpu::Buffer {
         &self.output_buffer_color
     }

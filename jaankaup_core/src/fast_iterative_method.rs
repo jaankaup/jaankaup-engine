@@ -233,10 +233,11 @@ impl FastIterativeMethod {
         let number_of_active_list: usize = (global_dimension[0] * global_dimension[1] * global_dimension[2]).try_into().unwrap();
         let number_of_fmm_cells: usize = (number_of_active_list as u32 * local_dimension[0] * local_dimension[1] * local_dimension[2]).try_into().unwrap();
 
-        let mut fim_data = vec![FmmCellPc { tag: OTHER, value: 100000.0, color: encode_rgba_u32(0, 0, 0, 255), } ; number_of_fmm_cells + 1];
+        let the_color = encode_rgba_u32(0, 0, 0, 255);
+        let mut fim_data = vec![FmmCellPc { tag: OTHER, value: 100000.0, color: the_color, } ; number_of_fmm_cells + 1];
 
         // The outside value.
-        fim_data[number_of_fmm_cells] = FmmCellPc { tag: OUTSIDE, value: 100000.0, color: encode_rgba_u32(0, 0, 0, 255), };
+        fim_data[number_of_fmm_cells] = FmmCellPc { tag: OUTSIDE, value: 100000.0, color: the_color, };
                                                 
         // Fast marching method cell data.
         print!("Creating fim_data buffer.  ");

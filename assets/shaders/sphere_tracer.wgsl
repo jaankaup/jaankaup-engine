@@ -1264,6 +1264,22 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
 	        render_circle(p, distance_to_interface, dist);
         }
+
+        // Render step points.
+        //++ if ( private_local_index.x == 0u) {
+        //++ output_aabb[atomicAdd(&counter[2], 1u)] =  
+        //++       AABB (
+        //++           vec4<f32>(4.0 * p.x - 0.4,
+        //++                     4.0 * p.y - 0.4,
+        //++                     4.0 * p.z - 0.4,
+        //++                     bitcast<f32>(rgba_u32(min(255u, step_counter), 0u, min(255u, 255u - step_counter), 255u))),
+        //++           vec4<f32>(4.0 * p.x + 0.4,
+        //++                     4.0 * p.y + 0.4,
+        //++                     4.0 * p.z + 0.4,
+        //++                     0.0),
+        //++ );
+        //++ }
+
         //if (abs(distance_to_interface) < 0.03) {
         if (abs(distance_to_interface) < sphere_tracer_params.isovalue) {
 
@@ -1351,6 +1367,35 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let point_on_plane = alpha * u + beta * v;
 
+    // Print camera sceen 3d.
+    // if (global_id.x == 0u) {
+    //     let screen_coord_a = vec2<f32>(index_to_screen(0u,
+    //                                    sphere_tracer_params.inner_dim.x,
+    //         			       sphere_tracer_params.inner_dim.y,
+    //         			       sphere_tracer_params.outer_dim.x));
+    //     let screen_coord_b = vec2<f32>(index_to_screen(total_cell_count() - 1u,
+    //                                    sphere_tracer_params.inner_dim.x,
+    //         			       sphere_tracer_params.inner_dim.y,
+    //         			       sphere_tracer_params.outer_dim.x));
+
+    //     let alpha_a = 2.0 * (f32(screen_coord_a.x) + 0.5) / screen_width - 1.0;
+    //     let beta_a  = 1.0 - 2.0 * (f32(screen_coord_a.y) + 0.5) / screen_height;
+    //     let alpha_b = 2.0 * (f32(screen_coord_b.x) + 0.5) / screen_width - 1.0;
+    //     let beta_b  = 1.0 - 2.0 * (f32(screen_coord_b.y) + 0.5) / screen_height;
+    //     let point_on_plane_a = alpha_a * u + beta_a * v + camera.pos.xyz;
+    //     let point_on_plane_b = alpha_b * u + beta_b * v + camera.pos.xyz;
+
+    //     output_arrow[atomicAdd(&counter[1], 1u)] =  
+    //           Arrow (
+    //               vec4<f32>(point_on_plane_a * 4.0, 0.0),
+    //               vec4<f32>(point_on_plane_b * 4.0, 0.0),
+    //               //vec4<f32>(tMins, 0.0),
+    //               //vec4<f32>(tMaxes, 0.0),
+    //               rgba_u32(155u, 0u, 1550u, 255u),
+    //               0.1
+    //     );
+    // }
+
     var ray: Ray;
     //ray.origin = point_on_plane + camera.pos.xyz * 0.25;
     ray.origin = point_on_plane + camera.pos.xyz;
@@ -1372,6 +1417,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     result.normal = payload.normal;
     result.diffuse_color = payload.color;
 
+    // Render camera focal point and lookat.
     if (global_id.x == 0u) {
         
         let focal_point = camera.pos - camera.view * d; 
@@ -1409,13 +1455,13 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if (sphere_tracer_params.draw_circles == 1u &&
         private_local_index.x == 32u &&
         (private_workgroup_index.x == total_sphere_block_count() / 2u + sphere_tracer_params.outer_dim.x / 2u)) {
-    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
+
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (
                   vec4<f32>(ray.origin * 4.0, 0.0),
                   vec4<f32>(payload.intersection_point * 4.0, 0.0),
                   //vec4<f32>(result.intersection_point, 0.0),
-                  rgba_u32(255u, 1550u, 550u, 255u),
+                  rgba_u32(255u, 1550u, 250u, 255u),
                   //rgba_u32_argb(payload.color),
                   0.2
         );
@@ -1429,6 +1475,19 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         //           0.1
         // );
     }
+    // Rays.
+    //++if (private_local_index.x == 0u && payload.color != rgba_u32(0u, 0u, 0u, 255u)) {
+    //++    output_arrow[atomicAdd(&counter[1], 1u)] =  
+    //++          Arrow (
+    //++              vec4<f32>(ray.origin * 4.0, 0.0),
+    //++              vec4<f32>(payload.intersection_point * 4.0, 0.0),
+    //++              //vec4<f32>(result.intersection_point, 0.0),
+    //++              rgba_u32_argb(payload.color),
+    //++              //rgba_u32(0u, 2550u, 0u, 255u),
+    //++              //payload.color,
+    //++              0.01
+    //++    );
+    //++}
     // Scene aabb.
     //++ if (global_id.x == 0u) {
     //++     let aabbmin = vec3<f32>(0.0, 0.0, 0.0);
@@ -1436,7 +1495,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //++     output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
     //++           AABB (
     //++               vec4<f32>(aabbmin * 4.0,
-    //++                         f32(rgba_u32(255u, 0u, 2550u, 255u))),
+    //++                         f32(rgba_u32(255u, 0u, 255u, 255u))),
     //++               vec4<f32>(aabbmax * 4.0,
     //++                         0.5)
     //++     );
