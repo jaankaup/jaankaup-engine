@@ -312,10 +312,9 @@ fn screen_to_index(v: vec2<u32>) -> u32 {
 
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-
     let light_pos = vec3<f32>(
-                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x),
-                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y),
+                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) * 0.5,
+                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) * 2.0,
                         f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) * 0.5 +
 			vec3<f32>(0.0, f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y), 0.0);
 
@@ -323,12 +322,12 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     // let light_pos = vec3<f32>(150.0,70.0,150.0);
     //let light_pos = camera.pos; // vec3<f32>(150.0,70.0,150.0);
     let lightColor = vec3<f32>(1.0,1.0,1.0);
-    let lightPower = 1000.0;
+    let lightPower = 10000.0;
     
     // Material properties
     let materialDiffuseColor = decode_color((*payload).color).xyz; //vec3<f32>(1.0, 0.0, 0.0);
     let materialAmbientColor = vec3<f32>(0.4,0.4,0.4) * materialDiffuseColor;
-    let materialSpecularColor = vec3<f32>(0.5,0.5,0.5);
+    let materialSpecularColor = vec3<f32>(0.8,0.8,0.8);
     
     // Distance to the light
     let distance = length(light_pos - (*payload).intersection_point);
@@ -628,7 +627,7 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    //   +------------------------+
    //  c001 : (0, 0, 1) 4       c101 : (1, 0, 1) 5 
 
-   let gamma = 1.0;
+   let gamma = 0.8;
 
    let c00 = pow(c000 * (1.0 - tx) + c100 * tx, vec4<f32>(1.0 / gamma)); 
    let c01 = pow(c010 * (1.0 - tx) + c110 * tx, vec4<f32>(1.0 / gamma)); 

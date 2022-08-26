@@ -85,6 +85,9 @@ const FMM_GLOBAL_Z: usize = 60;
 // const FMM_GLOBAL_X: usize = 82;
 // const FMM_GLOBAL_Y: usize = 17;
 // const FMM_GLOBAL_Z: usize = 58;
+// const FMM_GLOBAL_X: usize = 100;
+// const FMM_GLOBAL_Y: usize = 22;
+// const FMM_GLOBAL_Z: usize = 76;
 
 const FMM_INNER_X: usize = 4;
 const FMM_INNER_Y: usize = 4;
@@ -137,7 +140,8 @@ impl WGPUFeatures for FmmAppFeatures {
         limits.max_push_constant_size = 4;
         limits.max_push_constant_size = 4;
         //limits.max_compute_workgroup_size_x = 65536 * 2;
-        limits.max_storage_buffer_binding_size = 154275840; 
+        limits.max_storage_buffer_binding_size = 256819200; 
+        //limits.max_storage_buffer_binding_size = 154275840; 
         // limits.max_compute_workgroups_per_dimension = 65536 * 2;
         // println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
         limits
@@ -496,7 +500,7 @@ impl Application for FmmApp {
                 outer_dim: [128, 192],
                 render_rays: 1,
                 render_samplers: 0,
-                isovalue: 0.15,
+                isovalue: 0.015,
                 draw_circles: 0,
         };
 

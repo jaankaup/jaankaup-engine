@@ -412,14 +412,14 @@ impl FastIterativeMethod {
 
     pub fn fim_iteration(&mut self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut Option<GpuTimer>) {
 
-        let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count(), 1024);
-        let number_of_dispatches_64 = udiv_up_safe32(self.calculate_cell_count(), 64);
-        let number_of_dispatches_128 = udiv_up_safe32(self.calculate_cell_count(), 128);
+        // let number_of_dispatches = udiv_up_safe32(self.calculate_cell_count(), 1024);
+        // let number_of_dispatches_64 = udiv_up_safe32(self.calculate_cell_count(), 64);
+        // let number_of_dispatches_128 = udiv_up_safe32(self.calculate_cell_count(), 128);
         let number_of_dispatches_256 = udiv_up_safe32(self.calculate_cell_count(), 256);
         let number_of_dispatches_2048 = udiv_up_safe32(self.calculate_cell_count(), 2048);
-        println!("number_of_dispatches == {}", number_of_dispatches);
-        println!("number_of_dispatches_64 == {}", number_of_dispatches_64);
-        println!("number_of_dispatches_128 == {}", number_of_dispatches_128);
+        // println!("number_of_dispatches == {}", number_of_dispatches);
+        // println!("number_of_dispatches_64 == {}", number_of_dispatches_64);
+        // println!("number_of_dispatches_128 == {}", number_of_dispatches_128);
         println!("number_of_dispatches_256 == {}", number_of_dispatches_256);
         println!("self.calculate_block_count() == {}", self.calculate_block_count());
         let number_of_dispatches_prefix = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);

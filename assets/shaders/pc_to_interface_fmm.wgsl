@@ -31,50 +31,28 @@ struct FmmCellPc {
     tag: u32,
     value: atomic<i32>,
     color: atomic<u32>,
-}
+};
 
-// struct ModF {
-//     fract: f32,
-//     whole: f32,
+// struct SamplerCell {
+//     weight: f32,
+//     dist: f32,
+//     col: f32,
 // };
 
-// Debugging.
-// struct AABB {
-//     min: vec4<f32>, 
-//     max: vec4<f32>, 
-// };
-// 
-// // Debugging.
-// struct Char {
-//     start_pos: vec3<f32>,
-//     font_size: f32,
-//     value: vec4<f32>,
-//     vec_dim_count: u32,
-//     color: u32,
-//     decimal_count: u32,
-//     auxiliary_data: u32,
-// };
-// 
-// // Debugging.
-// struct Arrow {
-//     start_pos: vec4<f32>,
-//     end_pos:   vec4<f32>,
-//     color: u32,
-//     size:  f32,
-// };
-// 
-
-struct SamplerCell {
-    weight: f32,
-    dist: f32,
-    col: f32,
+struct TempData {
+    memory_index: u32,
+    dist: i32,
+    color: u32,
 };
 
 @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
 @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
 @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
 @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
-@group(0) @binding(4) var<storage, read_write> sample_data: array<SamplerCell>;
+@group(0) @binding(4) var<storage, read_write> sample_data: array<u32>; // not used
+
+var<workgroup> temp_workgroup_data: array<TempData, 8192>; 
+var<workgroup> temp_workgroup_data_counter: atomic<u32>; 
 
 // Debug. Disabled.
 // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
@@ -222,151 +200,136 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
 
-    let min_distance = 0.70710678;
-    // let min_distance = 0.1;
+    // let min_distance = 0.70710678;
+    let min_distance = 0.5;
 
     for (var i: u32 = 0u; i < number_of_chunks; i = i + 1u) { 
 
+	//if (global_id.x == 0u) {
+        //   atomicExchange(&temp_workgroup_data_counter, 0u);
+	//}
+	workgroupBarrier();
+
         let actual_index = i * 1024u + local_index;
 
-        var nearest_cell: vec3<i32>;
+        // var nearest_cell: vec3<i32>;
 
 	var p: VVVC;
 
         if (actual_index < point_cloud_params.point_count) {
-
             p = point_data[actual_index];
+	}
 
-            // p.position = p.position * point_cloud_params.pc_scale_factor;
+	let floor_position = vec3<i32>(floor(p.position));
 
+        var neighbors: array<vec3<i32>, 8> = array<vec3<i32>, 8>(
+            floor_position + vec3<i32>(0,  0,  0),
+            floor_position + vec3<i32>(1,  0,  0),
+            floor_position + vec3<i32>(0,  1,  0),
+            floor_position + vec3<i32>(1,  1,  0),
+            floor_position + vec3<i32>(0,  0,  1),
+            floor_position + vec3<i32>(1,  0,  1),
+            floor_position + vec3<i32>(0,  1,  1),
+            floor_position + vec3<i32>(1,  1,  1)
+        );
 
-            //let base_point = vec3<i32>(floor(p.position));
+	var mem_locations: array<u32, 8> = array<u32, 8>(
+	        get_cell_mem_location(vec3<u32>(neighbors[0])),
+	        get_cell_mem_location(vec3<u32>(neighbors[1])),
+	        get_cell_mem_location(vec3<u32>(neighbors[2])),
+	        get_cell_mem_location(vec3<u32>(neighbors[3])),
+	        get_cell_mem_location(vec3<u32>(neighbors[4])),
+	        get_cell_mem_location(vec3<u32>(neighbors[5])),
+	        get_cell_mem_location(vec3<u32>(neighbors[6])),
+	        get_cell_mem_location(vec3<u32>(neighbors[7]))
+        );
 
-            // COLORS
-            //for (var i:u32 = 0u ; i < 64u ; i = i + 1u) {
-            //for (var i:u32 = 0u ; i < 32u ; i = i + 1u) {
-            //    if (i == 13u) { continue; } 
-            //    let temp_point = vec3<i32>(index_to_uvec3(i, 3u, 3u)) - vec3<i32>(1, 1, 1) + base_point;
-            //    let dist = distance(vec3<f32>(temp_point), p.position); 
-            //    //if (dist < 1.41421356237 && isInside(temp_point)) {
-            //    if (dist < 2.0 && isInside(temp_point) ) {
-            //    //if (dist < 1.0) {
-            //    //if (dist < 2.0 && isInside(temp_point)) {
-            //        //let t_w = abs(dist - 1.0);
+	var local_temp_datas: array<TempData, 8>;
+        var local_temp_data_count = 0u;
 
-            //        //let t_w = pow(abs(dist - 1.41421356237), 2.0);
-            //        //let t_w = abs(dist - 2.0) / 2.0;
-            //        //let t_w = abs(dist - 1.0);
-            //        let mem = get_cell_mem_location(vec3<u32>(temp_point));
-            //        var fmm_cell= fmm_data[mem];
-            //        if (atomicLoad(&fmm_cell.color) == rgba_u32(0u, 0u, 0u, 255u)) { 
-            //            atomicStore(&fmm_data[mem].color, rgba_u32(255u, 0u, 0u, 255u));
-            //            //atomicStore(&fmm_data[mem].color, vec4_to_rgba(decode_color(fmm_cell.color) * 0.8));
-	    //        }
-            //        // val = val + t_w * decode_color(fmm_cell.color);
-            //        // weight = weight + t_w;
+        if (actual_index < point_cloud_params.point_count) {
 
-            //        // if (private_global_index.x == 0u) {
-            //        //     output_arrow[atomicAdd(&counter[1], 1u)] =  
-            //        //           Arrow (
-            //        //               vec4<f32>(p * 4.0, 0.0),
-            //        //               vec4<f32>(vec3<f32>(temp_point) * 4.0, 0.0),
-            //        //               //vec4<f32>(tMins, 0.0),
-            //        //               //vec4<f32>(tMaxes, 0.0),
-            //        //               fmm_cell.color,
-            //        //               0.1
-            //        //     );
-            //        // }
-            //    }
-            //}
-
-	    // let floor_position = floor(p.position);
-
-            // var neighbors: array<vec3<f32>, 8> = array<vec3<f32>, 8>(
-            //     floor_position + vec3<f32>(0.0,  0.0,  0.0),
-            //     floor_position + vec3<f32>(1.0,  0.0,  0.0),
-            //     floor_position + vec3<f32>(0.0,  1.0,  0.0),
-            //     floor_position + vec3<f32>(1.0,  1.0,  0.0),
-            //     floor_position + vec3<f32>(0.0,  0.0,  1.0),
-            //     floor_position + vec3<f32>(1.0,  0.0,  1.0),
-            //     floor_position + vec3<f32>(0.0,  1.0,  1.0),
-            //     floor_position + vec3<f32>(1.0,  1.0,  1.0)
-            // );
-
-	    // var closest_point: vec3<f32> = neighbors[0];
-	    // var closest_dist = abs(distance(neighbors[0], p.position));
-
-	    // for (var i: i32 = 1 ; i < 8 ; i = i + 1) {
-            //     var dist = abs(distance(neighbors[i], p.position));
-	    //     if (dist < closest_dist) {
-            //         closest_dist = dist;
-            //         closest_point = neighbors[i];
-	    //     }
-	    // }
-
-	    // let nearest_cell = vec3<i32>(closest_point);
-            
-            nearest_cell = vec3<i32>(i32(round(p.position.x)),
-                                     i32(round(p.position.y)),
-                                     i32(round(p.position.z)));
-
-            // Check if cell is inside the computational domain.
-            let inside = isInside(nearest_cell);
-
-            // Calculate the distance between point and nearest cell. 0.1 is the radius of the ball.
-            let dist = distance(p.position, vec3<f32>(nearest_cell)) - min_distance;
-            //let dist = distance(p.position, vec3<f32>(nearest_cell)) - 0.4;
-            //let dist = distance(p.position, vec3<f32>(nearest_cell)); // min_distance; // - min_distance;
-
-            // 0.045 => 45000
-            var dist_to_i32 = i32(dist * 1000000.0);
-
-            let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
-            //var up_date = false;
-
-            // If inside update distance.
-            //if (inside && abs(dist) < min_distance) {
-            if (inside) { 
-
-	        var the_color = decode_color(p.color).xyz;
-
-	        // up_date = select(false, true, the_color.x > 0.05 || the_color.y > 0.05 || the_color.z > 0.05);
-                
-                atomicMin(&fmm_data[memory_index].value, dist_to_i32);
-                // atomicMin(&fmm_data[memory_index].value, dist_to_i32);
+	    for (var i: i32 = 0; i < 8; i = i + 1) {
+                let inside = isInside(neighbors[i]);
+                if (inside) { 
+	            // var ind = atomicAdd(&temp_workgroup_data_counter, 1u);
+                    let dist = distance(p.position, vec3<f32>(neighbors[i])) - min_distance;
+                    var dist_to_i32 = i32(dist * 1000000.0);
+                    local_temp_datas[local_temp_data_count] = TempData(mem_locations[i], dist_to_i32, p.color);
+                    atomicMin(&fmm_data[mem_locations[i]].value, dist_to_i32);
+                    local_temp_data_count = local_temp_data_count + 1u;
+		}
             }
+            
+            //++ nearest_cell = vec3<i32>(i32(round(p.position.x)),
+            //++                          i32(round(p.position.y)),
+            //++                          i32(round(p.position.z)));
+
+            //++ // Check if cell is inside the computational domain.
+            //++ let inside = isInside(nearest_cell);
+
+            //++ // Calculate the distance between point and nearest cell.
+            //++ let dist = distance(p.position, vec3<f32>(nearest_cell)) - min_distance;
+	    //++ //let sign_of_dist = select(f, t, dist - min_distance < 0.0); 
+
+            //++ // 0.045 => 45000
+            //++ var dist_to_i32 = i32(dist * 1000000.0);
+
+            //++ let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
+            //++ //var up_date = false;
+
+            //++ // If inside update distance.
+            //++ //if (inside && abs(dist) < min_distance) {
+            //++ if (inside) { 
+
+	    //++     // var the_color = decode_color(p.color).xyz;
+
+	    //++     // up_date = select(false, true, the_color.x > 0.05 || the_color.y > 0.05 || the_color.z > 0.05);
+            //++     
+            //++     atomicMin(&fmm_data[memory_index].value, dist_to_i32);
+            //++     // atomicMin(&fmm_data[memory_index].value, dist_to_i32);
+            //++ }
         } // if
 
         workgroupBarrier(); 
+        if (actual_index < point_cloud_params.point_count) {
+	    for (var b: u32 = 0u; b < local_temp_data_count ; b = b + 1u) {
+		// Smallest value found.
+                if (local_temp_datas[b].dist == fmm_data[local_temp_datas[b].memory_index].value) {
+                    fmm_data[local_temp_datas[b].memory_index].color = local_temp_datas[b].color;
+                    fmm_data[local_temp_datas[b].memory_index].tag = KNOWN;
+		}
+	    }
+        }
         // storageBarrier(); 
 
         // if (actual_index < point_cloud_params.point_count && inside && abs(dist) < min_distance) {
-        if (actual_index < point_cloud_params.point_count && inside) {
+        //++ if (actual_index < point_cloud_params.point_count && inside) {
 
-            let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
+        //++     let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
 
-            var final_value = atomicLoad(&fmm_data[memory_index].value);
+        //++     var final_value = atomicLoad(&fmm_data[memory_index].value);
 
-            // Update the color and tag.
-            if (final_value == dist_to_i32) {
+        //++     // Update the color and tag.
+        //++     if (final_value == dist_to_i32) {
 
-                // Add sign.
-                // if (dist < 0.0) { final_value = final_value | (1u << 31u); }
+        //++         // Add sign.
+        //++         // if (dist < 0.0) { final_value = final_value | (1u << 31u); }
 
-                atomicExchange(&fmm_data[memory_index].color, p.color);
-                fmm_data[memory_index].tag = KNOWN; // SOURCE
-                // atomicExchange(&fmm_data[memory_index].value, final_value);
+        //++         atomicExchange(&fmm_data[memory_index].color, p.color);
+        //++         fmm_data[memory_index].tag = KNOWN; // SOURCE
+        //++         // atomicExchange(&fmm_data[memory_index].value, final_value);
 
-                //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
-                //++       Arrow (
-                //++           4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
-                //++           4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
-                //++           //fmm_data[memory_index].color,
-                //++           p.color,
-                //++           0.05
-                //++ );
-            }
-        }
+        //++         //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+        //++         //++       Arrow (
+        //++         //++           4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
+        //++         //++           4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
+        //++         //++           //fmm_data[memory_index].color,
+        //++         //++           p.color,
+        //++         //++           0.05
+        //++         //++ );
+        //++     }
+        //++ }
     }
     workgroupBarrier(); 
 
