@@ -154,6 +154,22 @@ fn rgba_u32_argb(c: u32) -> u32 {
   return (r << 24u) | (g << 16u) | (b  << 8u) | a;
 }
 
+fn rgb2hsv(c: vec3<f32>) -> vec3<f32> {
+    let K = vec4<f32>(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    let p = mix(vec4<f32>(c.bg, K.wz), vec4<f32>(c.gb, K.xy), vec4<f32>(step(c.b, c.g)));
+    let q = mix(vec4<f32>(p.xyw, c.r), vec4<f32>(c.r, p.yzx), vec4<f32>(step(p.x, c.r)));
+
+    let d: f32 = q.x - min(q.w, q.y);
+    let e: f32 = 1.0e-10;
+    return vec3<f32>(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+fn hsv2rgb(c: vec3<f32>) -> vec3<f32>  {
+    let K: vec4<f32> = vec4<f32>(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    let p: vec3<f32> = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, vec3<f32>(0.0), vec3<f32>(1.0)), c.yyy);
+}
+
 /// A function that checks if a given coordinate is within the global computational domain. 
 fn isInside(coord: vec3<i32>) -> bool {
     return (coord.x >= 0 && coord.x < i32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
@@ -344,13 +360,19 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     let r = reflect(-l,n);
     let cosAlpha = clamp( dot( e,r ), 0.0,1.0);
 
-    let final_color =
+    let gamma = 1.2;
+
+    // let c = pow(c0 * (1.0 - tz) + c1 * tz, vec4<f32>(1.0 / gamma)); 
+
+    var final_color = pow(
     	// Ambient : simulates indirect lighting
     	materialAmbientColor +
     	// Diffuse : "color" of the object
     	materialDiffuseColor * lightColor * lightPower * cosTheta / (distance*distance) +
     	// Specular : reflective highlight, like a mirror
-    	materialSpecularColor * lightColor * lightPower * pow(cosAlpha,7.0) / (distance*distance);
+    	materialSpecularColor * lightColor * lightPower * pow(cosAlpha,7.0) / (distance*distance), vec3<f32>(1.0 / gamma));
+
+    //++ final_color = hsv2rgb(rgb2hsv(final_color) - vec3<f32>(0.1, 0.1, 0.1));
     
     (*payload).color = 
        rgba_u32_tex(
@@ -627,7 +649,7 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    //   +------------------------+
    //  c001 : (0, 0, 1) 4       c101 : (1, 0, 1) 5 
 
-   let gamma = 0.8;
+   let gamma = 1.0;
 
    let c00 = pow(c000 * (1.0 - tx) + c100 * tx, vec4<f32>(1.0 / gamma)); 
    let c01 = pow(c010 * (1.0 - tx) + c110 * tx, vec4<f32>(1.0 / gamma)); 
