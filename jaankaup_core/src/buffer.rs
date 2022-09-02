@@ -29,7 +29,7 @@ pub fn buffer_from_data<T: Pod>(
 }
 
 /// Copy the content of the buffer into a vector.
-pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
+pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod + std::marker::Send>(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     buffer: &wgpu::Buffer,
@@ -50,7 +50,7 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod>(
     encoder.copy_buffer_to_buffer(buffer, 0, &staging_buffer, 0, copy_size);
     queue.submit(Some(encoder.finish()));
 
-    let res: Vec<T>;
+    let mut res: Vec<T>;
 
     let buffer_slice = staging_buffer.slice(..);
     //++ let (sender, receiver) = futures_intrusive::channel::shared::oneshot_channel();

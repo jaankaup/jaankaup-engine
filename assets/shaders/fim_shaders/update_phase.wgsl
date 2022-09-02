@@ -31,7 +31,6 @@ struct FmmParams {
 @group(0) @binding(3) var<storage,read_write> fim_data: array<FimCellPc>;
 @group(0) @binding(4) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
 
-var<workgroup> buffer_id: u32;
 var<workgroup> wg_mem_offset: atomic<u32>;
 var<workgroup> global_mem_offset: atomic<u32>;
 var<workgroup> items_to_process: u32;
@@ -150,10 +149,10 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
     var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
         vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
         vec3<i32>(coord) + vec3<i32>(1,   0,  0),
-        vec3<i32>(coord) + vec3<i32>(0,   1,  0),
         vec3<i32>(coord) + vec3<i32>(0,  -1,  0),
-        vec3<i32>(coord) + vec3<i32>(0,   0,  1),
-        vec3<i32>(coord) + vec3<i32>(0,   0, -1)
+        vec3<i32>(coord) + vec3<i32>(0,   1,  0),
+        vec3<i32>(coord) + vec3<i32>(0,   0, -1),
+        vec3<i32>(coord) + vec3<i32>(0,   0,  1)
     );
 
     let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
@@ -186,6 +185,20 @@ fn solve_quadratic() -> f32 {
                                   private_neighbors[4].value,
                                   private_neighbors[5].value 
     );
+    // var phis: array<f32, 6> = array<f32, 6>(
+    //                               //private_neighbors[0].value,
+    //                               //private_neighbors[1].value,
+    //                               //private_neighbors[2].value,
+    //                               //private_neighbors[3].value,
+    //                               //private_neighbors[4].value,
+    //                               //private_neighbors[5].value 
+    //                               select(0.0, private_neighbors[0].value, private_neighbors[0].tag == SOURCE),
+    //                               select(0.0, private_neighbors[1].value, private_neighbors[1].tag == SOURCE),
+    //                               select(0.0, private_neighbors[2].value, private_neighbors[2].tag == SOURCE),
+    //                               select(0.0, private_neighbors[3].value, private_neighbors[3].tag == SOURCE),
+    //                               select(0.0, private_neighbors[4].value, private_neighbors[4].tag == SOURCE),
+    //                               select(0.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE) 
+    // );
 
 
     var p = vec3<f32>(min(phis[0], phis[1]), min(phis[2], phis[3]), min(phis[4], phis[5]));
@@ -239,14 +252,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         if (local_index == 0u) {
 	    wg_mem_offset = 0u;
-            buffer_id = 0u;	
             items_to_process = atomicExchange(&fim_counter[1], 0u);
         }
-	//storageBarrier();
 	workgroupBarrier();
 
         let buffer_offset = total_cell_count();
-        //let buffer_offset = total_cell_count() / 2u;
 	var buffer_swap_id = 0u;
 
 	while (items_to_process > 0u) {
@@ -322,7 +332,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                                 active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[5];
 	                    }
 			}
-
 		    }
 	            fim_data[t] = fim_cell;
 	        }

@@ -73,15 +73,15 @@ const TOTAL_INDICES: usize = 32*16*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FM
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-// const FMM_GLOBAL_X: usize = 32;
-// const FMM_GLOBAL_Y: usize = 8;
-// const FMM_GLOBAL_Z: usize = 27;
+const FMM_GLOBAL_X: usize = 32;
+const FMM_GLOBAL_Y: usize = 8;
+const FMM_GLOBAL_Z: usize = 27;
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
-const FMM_GLOBAL_X: usize = 70;
-const FMM_GLOBAL_Y: usize = 18;
-const FMM_GLOBAL_Z: usize = 60;
+// const FMM_GLOBAL_X: usize = 70;
+// const FMM_GLOBAL_Y: usize = 18;
+// const FMM_GLOBAL_Z: usize = 60;
 // const FMM_GLOBAL_X: usize = 82;
 // const FMM_GLOBAL_Y: usize = 17;
 // const FMM_GLOBAL_Z: usize = 58;
@@ -200,7 +200,7 @@ impl Application for FmmApp {
         ray_camera.set_rotation_sensitivity(0.4);
         ray_camera.set_movement_sensitivity(0.05);
 
-        let camera_mode = CameraMode::Camera;
+        let camera_mode = CameraMode::RayCamera;
 
         ray_camera.set_focal_distance(1.0, &configuration.queue);
         // ray_camera.set_restriction_area([0.0, 0.0, 0.0],
@@ -700,7 +700,7 @@ impl Application for FmmApp {
 
         // Increase isovalue.
         if self.keyboard_manager.test_key(&Key::NumpadAdd, input) {
-            self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue + 0.001;
+            self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue + 0.1;
             println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
             self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
         }
@@ -709,7 +709,7 @@ impl Application for FmmApp {
         if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) {
             let old_val = self.sphere_tracer_params.isovalue;
             if old_val - 0.001 >= 0.0 { 
-                self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue - 0.001;
+                self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue - 0.1;
                 println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
                 self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
             }
@@ -882,7 +882,8 @@ impl Application for FmmApp {
 
             //let gpu_timer_result = self.gpu_timer.get_data(); 
 
-            self.fim.print_fim_histogram(&device, &queue);
+            //self.fim.print_fim_histogram(&device, &queue);
+
             // // println!("{:?}", gpu_timer_result);
             // let filtered_blocks = to_vec::<FmmBlock>(
             //     &device,

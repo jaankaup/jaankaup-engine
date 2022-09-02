@@ -147,10 +147,10 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
     var neighbors: array<vec3<i32>, 6> = array<vec3<i32>, 6>(
         vec3<i32>(coord) + vec3<i32>(-1,  0,  0),
         vec3<i32>(coord) + vec3<i32>(1,   0,  0),
-        vec3<i32>(coord) + vec3<i32>(0,   1,  0),
         vec3<i32>(coord) + vec3<i32>(0,  -1,  0),
-        vec3<i32>(coord) + vec3<i32>(0,   0,  1),
-        vec3<i32>(coord) + vec3<i32>(0,   0, -1)
+        vec3<i32>(coord) + vec3<i32>(0,   1,  0),
+        vec3<i32>(coord) + vec3<i32>(0,   0, -1),
+        vec3<i32>(coord) + vec3<i32>(0,   0,  1)
     );
 
     let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));

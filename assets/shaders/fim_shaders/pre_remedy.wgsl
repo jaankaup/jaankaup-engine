@@ -246,7 +246,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
                 var updated_value = solve_quadratic();
 
-		if (!(abs(updated_value - fim_cell.value) < 0.00001)) {
+		// if (abs(updated_value - fim_cell.value) > 0.0) {
+		if (updated_value < fim_cell.value) {
                     fim_data[global_id.x].tag = REMEDY;
 		    active_list[atomicAdd(&fim_counter[2], 1u)] = global_id.x;
 	        }

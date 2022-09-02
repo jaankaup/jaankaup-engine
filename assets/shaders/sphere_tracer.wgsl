@@ -402,19 +402,18 @@ fn load_trilinear_neighbors(coord: vec3<u32>, render: bool) -> array<u32, 8> {
         vec3<i32>(coord) + vec3<i32>(1,  1,  1),
     );
 
-    // if (sphere_tracer_params.render_samplers == 1u && render && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
-    if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u)) {
-    //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
-    // if (render && (((private_global_index.x + 32u) & 2047u) == 0u)) {
-    //if (render && ((private_global_index.x & 127u) == 0u)) {
-        output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
-              AABB (
-                  vec4<f32>(vec3<f32>(neighbors[0]) * 4.0,
-                            bitcast<f32>(rgba_u32(255u, 0u, 1550u, 255u))),
-                  vec4<f32>(vec3<f32>(neighbors[7]) * 4.0,
-                            0.1)
-        );
-    }
+    //+++++ if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u)) {
+    //+++++ //if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
+    //+++++ // if (render && (((private_global_index.x + 32u) & 2047u) == 0u)) {
+    //+++++ //if (render && ((private_global_index.x & 127u) == 0u)) {
+    //+++++     output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+    //+++++           AABB (
+    //+++++               vec4<f32>(vec3<f32>(neighbors[0]) * 4.0,
+    //+++++                         bitcast<f32>(rgba_u32(255u, 0u, 1550u, 255u))),
+    //+++++               vec4<f32>(vec3<f32>(neighbors[7]) * 4.0,
+    //+++++                         0.1)
+    //+++++     );
+    //+++++ }
 
     let i0 = get_cell_mem_location(vec3<u32>(neighbors[0]));
     let i1 = get_cell_mem_location(vec3<u32>(neighbors[1]));
@@ -666,7 +665,8 @@ fn fmm_color(p: vec3<f32>) -> u32 {
 
    //if ((private_global_index.x & 2047u) == 0u) {
    // if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
-   if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u)) {
+   if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u + sphere_tracer_params.outer_dim.x / 2u)) {
+
    //if (sphere_tracer_params.render_samplers == 1u && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
    //if (((private_global_index.x + 32u) & 2047u) == 0u) {
 
@@ -1070,7 +1070,7 @@ fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
     var grad: vec3<f32>;
 
     var pos = (*payload).intersection_point;
-    var offset = 0.01;
+    var offset = 0.05;
     // var right = sdBox(vec3(pos.x+offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
     // var left = sdBox(vec3(pos.x-offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
     // var up = sdBox(vec3(pos.x, pos.y+offset,pos.z), vec3<f32>(50.0, 50.0, 50.0));
@@ -1102,6 +1102,7 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
     (*payload).color = fmm_color((*payload).intersection_point);
+    //(*payload).color = rgba_u32(255u, 0u, 0u, 255u);
     //(*payload).color = fmm_color_nearest((*payload).intersection_point);
     (*payload).normal = calculate_normal(payload);
     (*payload).visibility = 1.0;
@@ -1276,7 +1277,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         //     }
              return;
         }
-        distance_to_interface = fmm_value(p, false); // max(min(0.01 * dist, 0.2), 0.001);
+        distance_to_interface = fmm_value(p, false); // - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
 
         if (step_counter > 0u &&
 	    sphere_tracer_params.draw_circles == 1u &&
@@ -1317,7 +1318,6 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
             //    nearest_color = fmm_color_nearest(temp_p);
             //}
 	    //dist = temp_distance;
-	    p = getPoint(dist, ray);
             (*payload).intersection_point = p;
             hit(ray, payload);
             return;
