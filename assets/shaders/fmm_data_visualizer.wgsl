@@ -22,8 +22,8 @@ struct Char {
     auxiliary_data: u32,
 };
 
-let FONT_SIZE = 0.25;
-let AABB_SIZE = 0.26;
+let FONT_SIZE = 0.15;
+let AABB_SIZE = 0.16;
 
 // FMM tags
 // 0 :: Far
@@ -347,7 +347,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     // TODO: spaces!
     let value = vec4<f32>(cell.value, 0.0, 0.0, 0.0);
     let total_number_of_chars = number_of_chars_data(value, 1u, 2u);
-    let element_position = 4.0 * position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.5, 0.0, -AABB_SIZE - 1.01);
+    //let element_position = position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.5, 0.0, (-1.0) * AABB_SIZE - FONT_SIZE*4.0 + 0.01);
+    let element_position = 4.0 * position - vec3<f32>(f32(total_number_of_chars) * FONT_SIZE * 0.5, 0.0, -AABB_SIZE - 4.0 * FONT_SIZE - 0.01);
     let renderable_element = Char (
                     // element_position,
                     element_position,
@@ -382,7 +383,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                            
         // visualize_cell(position, cell.color);
 	if (cell.color ==  rgba_u32(0u, 0u, 0u, 255u)) { return; }  
-        visualize_cell(position, cell.color);
+        //visualize_cell(position, cell.color);
+        visualize_cell(position, col);
         //visualize_cell(position, col);
 
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {

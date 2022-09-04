@@ -10,6 +10,11 @@ struct FimCellPc {
     color: u32,
 };
 
+struct TempData {
+    memory_location: u32,
+    value: f32,
+};
+
 struct PrefixParams {
     data_start_index: u32,
     data_end_index: u32,
@@ -26,7 +31,7 @@ struct FmmParams {
 
 @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage,read_write> active_list: array<u32>; //fmm_blocks
+@group(0) @binding(2) var<storage,read_write> active_list: array<TempData>; //fmm_blocks
 // @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>; // USELESS
 @group(0) @binding(3) var<storage,read_write> fim_data: array<FimCellPc>;
 @group(0) @binding(4) var<storage,read_write> fim_counter: array<u32>; // 5 placeholders
@@ -41,24 +46,24 @@ var<private> private_neighbors:     array<FimCellPc, 6>;
 
 fn udiv_up_safe32(x: u32, y: u32) -> u32 {
     let tmp = (x + y - 1u) / y;
-    return select(tmp, 0u, y == 0u); 
+    return select(tmp, 0u, y == 0u);
 }
 
 fn total_cell_count() -> u32 {
 
-    return fmm_params.global_dimension.x * 
-           fmm_params.global_dimension.y * 
-           fmm_params.global_dimension.z * 
-           fmm_params.local_dimension.x * 
-           fmm_params.local_dimension.y * 
-           fmm_params.local_dimension.z; 
+    return fmm_params.global_dimension.x *
+           fmm_params.global_dimension.y *
+           fmm_params.global_dimension.z *
+           fmm_params.local_dimension.x *
+           fmm_params.local_dimension.y *
+           fmm_params.local_dimension.z;
 };
 
-/// A function that checks if a given coordinate is within the global computational domain. 
+/// A function that checks if a given coordinate is within the global computational domain.
 fn isInside(coord: vec3<i32>) -> bool {
     return (coord.x >= 0 && coord.x < i32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
            (coord.y >= 0 && coord.y < i32(fmm_params.local_dimension.y * fmm_params.global_dimension.y)) &&
-           (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z)); 
+           (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z));
 }
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
@@ -123,7 +128,7 @@ fn get_cell_index(global_index: u32) -> vec3<u32> {
 
     let cell_position = block_position + local_position;
 
-    return cell_position; 
+    return cell_position;
 }
 
 /// Get memory index from given cell coordinate.
@@ -171,7 +176,7 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
         select(tcc ,i2, isInside(neighbors[2])),
         select(tcc ,i3, isInside(neighbors[3])),
         select(tcc ,i4, isInside(neighbors[4])),
-        select(tcc ,i5, isInside(neighbors[5])) 
+        select(tcc ,i5, isInside(neighbors[5]))
     );
 }
 
@@ -183,13 +188,13 @@ fn solve_quadratic() -> f32 {
                                   private_neighbors[2].value,
                                   private_neighbors[3].value,
                                   private_neighbors[4].value,
-                                  private_neighbors[5].value 
+                                  private_neighbors[5].value
                                   // select(0.0, private_neighbors[0].value, private_neighbors[0].tag == SOURCE),
                                   // select(0.0, private_neighbors[1].value, private_neighbors[1].tag == SOURCE),
                                   // select(0.0, private_neighbors[2].value, private_neighbors[2].tag == SOURCE),
                                   // select(0.0, private_neighbors[3].value, private_neighbors[3].tag == SOURCE),
                                   // select(0.0, private_neighbors[4].value, private_neighbors[4].tag == SOURCE),
-                                  // select(0.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE) 
+                                  // select(0.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE)
     );
 
     var p = vec3<f32>(min(phis[0], phis[1]), min(phis[2], phis[3]), min(phis[4], phis[5]));
@@ -213,7 +218,7 @@ fn solve_quadratic() -> f32 {
     }
 
     var result: f32 = 777.0;
-    
+
     // The speed information.
     let speed = 1.0;
     let fpow2_inv = 1.0; // / (speed * speed);
@@ -229,7 +234,7 @@ fn solve_quadratic() -> f32 {
         //result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
         result = 0.5 * (p[0] + p[1] + sqrt(2.0 * fpow2_inv - pow((p[0] - p[1]), 2.0)));
     }
- 
+
     else {
         result = p[0] + 1.0 * fpow2_inv;
     }
@@ -251,27 +256,27 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	workgroupBarrier();
 
         let buffer_offset = total_cell_count();
-	var buffer_swap_id = 0u;
+	var buffer_swap_id = 0u; // fim_counter[0];
 
 	var count = 0u;
 
 	while (items_to_process > 0u) {
 	    workgroupBarrier();
 
-            if (local_index == 0u) {
-                items_to_process = 0u;
-            }
-	    workgroupBarrier();
+            //+++ if (local_index == 0u) {
+            //+++     items_to_process = 0u;
+            //+++ }
+	    //+++ workgroupBarrier();
 
             var chunks = udiv_up_safe32(items_to_process, 1024u);
 
 	    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
+	        workgroupBarrier();
 
 	        var actual_index = local_index + i * 1024u;
 	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
 
-		var t: u32; 
-		var fim_cell: FimCellPc;
+		var t: TempData;
 		var this_coord: vec3<u32>;
 		var updated_value: f32;
 		var neighbor_mem_locations: array<u32, 6>;
@@ -280,8 +285,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                 // Overflow check. Load neighbor data and calculate the updated eikonal value.
                 if (actual_index < items_to_process) {
 	            t = active_list[swap_index]; // The location of fim active cell.
-	            fim_cell = fim_data[t]; // The actual fim active cell.
-	            this_coord = get_cell_index(t); // The coordinate of this cell.
+	            this_coord = get_cell_index(t.memory_location); // The coordinate of this cell.
 
 		    // Load neigbors memory indices.
                     neighbor_mem_locations = load_neighbors_6(this_coord);
@@ -297,16 +301,63 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     // Calculate eikonal value.
                     updated_value = solve_quadratic();
 		}
-		// If the value didn't change, remove cell from remedy set (don't add it to remedy next time).
-                if (actual_index < items_to_process && abs(updated_value - fim_cell.value) < 0.000001) {
-	            fim_data[t].tag = SOURCE;
+
+		// Value changed. Add neihborhood to remedy.
+                if (actual_index < items_to_process && updated_value < t.value) {
+	            //+++ fim_data[t].tag = SOURCE;
+                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = TempData(t.memory_location, updated_value);
+
+                    if (private_neighbors[0].tag != REMEDY && private_neighbors[0].tag != OUTSIDE) {
+		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, REMEDY);
+	                if (old_tag != REMEDY) {
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+		                TempData(neighbor_mem_locations[0], private_neighbors[0].value);
+	                }
+		    }
+                    if (private_neighbors[1].tag != REMEDY && private_neighbors[1].tag != OUTSIDE) {
+		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, REMEDY);
+	                if (old_tag != REMEDY) {
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+		                TempData(neighbor_mem_locations[1], private_neighbors[1].value);
+	                }
+		    }
+                    if (private_neighbors[2].tag != REMEDY && private_neighbors[2].tag != OUTSIDE) {
+		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, REMEDY);
+	                if (old_tag != REMEDY) {
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+		                TempData(neighbor_mem_locations[2], private_neighbors[2].value);
+	                }
+		    }
+                    if (private_neighbors[3].tag != REMEDY && private_neighbors[3].tag != OUTSIDE) {
+		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, REMEDY);
+	                if (old_tag != REMEDY) {
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
+		                TempData(neighbor_mem_locations[3], private_neighbors[3].value);
+	                }
+		    }
+                    if (private_neighbors[4].tag != REMEDY && private_neighbors[4].tag != OUTSIDE) {
+		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, REMEDY);
+	                if (old_tag != REMEDY) {
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+		                TempData(neighbor_mem_locations[4], private_neighbors[4].value);
+	                }
+		    }
+                    if (private_neighbors[5].tag != REMEDY && private_neighbors[5].tag != OUTSIDE) {
+		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, REMEDY);
+	                if (old_tag != REMEDY) {
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+		                TempData(neighbor_mem_locations[5], private_neighbors[5].value);
+	                }
+		    }
 	        }
-		// The value is a remedy cell. Add it to the remedy set.
+		// Move cell from remedy set to the source.
 		else {
-                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = t;
+	            fim_data[t.memory_location].tag = SOURCE;
 		}
-            } // for	
-	    storageBarrier();
+            } // for
+	    workgroupBarrier();
+
+	    // storageBarrier();
 
             if (local_index == 0u) {
                 items_to_process = atomicExchange(&wg_mem_offset, 0u);
@@ -317,90 +368,26 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             chunks = udiv_up_safe32(items_to_process, 1024u);
 
 	    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
+	        workgroupBarrier();
 
 	        var actual_index = local_index + i * 1024u;
 	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
 
-		var t: u32; 
-		var fim_cell: FimCellPc;
-		var this_coord: vec3<u32>;
-		var updated_value: f32;
-		var neighbor_mem_locations: array<u32, 6>;
-		let next_buffer_swap = (buffer_swap_id + 1u) & 1u;
-
-                // Overflow check. Load neighbor data and calculate the updated eikonal value.
                 if (actual_index < items_to_process) {
-	            t = active_list[swap_index]; // The location of fim active cell.
-	            fim_cell = fim_data[t]; // The actual fim active cell.
-	            this_coord = get_cell_index(t); // The coordinate of this cell.
 
-		    // Load neigbors memory indices.
-                    neighbor_mem_locations = load_neighbors_6(this_coord);
-
-		    // Load neigbor cells.
-                    private_neighbors[0] = fim_data[neighbor_mem_locations[0]];
-                    private_neighbors[1] = fim_data[neighbor_mem_locations[1]];
-                    private_neighbors[2] = fim_data[neighbor_mem_locations[2]];
-                    private_neighbors[3] = fim_data[neighbor_mem_locations[3]];
-                    private_neighbors[4] = fim_data[neighbor_mem_locations[4]];
-                    private_neighbors[5] = fim_data[neighbor_mem_locations[5]];
-
-                    // Calculate eikonal value.
-                    updated_value = solve_quadratic();
-	            fim_data[t].value = updated_value;
+	            var t = active_list[swap_index]; // The location of fim active cell.
+		    fim_data[t.memory_location].value = t.value;
 		}
 
-
-                if (actual_index < items_to_process) {
-                    fim_cell.value = updated_value;
-                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = t;
-
-                    if (private_neighbors[0].tag != REMEDY && private_neighbors[0].tag != OUTSIDE) {
-		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, REMEDY);
-	                if (old_tag != REMEDY) {
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[0];
-	                }
-		    }
-                    if (private_neighbors[1].tag != REMEDY && private_neighbors[1].tag != OUTSIDE) {
-		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, REMEDY);
-	                if (old_tag != REMEDY) {
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[1];
-	                }
-		    }
-                    if (private_neighbors[2].tag != REMEDY && private_neighbors[2].tag != OUTSIDE) {
-		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, REMEDY);
-	                if (old_tag != REMEDY) {
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[2];
-	                }
-		    }
-                    if (private_neighbors[3].tag != REMEDY && private_neighbors[3].tag != OUTSIDE) {
-		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, REMEDY);
-	                if (old_tag != REMEDY) {
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[3];
-	                }
-		    }
-                    if (private_neighbors[4].tag != REMEDY && private_neighbors[4].tag != OUTSIDE) {
-		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, REMEDY);
-	                if (old_tag != REMEDY) {
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[4];
-	                }
-		    }
-                    if (private_neighbors[5].tag != REMEDY && private_neighbors[5].tag != OUTSIDE) {
-		        var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, REMEDY);
-	                if (old_tag != REMEDY) {
-                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[5];
-	                }
-		    }
-		}
             } // for
 
             workgroupBarrier();
             if (local_index == 0u) {
-                items_to_process = atomicExchange(&wg_mem_offset, 0u);
+                //+++ items_to_process = atomicExchange(&wg_mem_offset, 0u);
 		fim_counter[3] = items_to_process;
 		fim_counter[4] = count;
             }
-            buffer_swap_id = (buffer_swap_id + 1u) & 1u;
-	    count = count + 1u;
+            //+++ buffer_swap_id = (buffer_swap_id + 1u) & 1u;
+	    //+++ count = count + 1u;
         } // while
 }

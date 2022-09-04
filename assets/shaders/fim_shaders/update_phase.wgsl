@@ -10,6 +10,11 @@ struct FimCellPc {
     color: u32,
 };
 
+struct TempData {
+    memory_location: u32,
+    value: f32,
+};
+
 struct PrefixParams {
     data_start_index: u32,
     data_end_index: u32,
@@ -26,7 +31,7 @@ struct FmmParams {
 
 @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage,read_write> active_list: array<u32>; //fmm_blocks
+@group(0) @binding(2) var<storage,read_write> active_list: array<TempData>; //fmm_blocks
 // @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
 @group(0) @binding(3) var<storage,read_write> fim_data: array<FimCellPc>;
 @group(0) @binding(4) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
@@ -265,19 +270,28 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             var chunks = udiv_up_safe32(items_to_process, 1024u);
 
 	    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
-                // workgroupBarrier();
+                workgroupBarrier();
 
 	        var actual_index = local_index + i * 1024u; // + buffer_swap_id * buffer_offset;
 	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
 
+		var t: TempData; 
+		var fim_cell: FimCellPc;
+		var this_coord: vec3<u32>;
+		var updated_value: f32;
+		var neighbor_mem_locations: array<u32, 6>;
+		let next_buffer_swap = (buffer_swap_id + 1u) & 1u;
+
+                // Overflow check. Load neighbor data and calculate the updated eikonal value.
                 if (actual_index < items_to_process) {
-	            var t = active_list[swap_index]; // The location of fim active cell.
-	            var fim_cell = fim_data[t]; // The actual fim active cell.
-	            var this_coord = get_cell_index(t); // The coordinate of this cell.
+	            t = active_list[swap_index]; // The location of fim active cell.
+	            // fim_cell = fim_data[t.memory_location]; // The actual fim active cell.
+	            this_coord = get_cell_index(t.memory_location); // The coordinate of this cell.
 
-		    // Load neigbors.
-                    var neighbor_mem_locations = load_neighbors_6(this_coord);
+		    // Load neigbors memory indices.
+                    neighbor_mem_locations = load_neighbors_6(this_coord);
 
+		    // Load neigbor cells.
                     private_neighbors[0] = fim_data[neighbor_mem_locations[0]];
                     private_neighbors[1] = fim_data[neighbor_mem_locations[1]];
                     private_neighbors[2] = fim_data[neighbor_mem_locations[2]];
@@ -285,63 +299,161 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     private_neighbors[4] = fim_data[neighbor_mem_locations[4]];
                     private_neighbors[5] = fim_data[neighbor_mem_locations[5]];
 
-                    var updated_value = solve_quadratic();
+                    // Calculate eikonal value.
+                    updated_value = solve_quadratic();
+		}
+
+                if (actual_index < items_to_process) {
 		    let next_buffer_swap = (buffer_swap_id + 1u) & 1u;
 
-		    if (updated_value < fim_cell.value) {
-                        fim_cell.value = updated_value;
-                        active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = t;
+		    if (updated_value < t.value) {
+                        // fim_cell.value = updated_value;
+	                //!!! fim_data[t].value = updated_value;
+                        active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = TempData(t.memory_location, updated_value);
 		    }
-		    // The value didn't change. Add the active cell to the source. Add all non SOURCE/ACTIVE/OUTSIDE neighbors to the active list.
+
 		    else {
-                        fim_cell.tag = SOURCE;
 
                         if (!(private_neighbors[0].tag == SOURCE || private_neighbors[0].tag == ACTIVE || private_neighbors[0].tag == OUTSIDE)) {
-			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, ACTIVE);
+		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, ACTIVE);
 	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[0];
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
+				    TempData(neighbor_mem_locations[0], private_neighbors[0].value);
 	                    }
-			}
+		        }
                         if (!(private_neighbors[1].tag == SOURCE || private_neighbors[1].tag == ACTIVE || private_neighbors[1].tag == OUTSIDE)) {
-			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, ACTIVE);
+		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, ACTIVE);
 	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[1];
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
+				    TempData(neighbor_mem_locations[1], private_neighbors[1].value);
 	                    }
-			}
+		        }
                         if (!(private_neighbors[2].tag == SOURCE || private_neighbors[2].tag == ACTIVE || private_neighbors[2].tag == OUTSIDE)) {
-			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, ACTIVE);
+		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, ACTIVE);
 	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[2];
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+				    TempData(neighbor_mem_locations[2], private_neighbors[2].value);
 	                    }
-			}
+		        }
                         if (!(private_neighbors[3].tag == SOURCE || private_neighbors[3].tag == ACTIVE || private_neighbors[3].tag == OUTSIDE)) {
-			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, ACTIVE);
+		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, ACTIVE);
 	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[3];
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+				    TempData(neighbor_mem_locations[3], private_neighbors[3].value);
 	                    }
-			}
+		        }
                         if (!(private_neighbors[4].tag == SOURCE || private_neighbors[4].tag == ACTIVE || private_neighbors[4].tag == OUTSIDE)) {
-			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, ACTIVE);
+		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, ACTIVE);
 	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[4];
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+				    TempData(neighbor_mem_locations[4], private_neighbors[4].value);
 	                    }
-			}
+		        }
                         if (!(private_neighbors[5].tag == SOURCE || private_neighbors[5].tag == ACTIVE || private_neighbors[5].tag == OUTSIDE)) {
-			    var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, ACTIVE);
+		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, ACTIVE);
 	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[5];
+                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+				    TempData(neighbor_mem_locations[5], private_neighbors[5].value);
 	                    }
-			}
+		        }
 		    }
-	            fim_data[t] = fim_cell;
 	        }
             } // for
+	    workgroupBarrier();
 
-            workgroupBarrier();
             if (local_index == 0u) {
-                items_to_process = wg_mem_offset;
-                atomicStore(&wg_mem_offset, 0u);
+                items_to_process = atomicExchange(&wg_mem_offset, 0u);
             }
+	    workgroupBarrier();
+
+            // buffer_swap_id = (buffer_swap_id + 1u) & 1u;
+            chunks = udiv_up_safe32(items_to_process, 1024u);
+
+            // Update the active list values to the actual fim data.
+	    for (var i: u32 = 0u; i < chunks ; i = i + 1u) {
+                workgroupBarrier();
+
+	        var actual_index = local_index + i * 1024u;
+	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
+
+		var t: TempData;
+		// var fim_cell: FimCellPc;
+		// var this_coord: vec3<u32>;
+		// var updated_value: f32;
+		// var neighbor_mem_locations: array<u32, 6>;
+		// let next_buffer_swap = (buffer_swap_id + 1u) & 1u;
+
+                // Overflow check. Load neighbor data and calculate the updated eikonal value.
+                if (actual_index < items_to_process) {
+	            t = active_list[swap_index]; // The location of fim active cell.
+		    fim_data[t.memory_location].value = t.value;
+	            // fim_cell = fim_data[t]; // The actual fim active cell.
+	            //+++ this_coord = get_cell_index(t.memory_location); // The coordinate of this cell.
+
+		    //+++ // Load neigbors memory indices.
+                    //+++ neighbor_mem_locations = load_neighbors_6(this_coord);
+
+		    //+++ // Load neigbor cells.
+                    //+++ private_neighbors[0] = fim_data[neighbor_mem_locations[0]];
+                    //+++ private_neighbors[1] = fim_data[neighbor_mem_locations[1]];
+                    //+++ private_neighbors[2] = fim_data[neighbor_mem_locations[2]];
+                    //+++ private_neighbors[3] = fim_data[neighbor_mem_locations[3]];
+                    //+++ private_neighbors[4] = fim_data[neighbor_mem_locations[4]];
+                    //+++ private_neighbors[5] = fim_data[neighbor_mem_locations[5]];
+
+                    // Calculate eikonal value.
+                    //+++ updated_value = solve_quadratic();
+	            //+++ fim_data[t].value = updated_value;
+		}
+
+                // The value doesn't change. Move cell from active to source and gather neighbors.
+                //+++ if (actual_index < items_to_process && abs(t.value - updated_value) < 0.000001) {
+
+                //+++     if (!(private_neighbors[0].tag == SOURCE || private_neighbors[0].tag == ACTIVE || private_neighbors[0].tag == OUTSIDE)) {
+		//+++         var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, ACTIVE);
+	        //+++         if (old_tag != ACTIVE) {
+                //+++             active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[0];
+	        //+++         }
+		//+++     }
+                //+++     if (!(private_neighbors[1].tag == SOURCE || private_neighbors[1].tag == ACTIVE || private_neighbors[1].tag == OUTSIDE)) {
+		//+++         var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, ACTIVE);
+	        //+++         if (old_tag != ACTIVE) {
+                //+++             active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[1];
+	        //+++         }
+		//+++     }
+                //+++     if (!(private_neighbors[2].tag == SOURCE || private_neighbors[2].tag == ACTIVE || private_neighbors[2].tag == OUTSIDE)) {
+		//+++         var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, ACTIVE);
+	        //+++         if (old_tag != ACTIVE) {
+                //+++             active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[2];
+	        //+++         }
+		//+++     }
+                //+++     if (!(private_neighbors[3].tag == SOURCE || private_neighbors[3].tag == ACTIVE || private_neighbors[3].tag == OUTSIDE)) {
+		//+++         var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, ACTIVE);
+	        //+++         if (old_tag != ACTIVE) {
+                //+++             active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[3];
+	        //+++         }
+		//+++     }
+                //+++     if (!(private_neighbors[4].tag == SOURCE || private_neighbors[4].tag == ACTIVE || private_neighbors[4].tag == OUTSIDE)) {
+		//+++         var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, ACTIVE);
+	        //+++         if (old_tag != ACTIVE) {
+                //+++             active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[4];
+	        //+++         }
+		//+++     }
+                //+++     if (!(private_neighbors[5].tag == SOURCE || private_neighbors[5].tag == ACTIVE || private_neighbors[5].tag == OUTSIDE)) {
+		//+++         var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, ACTIVE);
+	        //+++         if (old_tag != ACTIVE) {
+                //+++             active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = neighbor_mem_locations[5];
+	        //+++         }
+		//+++     }
+	        //+++ }
+            } // for loop
+
+            //+++ workgroupBarrier();
+            //+++ if (local_index == 0u) {
+            //+++     items_to_process = wg_mem_offset;
+            //+++     atomicStore(&wg_mem_offset, 0u);
+            //+++ }
+            //+++atomicStore(&fim_counter[0], buffer_swap_id);
             buffer_swap_id = (buffer_swap_id + 1u) & 1u;
         } // while
 }

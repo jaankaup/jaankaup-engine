@@ -12,8 +12,8 @@ struct FimCellPc {
 };
 
 struct TempData {
-    data0: u32,
-    data1: u32,
+    memory_location: u32,
+    value: f32,
 };
 
 struct PrefixParams {
@@ -32,7 +32,7 @@ struct FmmParams {
 
 @group(0) @binding(0) var<uniform>            prefix_params: PrefixParams;
 @group(0) @binding(1) var<uniform>            fmm_params:    FmmParams;
-@group(0) @binding(2) var<storage,read_write> active_list: array<u32>; //fmm_blocks
+@group(0) @binding(2) var<storage,read_write> active_list: array<TempData>; //fmm_blocks
 // @group(0) @binding(3) var<storage,read_write> temp_prefix_sum: array<u32>;
 @group(0) @binding(3) var<storage,read_write> fim_data: array<FimCellPc>;
 @group(0) @binding(4) var<storage,read_write> fim_counter: array<atomic<u32>>; // 5 placeholders
@@ -249,7 +249,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		// if (abs(updated_value - fim_cell.value) > 0.0) {
 		if (updated_value < fim_cell.value) {
                     fim_data[global_id.x].tag = REMEDY;
-		    active_list[atomicAdd(&fim_counter[2], 1u)] = global_id.x;
+		    active_list[atomicAdd(&fim_counter[2], 1u)] = TempData(global_id.x, fim_data[global_id.x].value);
 	        }
 	}
 }

@@ -1277,7 +1277,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         //     }
              return;
         }
-        distance_to_interface = fmm_value(p, false); // - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
+        distance_to_interface = fmm_value(p, false) - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
 
         if (step_counter > 0u &&
 	    sphere_tracer_params.draw_circles == 1u &&

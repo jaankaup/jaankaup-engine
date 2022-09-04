@@ -52,7 +52,7 @@ const MAX_NUMBER_OF_ARROWS:     usize = 262144 * 8;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES * 4;
+const MAX_NUMBER_OF_AABBS:      usize = TOTAL_INDICES;
 
 /// Max number of box frames for gpu debugger.
 #[allow(dead_code)]
@@ -73,9 +73,9 @@ const TOTAL_INDICES: usize = 32*16*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FM
 /// Name for the fire tower mesh (assets/models/wood.obj).
 //const FIRE_TOWER_MESH: &'static str = "FIRE_TOWER";
 
-const FMM_GLOBAL_X: usize = 32;
-const FMM_GLOBAL_Y: usize = 8;
-const FMM_GLOBAL_Z: usize = 27;
+// const FMM_GLOBAL_X: usize = 32;
+// const FMM_GLOBAL_Y: usize = 8;
+// const FMM_GLOBAL_Z: usize = 27;
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
@@ -88,6 +88,9 @@ const FMM_GLOBAL_Z: usize = 27;
 // const FMM_GLOBAL_X: usize = 100;
 // const FMM_GLOBAL_Y: usize = 22;
 // const FMM_GLOBAL_Z: usize = 76;
+const FMM_GLOBAL_X: usize = 116;
+const FMM_GLOBAL_Y: usize = 25;
+const FMM_GLOBAL_Z: usize = 89;
 
 const FMM_INNER_X: usize = 4;
 const FMM_INNER_Y: usize = 4;
@@ -140,7 +143,8 @@ impl WGPUFeatures for FmmAppFeatures {
         limits.max_push_constant_size = 4;
         limits.max_push_constant_size = 4;
         //limits.max_compute_workgroup_size_x = 65536 * 2;
-        limits.max_storage_buffer_binding_size = 256819200; 
+        limits.max_storage_buffer_binding_size = 436101120; 
+        //limits.max_storage_buffer_binding_size = 256819200; 
         //limits.max_storage_buffer_binding_size = 154275840; 
         // limits.max_compute_workgroups_per_dimension = 65536 * 2;
         // println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
@@ -700,7 +704,7 @@ impl Application for FmmApp {
 
         // Increase isovalue.
         if self.keyboard_manager.test_key(&Key::NumpadAdd, input) {
-            self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue + 0.1;
+            self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue + 0.01;
             println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
             self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
         }
@@ -708,8 +712,8 @@ impl Application for FmmApp {
         // Decrease isovalue.
         if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) {
             let old_val = self.sphere_tracer_params.isovalue;
-            if old_val - 0.001 >= 0.0 { 
-                self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue - 0.1;
+            if old_val - 0.01 > 0.0 { 
+                self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue - 0.01;
                 println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
                 self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
             }

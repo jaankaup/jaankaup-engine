@@ -407,7 +407,7 @@ impl FastIterativeMethod {
              1, 1, 1, Some("Point data to interface dispatch")
          );
 
-         self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(pc.get_point_count(), 1024), 1, 1]);
+         self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(self.calculate_cell_count(), 1024), 1, 1]);
     }
 
     pub fn fim_iteration(&mut self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut Option<GpuTimer>) {
