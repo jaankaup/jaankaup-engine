@@ -1101,8 +1101,8 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
     fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
-    (*payload).color = fmm_color((*payload).intersection_point);
-    //(*payload).color = rgba_u32(255u, 0u, 0u, 255u);
+    //(*payload).color = fmm_color((*payload).intersection_point);
+    (*payload).color = rgba_u32(255u, 0u, 0u, 255u);
     //(*payload).color = fmm_color_nearest((*payload).intersection_point);
     (*payload).normal = calculate_normal(payload);
     (*payload).visibility = 1.0;

@@ -704,7 +704,7 @@ impl Application for FmmApp {
 
         // Increase isovalue.
         if self.keyboard_manager.test_key(&Key::NumpadAdd, input) {
-            self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue + 0.01;
+            self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue + 0.1;
             println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
             self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
         }
@@ -712,8 +712,8 @@ impl Application for FmmApp {
         // Decrease isovalue.
         if self.keyboard_manager.test_key(&Key::NumpadSubtract, input) {
             let old_val = self.sphere_tracer_params.isovalue;
-            if old_val - 0.01 > 0.0 { 
-                self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue - 0.01;
+            if old_val - 0.1 > 0.0 { 
+                self.sphere_tracer_params.isovalue = self.sphere_tracer_params.isovalue - 0.1;
                 println!("sphere_tracer_params.isovalue == {}", self.sphere_tracer_params.isovalue);
                 self.sphere_tracer.change_isovalue(queue, self.sphere_tracer_params.isovalue);
             }
