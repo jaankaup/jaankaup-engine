@@ -71,7 +71,7 @@ struct RayPayload {
   intersection_point: vec3<f32>,
   visibility: f32,
   normal: vec3<f32>,
-  opacity: f32,
+  opacity: f32, // Used as distance now.
   color: u32,
 };
 
@@ -360,7 +360,7 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     let r = reflect(-l,n);
     let cosAlpha = clamp( dot( e,r ), 0.0,1.0);
 
-    let gamma = 1.2;
+    let gamma = 1.1;
 
     // let c = pow(c0 * (1.0 - tz) + c1 * tz, vec4<f32>(1.0 / gamma)); 
 
@@ -372,7 +372,7 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     	// Specular : reflective highlight, like a mirror
     	materialSpecularColor * lightColor * lightPower * pow(cosAlpha,7.0) / (distance*distance), vec3<f32>(1.0 / gamma));
 
-    //++ final_color = hsv2rgb(rgb2hsv(final_color) - vec3<f32>(0.1, 0.1, 0.1));
+    // final_color = hsv2rgb(rgb2hsv(final_color) - vec3<f32>(2.8, 0.0, 0.0));
     
     (*payload).color = 
        rgba_u32_tex(
@@ -457,167 +457,60 @@ fn fmm_color_nearest(p: vec3<f32>) -> u32 {
     return private_neighbors[0].color;
 }
 
+//fn sample_color(p: vec3<f32>) -> vec3<f32> {
+//
+//   load_neighbors_private(vec3<u32>(floor(p)));
+//
+//   let tx = fract(p.x);
+//   let ty = fract(p.y);
+//   let tz = fract(p.z);
+//
+//   let loc0 = get_cell_index(private_neighbors_loc[0]);
+//   let loc1 = get_cell_index(private_neighbors_loc[1]);
+//   let loc2 = get_cell_index(private_neighbors_loc[2]);
+//   let loc3 = get_cell_index(private_neighbors_loc[3]);
+//   let loc4 = get_cell_index(private_neighbors_loc[4]);
+//   let loc5 = get_cell_index(private_neighbors_loc[5]);
+//   let loc6 = get_cell_index(private_neighbors_loc[6]);
+//   let loc7 = get_cell_index(private_neighbors_loc[7]);
+//
+//   let c000 = decode_color(private_neighbors[0].color);
+//   let c100 = decode_color(private_neighbors[1].color); 
+//   let c010 = decode_color(private_neighbors[2].color);
+//   let c110 = decode_color(private_neighbors[3].color); 
+//   let c001 = decode_color(private_neighbors[4].color);
+//   let c101 = decode_color(private_neighbors[5].color); 
+//   let c011 = decode_color(private_neighbors[6].color); 
+//   let c111 = decode_color(private_neighbors[7].color); 
+//
+//   let col = c000 * (1.0 - tx) * (1.0 - ty) * (1.0 - tz) + 
+//             c100 *        tx  * (1.0 - ty) * (1.0 - tz) + 
+//             c010 * (1.0 - tx) *        ty  * (1.0 - tz) + 
+//             c110 *        tx  *        ty  * (1.0 - tz) + 
+//             c001 * (1.0 - tx) * (1.0 - ty) *        tz  + 
+//             c101 *        tx  * (1.0 - ty) *        tz  + 
+//             c011 * (1.0 - tx) *        ty  *        tz  + 
+//             c111 *        tx  *        ty  *        tz;
+//
+//   return col;
+//}
+
 fn fmm_color(p: vec3<f32>) -> u32 {
 
-   //++ var point_counter = 0u;
-   //++ let base_point = vec3<i32>(floor(p));
-
-   //++ let tcc = total_cell_count();
-   //++ var weight = 0.0;
-   //++ var val = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-
-   //++ //for (var i:u32 = 0u ; i < 64u ; i = i + 1u) {
-   //++ for (var i:u32 = 0u ; i < 32u ; i = i + 1u) {
-   //++     
-   //++     let temp_point = vec3<i32>(index_to_uvec3(i, 3u, 3u)) - vec3<i32>(1, 1, 1) + base_point;
-   //++     //let temp_point = vec3<i32>(index_to_uvec3(i, 4u, 4u)) - vec3<i32>(1, 1, 1) + base_point;
-   //++     //let dist = pow(distance(vec3<f32>(temp_point), p), 2.0); 
-   //++     let dist = distance(vec3<f32>(temp_point), p); 
-   //++     if (dist < 1.41421356237 && isInside(temp_point)) {
-   //++     //if (dist < 2.0 && isInside(temp_point)) {
-   //++     //if (dist < 1.0) {
-   //++     //if (dist < 2.0 && isInside(temp_point)) {
-   //++         //let t_w = abs(dist - 1.0);
-
-   //++         let t_w = pow(abs(dist - 1.41421356237), 2.0);
-   //++         //let t_w = abs(dist - 2.0) / 2.0;
-   //++         //let t_w = abs(dist - 1.0);
-   //++         let mem = get_cell_mem_location(vec3<u32>(temp_point));
-   //++         let fmm_cell= fmm_data[mem];
-   //++         if (fmm_cell.color == 0u) { continue; }
-   //++         val = val + t_w * decode_color(fmm_cell.color);
-   //++         weight = weight + t_w;
-
-   //++         if (private_global_index.x == 0u) {
-   //++             output_arrow[atomicAdd(&counter[1], 1u)] =  
-   //++                   Arrow (
-   //++                       vec4<f32>(p * 4.0, 0.0),
-   //++                       vec4<f32>(vec3<f32>(temp_point) * 4.0, 0.0),
-   //++                       //vec4<f32>(tMins, 0.0),
-   //++                       //vec4<f32>(tMaxes, 0.0),
-   //++                       fmm_cell.color,
-   //++                       0.1
-   //++             );
-   //++         }
-   //++     }
-   //++ }
-
-   //++ var final_color = val / weight;
-
-   //++ return vec4_to_rgba(vec4<f32>(final_color.xyz, 1.0));  //val / weight);
-
-   //++++ var neighbors: array<vec3<i32>, 8> = array<vec3<i32>, 8>(
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  0),
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  0),
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  0),
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  0),
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  1),
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  1),
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  1),
-   //++++     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  1),
-   //++++ );
-
-   //++++ let w0 = 1.0 / distance(p, vec3<f32>(neighbors[0])); 
-   //++++ let w1 = 1.0 / distance(p, vec3<f32>(neighbors[1])); 
-   //++++ let w2 = 1.0 / distance(p, vec3<f32>(neighbors[2])); 
-   //++++ let w3 = 1.0 / distance(p, vec3<f32>(neighbors[3])); 
-   //++++ let w4 = 1.0 / distance(p, vec3<f32>(neighbors[4])); 
-   //++++ let w5 = 1.0 / distance(p, vec3<f32>(neighbors[5])); 
-   //++++ let w6 = 1.0 / distance(p, vec3<f32>(neighbors[6])); 
-   //++++ let w7 = 1.0 / distance(p, vec3<f32>(neighbors[7])); 
-
-   //++++ let factor0 = select(1.0, 0.0, private_neighbors[0].tag == OUTSIDE || private_neighbors[0].color == 0u);
-   //++++ let factor1 = select(1.0, 0.0, private_neighbors[1].tag == OUTSIDE || private_neighbors[1].color == 0u);
-   //++++ let factor2 = select(1.0, 0.0, private_neighbors[2].tag == OUTSIDE || private_neighbors[2].color == 0u);
-   //++++ let factor3 = select(1.0, 0.0, private_neighbors[3].tag == OUTSIDE || private_neighbors[3].color == 0u);
-   //++++ let factor4 = select(1.0, 0.0, private_neighbors[4].tag == OUTSIDE || private_neighbors[4].color == 0u);
-   //++++ let factor5 = select(1.0, 0.0, private_neighbors[5].tag == OUTSIDE || private_neighbors[5].color == 0u);
-   //++++ let factor6 = select(1.0, 0.0, private_neighbors[6].tag == OUTSIDE || private_neighbors[6].color == 0u);
-   //++++ let factor7 = select(1.0, 0.0, private_neighbors[7].tag == OUTSIDE || private_neighbors[7].color == 0u);
-
-   //++++ let c0 = decode_color(private_neighbors[0].color);
-   //++++ let c1 = decode_color(private_neighbors[1].color); 
-   //++++ let c2 = decode_color(private_neighbors[2].color);
-   //++++ let c3 = decode_color(private_neighbors[3].color); 
-   //++++ let c4 = decode_color(private_neighbors[4].color);
-   //++++ let c5 = decode_color(private_neighbors[5].color); 
-   //++++ let c6 = decode_color(private_neighbors[6].color); 
-   //++++ let c7 = decode_color(private_neighbors[7].color); 
-
-   //++++ var c = c0 * w0 * factor0 + // * factor0 +
-   //++++         c1 * w1 * factor1 + // * factor1 +
-   //++++         c2 * w2 * factor2 + // * factor2 +
-   //++++         c3 * w3 * factor3 + // * factor3 +
-   //++++         c4 * w4 * factor4 + // * factor4 +
-   //++++         c5 * w5 * factor5 + // * factor5 +
-   //++++         c7 * w6 * factor6 + // * factor6 +
-   //++++         c7 * w7 * factor7;  // * factor7 ;
-
-   //++++ c = c / (w0 * factor0 + w1 * factor1 + w2 * factor2 + w3 * factor3 + w4 * factor4 + w5 * factor5 + w6 * factor6 + w7 * factor7); // Zero? 
-
-   //++++ // let x = 1.0/6.0 * f32(c0.x + c1.x + c2.x + c3.x + c4.x + c5.x); 
-   //++++ // let y = 1.0/6.0 * f32(c0.y + c1.y + c2.y + c3.y + c4.y + c5.y); 
-   //++++ // let z = 1.0/6.0 * f32(c0.z + c1.z + c2.z + c3.z + c4.z + c5.z); 
-   //++++ c.w = 1.0;
-   //++++ // var final_color = rgba_u32(u32(min(255.0, c.x)), u32(min(255.0, c.y)), u32(min(255.0, c.z)), 255u);
-   //++++ return vec4_to_rgba(c);
-   // var c001 = decode_color(private_neighbors[0].color);
-   // var c101 = decode_color(private_neighbors[1].color);
-   // var c011 = decode_color(private_neighbors[2].color);
-   // var c111 = decode_color(private_neighbors[3].color);
-   // var c000 = decode_color(private_neighbors[4].color);
-   // var c100 = decode_color(private_neighbors[5].color);
-   // var c010 = decode_color(private_neighbors[6].color);
-   // var c110 = decode_color(private_neighbors[7].color);
-
-   // let max_value = max(c000,  
-   //                 max(c100, 
-   //                 max(c010, 
-   //                 max(c110, 
-   //                 max(c001, 
-   //                 max(c101, 
-   //                 max(c011, 
-   //                     c111))))))); 
-
-   // c000 = select(c000, max_value, private_neighbors[0].tag == FAR || private_neighbors[0].color == 0u);
-   // c100 = select(c100, max_value, private_neighbors[1].tag == FAR || private_neighbors[1].color == 0u);
-   // c010 = select(c010, max_value, private_neighbors[2].tag == FAR || private_neighbors[2].color == 0u);
-   // c110 = select(c110, max_value, private_neighbors[3].tag == FAR || private_neighbors[3].color == 0u);
-   // c001 = select(c001, max_value, private_neighbors[4].tag == FAR || private_neighbors[4].color == 0u);
-   // c101 = select(c101, max_value, private_neighbors[5].tag == FAR || private_neighbors[5].color == 0u);
-   // c011 = select(c011, max_value, private_neighbors[6].tag == FAR || private_neighbors[6].color == 0u);
-   // c111 = select(c111, max_value, private_neighbors[7].tag == FAR || private_neighbors[7].color == 0u);
-   
-   // c000 = select(c000, max_value, private_neighbors[4].tag == FAR || private_neighbors[4].color == 0u);
-   // c100 = select(c100, max_value, private_neighbors[5].tag == FAR || private_neighbors[5].color == 0u);
-   // c010 = select(c010, max_value, private_neighbors[6].tag == FAR || private_neighbors[6].color == 0u);
-   // c110 = select(c110, max_value, private_neighbors[7].tag == FAR || private_neighbors[7].color == 0u);
-   // c001 = select(c001, max_value, private_neighbors[0].tag == FAR || private_neighbors[0].color == 0u);
-   // c101 = select(c101, max_value, private_neighbors[1].tag == FAR || private_neighbors[5].color == 0u);
-   // c011 = select(c011, max_value, private_neighbors[2].tag == FAR || private_neighbors[6].color == 0u);
-   // c111 = select(c111, max_value, private_neighbors[3].tag == FAR || private_neighbors[7].color == 0u);
-
-   // var c000_factor = select(1.0, 0.0, c000.x == 0.0 && c000.y == 0.0 && c000.z == 0.0);
-   // var c100_factor = select(1.0, 0.0, c100.x == 0.0 && c100.y == 0.0 && c100.z == 0.0);
-   // var c010_factor = select(1.0, 0.0, c010.x == 0.0 && c010.y == 0.0 && c010.z == 0.0);
-   // var c110_factor = select(1.0, 0.0, c110.x == 0.0 && c110.y == 0.0 && c110.z == 0.0);
-   // var c001_factor = select(1.0, 0.0, c001.x == 0.0 && c001.y == 0.0 && c001.z == 0.0);
-   // var c101_factor = select(1.0, 0.0, c101.x == 0.0 && c101.y == 0.0 && c101.z == 0.0);
-   // var c011_factor = select(1.0, 0.0, c011.x == 0.0 && c011.y == 0.0 && c011.z == 0.0);
-   // var c111_factor = select(1.0, 0.0, c111.x == 0.0 && c111.y == 0.0 && c111.z == 0.0);
+   load_neighbors_private(vec3<u32>(floor(p)), false);
 
    let tx = fract(p.x);
    let ty = fract(p.y);
    let tz = fract(p.z);
 
-   let loc0 = get_cell_index(private_neighbors_loc[0]);
-   let loc1 = get_cell_index(private_neighbors_loc[1]);
-   let loc2 = get_cell_index(private_neighbors_loc[2]);
-   let loc3 = get_cell_index(private_neighbors_loc[3]);
-   let loc4 = get_cell_index(private_neighbors_loc[4]);
-   let loc5 = get_cell_index(private_neighbors_loc[5]);
-   let loc6 = get_cell_index(private_neighbors_loc[6]);
-   let loc7 = get_cell_index(private_neighbors_loc[7]);
+   // let loc0 = get_cell_index(private_neighbors_loc[0]);
+   // let loc1 = get_cell_index(private_neighbors_loc[1]);
+   // let loc2 = get_cell_index(private_neighbors_loc[2]);
+   // let loc3 = get_cell_index(private_neighbors_loc[3]);
+   // let loc4 = get_cell_index(private_neighbors_loc[4]);
+   // let loc5 = get_cell_index(private_neighbors_loc[5]);
+   // let loc6 = get_cell_index(private_neighbors_loc[6]);
+   // let loc7 = get_cell_index(private_neighbors_loc[7]);
 
    let c000 = decode_color(private_neighbors[0].color);
    let c100 = decode_color(private_neighbors[1].color); 
@@ -627,6 +520,26 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    let c101 = decode_color(private_neighbors[5].color); 
    let c011 = decode_color(private_neighbors[6].color); 
    let c111 = decode_color(private_neighbors[7].color); 
+
+   let col = c000 * (1.0 - tx) * (1.0 - ty) * (1.0 - tz) + 
+             c100 *        tx  * (1.0 - ty) * (1.0 - tz) + 
+             c010 * (1.0 - tx) *        ty  * (1.0 - tz) + 
+             c110 *        tx  *        ty  * (1.0 - tz) + 
+             c001 * (1.0 - tx) * (1.0 - ty) *        tz  + 
+             c101 *        tx  * (1.0 - ty) *        tz  + 
+             c011 * (1.0 - tx) *        ty  *        tz  + 
+             c111 *        tx  *        ty  *        tz; 
+
+   // let col = c001 * (1.0 - tx) * (1.0 - ty) * (1.0 - tz) + 
+   //           c101 *        tx  * (1.0 - ty) * (1.0 - tz) + 
+   //           c011 * (1.0 - tx) *        ty  * (1.0 - tz) + 
+   //           c111 *        tx  *        ty  * (1.0 - tz) + 
+   //           c000 * (1.0 - tx) * (1.0 - ty) *        tz  + 
+   //           c100 *        tx  * (1.0 - ty) *        tz  + 
+   //           c010 * (1.0 - tx) *        ty  *        tz  + 
+   //           c110 *        tx  *        ty  *        tz; 
+
+   return vec4_to_rgba(vec4<f32>(col.x, col.y, col.z, 1.0));
 
    //        c010 : (0,1,0) : 2       c110 : (1,1,0) 3 
    //         +------------------------+
@@ -648,157 +561,157 @@ fn fmm_color(p: vec3<f32>) -> u32 {
    //   +------------------------+
    //  c001 : (0, 0, 1) 4       c101 : (1, 0, 1) 5 
 
-   let gamma = 1.0;
+   //+++ let gamma = 1.0;
 
-   let c00 = pow(c000 * (1.0 - tx) + c100 * tx, vec4<f32>(1.0 / gamma)); 
-   let c01 = pow(c010 * (1.0 - tx) + c110 * tx, vec4<f32>(1.0 / gamma)); 
-   let c10 = pow(c001 * (1.0 - tx) + c101 * tx, vec4<f32>(1.0 / gamma)); 
-   let c11 = pow(c011 * (1.0 - tx) + c111 * tx, vec4<f32>(1.0 / gamma)); 
+   //+++ let c00 = pow(c000 * (1.0 - tx) + c100 * tx, vec4<f32>(1.0 / gamma)); 
+   //+++ let c01 = pow(c010 * (1.0 - tx) + c110 * tx, vec4<f32>(1.0 / gamma)); 
+   //+++ let c10 = pow(c001 * (1.0 - tx) + c101 * tx, vec4<f32>(1.0 / gamma)); 
+   //+++ let c11 = pow(c011 * (1.0 - tx) + c111 * tx, vec4<f32>(1.0 / gamma)); 
 
-   let c0 = pow(c00 * (1.0 - ty) + c01 * ty, vec4<f32>(1.0 / gamma));
-   let c1 = pow(c10 * (1.0 - ty) + c11 * ty, vec4<f32>(1.0 / gamma));
+   //+++ let c0 = pow(c00 * (1.0 - ty) + c01 * ty, vec4<f32>(1.0 / gamma));
+   //+++ let c1 = pow(c10 * (1.0 - ty) + c11 * ty, vec4<f32>(1.0 / gamma));
 
-   //let c = c1 * (1.0 - tz) + c0 * tz; 
-   let c = pow(c0 * (1.0 - tz) + c1 * tz, vec4<f32>(1.0 / gamma)); 
+   //+++ //let c = c1 * (1.0 - tz) + c0 * tz; 
+   //+++ let c = pow(c0 * (1.0 - tz) + c1 * tz, vec4<f32>(1.0 / gamma)); 
 
-   let size = 0.1;
+   //+++ let size = 0.1;
 
-   //if ((private_global_index.x & 2047u) == 0u) {
-   // if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
-   if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u + sphere_tracer_params.outer_dim.x / 2u)) {
+   //+++ //if ((private_global_index.x & 2047u) == 0u) {
+   //+++ // if (sphere_tracer_params.render_samplers == 1u && (private_global_index.x == total_sphere_count() / 2u)) {
+   //+++ if (sphere_tracer_params.render_samplers == 1u && private_local_index.x == 32u && (private_workgroup_index.x == total_sphere_block_count() / 2u + sphere_tracer_params.outer_dim.x / 2u)) {
 
-   //if (sphere_tracer_params.render_samplers == 1u && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
-   //if (((private_global_index.x + 32u) & 2047u) == 0u) {
+   //+++ //if (sphere_tracer_params.render_samplers == 1u && (private_local_index.x == 0u) && (private_workgroup_index.x % 44u) == 0u) {
+   //+++ //if (((private_global_index.x + 32u) & 2047u) == 0u) {
 
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc0) * 4.0, 0.0),
-    	     vec4_to_rgba(c000),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc1) * 4.0, 0.0),
-    	     vec4_to_rgba(c100),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc2) * 4.0, 0.0),
-    	     vec4_to_rgba(c010),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc3) * 4.0, 0.0),
-    	     vec4_to_rgba(c110),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc4) * 4.0, 0.0),
-    	     vec4_to_rgba(c001),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc5) * 4.0, 0.0),
-    	     vec4_to_rgba(c101),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc6) * 4.0, 0.0),
-    	     vec4_to_rgba(c011),
-             size
-   );
-   output_arrow[atomicAdd(&counter[1], 1u)] =  
-         Arrow (
-             vec4<f32>(p * 4.0, 0.0),
-             vec4<f32>(vec3<f32>(loc7) * 4.0, 0.0),
-    	     vec4_to_rgba(c111),
-             size
-   );
-   output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
-         AABB (
-             vec4<f32>(vec3<f32>(loc0) * 4.0,
-                       bitcast<f32>(rgba_u32(255u, 0u, 1550u, 255u))),
-             vec4<f32>(vec3<f32>(loc7) * 4.0,
-                       0.1)
-   );
-   }
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc0) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c000),
+   //+++           size
+   //+++ );
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc1) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c100),
+   //+++           size
+   //+++ );
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc2) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c010),
+   //+++           size
+   //+++ );
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc3) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c110),
+   //+++           size
+   //+++ );
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc4) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c001),
+   //+++           size
+   //+++ );
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc5) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c101),
+   //+++           size
+   //+++ );
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc6) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c011),
+   //+++           size
+   //+++ );
+   //+++ output_arrow[atomicAdd(&counter[1], 1u)] =  
+   //+++       Arrow (
+   //+++           vec4<f32>(p * 4.0, 0.0),
+   //+++           vec4<f32>(vec3<f32>(loc7) * 4.0, 0.0),
+   //+++  	     vec4_to_rgba(c111),
+   //+++           size
+   //+++ );
+   //+++ output_aabb_wire[atomicAdd(&counter[3], 1u)] =  
+   //+++       AABB (
+   //+++           vec4<f32>(vec3<f32>(loc0) * 4.0,
+   //+++                     bitcast<f32>(rgba_u32(255u, 0u, 1550u, 255u))),
+   //+++           vec4<f32>(vec3<f32>(loc7) * 4.0,
+   //+++                     0.1)
+   //+++ );
+   //+++ }
 
-   //++++let c010 = decode_color(private_neighbors[0].color);
-   //++++let c110 = decode_color(private_neighbors[1].color); 
-   //++++let c011 = decode_color(private_neighbors[2].color);
-   //++++let c111 = decode_color(private_neighbors[3].color); 
-   //++++let c000 = decode_color(private_neighbors[4].color);
-   //++++let c100 = decode_color(private_neighbors[5].color); 
-   //++++let c001 = decode_color(private_neighbors[6].color); 
-   //++++let c101 = decode_color(private_neighbors[7].color); 
+   //+++ //++++let c010 = decode_color(private_neighbors[0].color);
+   //+++ //++++let c110 = decode_color(private_neighbors[1].color); 
+   //+++ //++++let c011 = decode_color(private_neighbors[2].color);
+   //+++ //++++let c111 = decode_color(private_neighbors[3].color); 
+   //+++ //++++let c000 = decode_color(private_neighbors[4].color);
+   //+++ //++++let c100 = decode_color(private_neighbors[5].color); 
+   //+++ //++++let c001 = decode_color(private_neighbors[6].color); 
+   //+++ //++++let c101 = decode_color(private_neighbors[7].color); 
 
-   //++ var c = c0 * d0 * factor0 + // * factor0 +
-   //++         c1 * d1 * factor1 + // * factor1 +
-   //++         c2 * d2 * factor2 + // * factor2 +
-   //++         c3 * d3 * factor3 + // * factor3 +
-   //++         c4 * d4 * factor4 + // * factor4 +
-   //++         c5 * d5 * factor5 + // * factor5 +
-   //++         c7 * d6 * factor6 + // * factor6 +
-   //++         c7 * d7 * factor7;  // * factor7 ;
+   //+++ //++ var c = c0 * d0 * factor0 + // * factor0 +
+   //+++ //++         c1 * d1 * factor1 + // * factor1 +
+   //+++ //++         c2 * d2 * factor2 + // * factor2 +
+   //+++ //++         c3 * d3 * factor3 + // * factor3 +
+   //+++ //++         c4 * d4 * factor4 + // * factor4 +
+   //+++ //++         c5 * d5 * factor5 + // * factor5 +
+   //+++ //++         c7 * d6 * factor6 + // * factor6 +
+   //+++ //++         c7 * d7 * factor7;  // * factor7 ;
 
-   //++ c = c / (d0 * factor0 + d1 * factor1 + d2 * factor2 + d3 * factor3 + d4 * factor4 + d5 * factor5 + d6 * factor6 + d7 * factor7); // Zero? 
+   //+++ //++ c = c / (d0 * factor0 + d1 * factor1 + d2 * factor2 + d3 * factor3 + d4 * factor4 + d5 * factor5 + d6 * factor6 + d7 * factor7); // Zero? 
 
-   //++ // let x = 1.0/6.0 * f32(c0.x + c1.x + c2.x + c3.x + c4.x + c5.x); 
-   //++ // let y = 1.0/6.0 * f32(c0.y + c1.y + c2.y + c3.y + c4.y + c5.y); 
-   //++ // let z = 1.0/6.0 * f32(c0.z + c1.z + c2.z + c3.z + c4.z + c5.z); 
-   //++ c.w = 1.0;
-   //++ // var final_color = rgba_u32(u32(min(255.0, c.x)), u32(min(255.0, c.y)), u32(min(255.0, c.z)), 255u);
-   //++ return vec4_to_rgba(c);
+   //+++ //++ // let x = 1.0/6.0 * f32(c0.x + c1.x + c2.x + c3.x + c4.x + c5.x); 
+   //+++ //++ // let y = 1.0/6.0 * f32(c0.y + c1.y + c2.y + c3.y + c4.y + c5.y); 
+   //+++ //++ // let z = 1.0/6.0 * f32(c0.z + c1.z + c2.z + c3.z + c4.z + c5.z); 
+   //+++ //++ c.w = 1.0;
+   //+++ //++ // var final_color = rgba_u32(u32(min(255.0, c.x)), u32(min(255.0, c.y)), u32(min(255.0, c.z)), 255u);
+   //+++ //++ return vec4_to_rgba(c);
 
-   // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-   //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-   //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-   //        tx * ty * (1.0 - tz) * c110 + 
-   //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-   //        tx * (1.0 - ty) * tz * c101 + 
-   //        (1.0 - tx) * ty * tz * c011 + 
-   //        tx * ty * tz * c111;
+   //+++ // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+   //+++ //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+   //+++ //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+   //+++ //        tx * ty * (1.0 - tz) * c110 + 
+   //+++ //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+   //+++ //        tx * (1.0 - ty) * tz * c101 + 
+   //+++ //        (1.0 - tx) * ty * tz * c011 + 
+   //+++ //        tx * ty * tz * c111;
 
 
-   // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-   //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-   //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-   //        tx * ty * (1.0 - tz) * c110 + 
-   //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-   //        tx * (1.0 - ty) * tz * c101 + 
-   //        (1.0 - tx) * ty * tz * c011 + 
-   //        tx * ty * tz * c111;
+   //+++ // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
+   //+++ //        tx * (1.0 - ty) * (1.0 - tz) * c100 + 
+   //+++ //        (1.0 - tx) * ty * (1.0 - tz) * c010 + 
+   //+++ //        tx * ty * (1.0 - tz) * c110 + 
+   //+++ //        (1.0 - tx) * (1.0 - ty) * tz * c001 + 
+   //+++ //        tx * (1.0 - ty) * tz * c101 + 
+   //+++ //        (1.0 - tx) * ty * tz * c011 + 
+   //+++ //        tx * ty * tz * c111;
 
-   // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 * c000_factor + 
-   //        tx * (1.0 - ty) * (1.0 - tz) * c100 * c100_factor + 
-   //        (1.0 - tx) * ty * (1.0 - tz) * c010 * c010_factor + 
-   //        tx * ty * (1.0 - tz) * c110 * c110_factor + 
-   //        (1.0 - tx) * (1.0 - ty) * tz * c001 * c001_factor + 
-   //        tx * (1.0 - ty) * tz * c101 * c101_factor + 
-   //        (1.0 - tx) * ty * tz * c011 * c011_factor + 
-   //        tx * ty * tz * c111 * c111_factor;
-   return vec4_to_rgba(vec4<f32>(c.x, c.y, c.z, 1.0));
+   //+++ // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 * c000_factor + 
+   //+++ //        tx * (1.0 - ty) * (1.0 - tz) * c100 * c100_factor + 
+   //+++ //        (1.0 - tx) * ty * (1.0 - tz) * c010 * c010_factor + 
+   //+++ //        tx * ty * (1.0 - tz) * c110 * c110_factor + 
+   //+++ //        (1.0 - tx) * (1.0 - ty) * tz * c001 * c001_factor + 
+   //+++ //        tx * (1.0 - ty) * tz * c101 * c101_factor + 
+   //+++ //        (1.0 - tx) * ty * tz * c011 * c011_factor + 
+   //+++ //        tx * ty * tz * c111 * c111_factor;
+   //+++ return vec4_to_rgba(vec4<f32>(c.x, c.y, c.z, 1.0));
 
-   //++ // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[0].color) * c000_factor + 
-   //++ //        tx * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[1].color) * c100_factor + 
-   //++ //        (1.0 - tx) * ty * (1.0 - tz) * decode_color(private_neighbors[2].color) * c010_factor + 
-   //++ //        tx * ty * (1.0 - tz) * decode_color(private_neighbors[3].color) * c110_factor + 
-   //++ //        (1.0 - tx) * (1.0 - ty) * tz * decode_color(private_neighbors[4].color) * c001_factor + 
-   //++ //        tx * (1.0 - ty) * tz * decode_color(private_neighbors[5].color) * c101_factor + 
-   //++ //        (1.0 - tx) * ty * tz * decode_color(private_neighbors[6].color) * c011_factor + 
-   //++ //        tx * ty * tz * decode_color(private_neighbors[7].color) * c111_factor;
+   //+++ //++ // var color = (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[0].color) * c000_factor + 
+   //+++ //++ //        tx * (1.0 - ty) * (1.0 - tz) * decode_color(private_neighbors[1].color) * c100_factor + 
+   //+++ //++ //        (1.0 - tx) * ty * (1.0 - tz) * decode_color(private_neighbors[2].color) * c010_factor + 
+   //+++ //++ //        tx * ty * (1.0 - tz) * decode_color(private_neighbors[3].color) * c110_factor + 
+   //+++ //++ //        (1.0 - tx) * (1.0 - ty) * tz * decode_color(private_neighbors[4].color) * c001_factor + 
+   //+++ //++ //        tx * (1.0 - ty) * tz * decode_color(private_neighbors[5].color) * c101_factor + 
+   //+++ //++ //        (1.0 - tx) * ty * tz * decode_color(private_neighbors[6].color) * c011_factor + 
+   //+++ //++ //        tx * ty * tz * decode_color(private_neighbors[7].color) * c111_factor;
 }
 
 
@@ -843,6 +756,8 @@ fn fmm_color(p: vec3<f32>) -> u32 {
 
 
 fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
+
+   if (!isInside(vec3<i32>(p))) { return 0.1; }
 
    load_neighbors_private(vec3<u32>(floor(p)), render);
 
@@ -891,178 +806,36 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    //let c = c1 * (1.0 - tz) + c0 * tz; 
    let c = c0 * (1.0 - tz) + c1 * tz; 
 
+
+
    return c;
-
-   //++++let min_value = min(private_neighbors[0].value,  
-   //++++                min(private_neighbors[1].value, 
-   //++++                min(private_neighbors[2].value, 
-   //++++                min(private_neighbors[3].value, 
-   //++++                min(private_neighbors[4].value, 
-   //++++                min(private_neighbors[5].value, 
-   //++++                min(private_neighbors[6].value, 
-   //++++                    private_neighbors[7].value))))))); 
-
-   //++++var c000 = select(private_neighbors[0].value, min_value, private_neighbors[0].tag == FAR);
-   //++++var c100 = select(private_neighbors[1].value, min_value, private_neighbors[1].tag == FAR);
-   //++++var c010 = select(private_neighbors[2].value, min_value, private_neighbors[2].tag == FAR);
-   //++++var c110 = select(private_neighbors[3].value, min_value, private_neighbors[3].tag == FAR);
-   //++++var c001 = select(private_neighbors[4].value, min_value, private_neighbors[4].tag == FAR);
-   //++++var c101 = select(private_neighbors[5].value, min_value, private_neighbors[5].tag == FAR);
-   //++++var c011 = select(private_neighbors[6].value, min_value, private_neighbors[6].tag == FAR);
-   //++++var c111 = select(private_neighbors[7].value, min_value, private_neighbors[7].tag == FAR);
-
-   //++++// let c = mapRange(0.0, 
-   //++++//                  64.0,
-   //++++//     	     0.0,
-   //++++//     	     255.0, 
-   //++++//     	     f32(actual_index)
-   //++++// );
-
-   //++++let c = rgba_u32(min(step_counter, 255u),
-   //++++                 0u,
-   //++++                 255u - min(step_counter, 255u),
-   //++++     	    255u);
-
-   //++++// Draw the current point on ray and arrows to the neighbor cells. 
-   //++++// if ((private_global_index.x & 1023u) == 0u) {
-   //++++//     output_aabb[atomicAdd(&counter[2], 1u)] =  
-   //++++//           AABB (
-   //++++//               vec4<f32>(pah.x - 0.3,
-   //++++//                         pah.y - 0.3,
-   //++++//                         pah.z - 0.3,
-   //++++//                         bitcast<f32>(c)),
-   //++++//               vec4<f32>(pah.x + 0.3,
-   //++++//                         pah.y + 0.3,
-   //++++//                         pah.z + 0.3,
-   //++++//                         0.0),
-   //++++//     );
-
-   //++++//     let known_color = rgba_u32(155u, 0u, 0u, 255u);
-   //++++//     let outside_color = rgba_u32(0u, 0u, 255u, 255u);
-
-   //++++//     for (var i: i32 =  0 ; i<8 ; i = i + 1) {
-   //++++//         let col = select(known_color, outside_color, private_neighbors[i].tag == OUTSIDE); 
-   //++++//         let size = select(0.1, 20.0, private_neighbors[i].tag == OUTSIDE); 
-   //++++//         output_arrow[atomicAdd(&counter[1], 1u)] =  
-   //++++//               Arrow (
-   //++++//                   vec4<f32>(pah, 0.0),
-   //++++//                   vec4<f32>(vec3<f32>(get_cell_index(private_neighbors_loc[i])) * 4.0, 0.0),
-   //++++//          	     col,
-   //++++//                   size
-   //++++//         );
-   //++++//     }
-   //++++// }
-
-   //++++// let x_value = x_part * n0 + (1.0 - x_part) * n1;  
-   //++++// let y_value = y_part * n2 + (1.0 - y_part) * n1;  
-   //++++// let z_value = z_part * n0 + (1.0 - z_part) * n1;  
-
-   //++++return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * c000 + 
-   //++++       tx * (1.0 - ty) * (1.0 - tz) * c100 + 
-   //++++       (1.0 - tx) * ty * (1.0 - tz) * c010 + 
-   //++++       tx * ty * (1.0 - tz) * c110 + 
-   //++++       (1.0 - tx) * (1.0 - ty) * tz * c001 + 
-   //++++       tx * (1.0 - ty) * tz * c101 + 
-   //++++       (1.0 - tx) * ty * tz * c011 + 
-   //++++       tx * ty * tz * c111; 
-
- 
-   //++ var point_counter = 0u;
-   //++ let base_point = vec3<i32>(floor(p));
-
-   //++ let tcc = total_cell_count();
-   //++ var weight = 0.0;
-   //++ var val = 0.0;
-
-   //++ // for (var i:u32 = 0u ; i < 64u ; i = i + 1u) {
-   //++ for (var i:u32 = 0u ; i < 27u ; i = i + 1u) {
-   //++     
-   //++     let temp_point = vec3<i32>(index_to_uvec3(i, 3u, 3u)) - vec3<i32>(1, 1, 1) + base_point;
-   //++     //let temp_point = vec3<i32>(index_to_uvec3(i, 4u, 4u)) - vec3<i32>(1, 1, 1) + base_point;
-   //++     let dist = distance(vec3<f32>(temp_point), p); 
-   //++     //if (dist < 1.41421356237 && isInside(temp_point)) {
-   //++     if (dist < 1.0 && isInside(temp_point)) {
-   //++     //if (dist < 2.0 && isInside(temp_point)) {
-   //++         let t_w = abs(dist - 1.0);
-   //++         //let t_w = abs(dist - 1.41421356237);
-   //++         let mem = get_cell_mem_location(vec3<u32>(temp_point));
-   //++         let fmm_cell= fmm_data[mem];
-   //++         val = val + t_w * fmm_cell.value;
-   //++         weight = weight + t_w;
-
-   //++         // if (private_global_index.x == 0u) {
-   //++         //     output_arrow[atomicAdd(&counter[1], 1u)] =  
-   //++         //           Arrow (
-   //++         //               vec4<f32>(p * 4.0, 0.0),
-   //++         //               vec4<f32>(vec3<f32>(temp_point) * 4.0, 0.0),
-   //++         //               //vec4<f32>(tMins, 0.0),
-   //++         //               //vec4<f32>(tMaxes, 0.0),
-   //++         //               rgba_u32(155u, 0u, 1550u, 255u),
-   //++         //               0.1
-   //++         //     );
-   //++         // }
-   //++     }
-   //++ }
-
-   //++ return val / weight;
-
-   // var neighbors: array<vec3<i32>, 8> = array<vec3<i32>, 8>(
-   //     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  0),
-   //     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  0),
-   //     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  0),
-   //     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  0),
-   //     vec3<i32>(floor(p)) + vec3<i32>(0,  0,  1),
-   //     vec3<i32>(floor(p)) + vec3<i32>(1,  0,  1),
-   //     vec3<i32>(floor(p)) + vec3<i32>(0,  1,  1),
-   //     vec3<i32>(floor(p)) + vec3<i32>(1,  1,  1),
-   // );
-
-   // let w0 = distance(p, vec3<f32>(neighbors[0])); 
-   // let w1 = distance(p, vec3<f32>(neighbors[1])); 
-   // let w2 = distance(p, vec3<f32>(neighbors[2])); 
-   // let w3 = distance(p, vec3<f32>(neighbors[3])); 
-   // let w4 = distance(p, vec3<f32>(neighbors[4])); 
-   // let w5 = distance(p, vec3<f32>(neighbors[5])); 
-   // let w6 = distance(p, vec3<f32>(neighbors[6])); 
-   // let w7 = distance(p, vec3<f32>(neighbors[7])); 
-
-   // let factor0 = select(1.0, 0.0, private_neighbors[0].tag == OUTSIDE);
-   // let factor1 = select(1.0, 0.0, private_neighbors[1].tag == OUTSIDE);
-   // let factor2 = select(1.0, 0.0, private_neighbors[2].tag == OUTSIDE);
-   // let factor3 = select(1.0, 0.0, private_neighbors[3].tag == OUTSIDE);
-   // let factor4 = select(1.0, 0.0, private_neighbors[4].tag == OUTSIDE);
-   // let factor5 = select(1.0, 0.0, private_neighbors[5].tag == OUTSIDE);
-   // let factor6 = select(1.0, 0.0, private_neighbors[6].tag == OUTSIDE);
-   // let factor7 = select(1.0, 0.0, private_neighbors[7].tag == OUTSIDE);
-
-   //++ var w = private_neighbors[0].value * (sqrt(2.0) - w0) * factor0 + // * factor0 +
-   //++         private_neighbors[1].value * (sqrt(2.0) - w1) * factor1 + // * factor1 +
-   //++         private_neighbors[2].value * (sqrt(2.0) - w2) * factor2 + // * factor2 +
-   //++         private_neighbors[3].value * (sqrt(2.0) - w3) * factor3 + // * factor3 +
-   //++         private_neighbors[4].value * (sqrt(2.0) - w4) * factor4 + // * factor4 +
-   //++         private_neighbors[5].value * (sqrt(2.0) - w5) * factor5 + // * factor5 +
-   //++         private_neighbors[6].value * (sqrt(2.0) - w6) * factor6 + // * factor6 +
-   //++         private_neighbors[7].value * (sqrt(2.0) - w7) * factor7;  // * factor7 ;
-
-   //++ return w / (w0 * factor0 + w1 * factor1 + w2 * factor2 + w3 * factor3 + w4 * factor4 + w5 * factor5 + w6 * factor6 + w7 * factor7); // Zero? 
-
-   //return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value + // * c000_factor + 
-   //       tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value + // * c100_factor+ 
-   //       (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value + // * c010_factor+ 
-   //       tx * ty * (1.0 - tz) * private_neighbors[3].value + // * c110_factor+ 
-   //       (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value + // * c001_factor+ 
-   //       tx * (1.0 - ty) * tz * private_neighbors[5].value + // * c101_factor+ 
-   //       (1.0 - tx) * ty * tz * private_neighbors[6].value + // * c011_factor+ 
-   //       tx * ty * tz * private_neighbors[7].value; // * c111_factor; 
-   // return (1.0 - tx) * (1.0 - ty) * (1.0 - tz) * private_neighbors[0].value * factor0 + // * c000_factor + 
-   //        tx * (1.0 - ty) * (1.0 - tz) * private_neighbors[1].value * factor1 + // * c100_factor+ 
-   //        (1.0 - tx) * ty * (1.0 - tz) * private_neighbors[2].value * factor2 + // * c010_factor+ 
-   //        tx * ty * (1.0 - tz) * private_neighbors[3].value * factor3 + // * c110_factor+ 
-   //        (1.0 - tx) * (1.0 - ty) * tz *  private_neighbors[4].value * factor4 + // * c001_factor+ 
-   //        tx * (1.0 - ty) * tz * private_neighbors[5].value * factor5 + // * c101_factor+ 
-   //        (1.0 - tx) * ty * tz * private_neighbors[6].value * factor6 + // * c011_factor+ 
-   //        tx * ty * tz * private_neighbors[7].value * factor7; // * c111_factor; 
 }
+
+fn resampleGradientAndDistance(p: vec3<f32>) -> vec4<f32> {
+
+    var sample = fmm_value(p, false);
+
+    var sample0: vec3<f32>;
+    var sample1: vec3<f32>;
+
+    let size = 1.5;
+    let step = 1.0 / size;
+
+    sample0.x = fmm_value(p - vec3<f32>(step, 0.0, 0.0), false); 
+    sample0.y = fmm_value(p - vec3<f32>(0.0, step, 0.0), false); 
+    sample0.z = fmm_value(p - vec3<f32>(0.0, 0.0, step), false); 
+
+    sample1.x = fmm_value(p + vec3<f32>(step, 0.0, 0.0), false); 
+    sample1.y = fmm_value(p + vec3<f32>(0.0, step, 0.0), false); 
+    sample1.z = fmm_value(p + vec3<f32>(0.0, 0.0, step), false); 
+
+    let scaledPosition = p * size - 0.5;
+    let fraction = scaledPosition - floor(scaledPosition);
+    let correctionPolynomial = (fraction * (fraction - 1.0)) / 2.0;
+    sample += dot((sample0 - sample * 2.0 + sample1), correctionPolynomial);
+    return vec4<f32>(normalize(sample1 - sample0), sample);
+}
+
 
 /// Calculate normal using fmm neighbors.
 fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
@@ -1099,14 +872,19 @@ fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
 /// Function tha is called on ray hit. TODO: separate gradien calculation to another function.
 fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    fmm_value((*payload).intersection_point, true);
+    //fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
     // (*payload).color = fmm_color((*payload).intersection_point);
-    (*payload).color = rgba_u32(255u, 0u, 0u, 255u);
+    // final_color = hsv2rgb(rgb2hsv(final_color) - vec3<f32>(2.8, 0.0, 0.0));
+
+    let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(sphere_tracer_params.isovalue * 0.01, sphere_tracer_params.isovalue * 0.01, 0.0));
+    (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u); 
+
     //(*payload).color = fmm_color_nearest((*payload).intersection_point);
-    (*payload).normal = calculate_normal(payload);
+    //(*payload).normal = calculate_normal(payload);
     (*payload).visibility = 1.0;
     diffuse(ray, payload);
+
 }
 
 /// Checks if a given value is inside the fmm domain.
@@ -1277,7 +1055,13 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         //     }
              return;
         }
-        distance_to_interface = fmm_value(p, false) - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
+        // distance_to_interface = fmm_value(p, false) - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
+	let dist_norm = resampleGradientAndDistance(p);
+        distance_to_interface = dist_norm.w - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
+        dist = dist + distance_to_interface;
+        p = getPoint(dist, ray);
+        (*payload).intersection_point = p;
+        (*payload).normal = dist_norm.xyz;
 
         if (step_counter > 0u &&
 	    sphere_tracer_params.draw_circles == 1u &&
@@ -1306,25 +1090,11 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 	//let delta = abs(distance_to_interface - sphere_tracer_params.isovalue)
         if (abs(distance_to_interface) < 0.01) { // sphere_tracer_params.isovalue) {
 
-	    // var temp_distance = dist;
-	    //var temp_p = p;
-            //var nearest_color = fmm_color_nearest(p);
-            //var black = rgba_u32(0u, 0u, 0u, 255u);
-	    //for (var b: i32 = 1; b < 10 ; b = b + 1) {
-	    //    p = temp_p;
-	    //    if (nearest_color != black) { break; } 
-            //    load_neighbors_private(vec3<u32>(temp_p));
-	    //    temp_distance = temp_distance + 0.01;
-            //    temp_p = getPoint(temp_distance, ray);
-            //    nearest_color = fmm_color_nearest(temp_p);
-            //}
-	    //dist = temp_distance;
-            (*payload).intersection_point = p;
+            (*payload).opacity = dist;
             hit(ray, payload);
             return;
         }
         step_counter = step_counter + 1u;
-        dist = dist + distance_to_interface;
     } // while
 
     (*payload).intersection_point = p;
