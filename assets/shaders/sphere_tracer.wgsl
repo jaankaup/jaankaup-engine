@@ -1070,7 +1070,7 @@ fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
     var grad: vec3<f32>;
 
     var pos = (*payload).intersection_point;
-    var offset = 0.05;
+    var offset = 0.01;
     // var right = sdBox(vec3(pos.x+offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
     // var left = sdBox(vec3(pos.x-offset, pos.y,pos.z), vec3<f32>(50.0, 50.0, 50.0));
     // var up = sdBox(vec3(pos.x, pos.y+offset,pos.z), vec3<f32>(50.0, 50.0, 50.0));
@@ -1101,7 +1101,7 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
     fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
-    //(*payload).color = fmm_color((*payload).intersection_point);
+    // (*payload).color = fmm_color((*payload).intersection_point);
     (*payload).color = rgba_u32(255u, 0u, 0u, 255u);
     //(*payload).color = fmm_color_nearest((*payload).intersection_point);
     (*payload).normal = calculate_normal(payload);
@@ -1303,7 +1303,8 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         //++ }
 
         //if (abs(distance_to_interface) < 0.03) {
-        if (abs(distance_to_interface) < sphere_tracer_params.isovalue) {
+	//let delta = abs(distance_to_interface - sphere_tracer_params.isovalue)
+        if (abs(distance_to_interface) < 0.01) { // sphere_tracer_params.isovalue) {
 
 	    // var temp_distance = dist;
 	    //var temp_p = p;
