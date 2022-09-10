@@ -757,34 +757,12 @@ fn fmm_color(p: vec3<f32>) -> u32 {
 
 fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
 
-   if (!isInside(vec3<i32>(p))) { return 0.1; }
 
    load_neighbors_private(vec3<u32>(floor(p)), render);
 
    let tx = fract(p.x);
    let ty = fract(p.y);
    let tz = fract(p.z);
-
-   // let c000 = private_neighbors[0].value;
-   // let c100 = private_neighbors[1].value; 
-   // let c010 = private_neighbors[2].value;
-   // let c110 = private_neighbors[3].value; 
-   // let c001 = private_neighbors[4].value;
-   // let c101 = private_neighbors[5].value; 
-   // let c011 = private_neighbors[6].value; 
-   // let c111 = private_neighbors[7].value; 
-
-   // let c00 = c000 * (1.0 - tx) + c100 * tx; 
-   // let c01 = c001 * (1.0 - tx) + c101 * tx; 
-   // let c10 = c010 * (1.0 - tx) + c110 * tx; 
-   // let c11 = c011 * (1.0 - tx) + c111 * tx; 
-
-   // let c0 = c00 * (1.0 - ty) + c10 * ty;
-   // let c1 = c01 * (1.0 - ty) + c11 * ty;
-
-   // let c = c0 * (1.0 - tz) + c1 * tz; 
-
-   // return c;
 
    let c000 = private_neighbors[0].value;
    let c100 = private_neighbors[1].value; 
@@ -794,6 +772,8 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    let c101 = private_neighbors[5].value; 
    let c011 = private_neighbors[6].value; 
    let c111 = private_neighbors[7].value; 
+
+   // let min_of_cs = min(min(min(min(min(min(min(c000,c100), c010),c110),c001),c101),c011),c111) + 1.0; 
 
    let c00 = c000 * (1.0 - tx) + c100 * tx; 
    let c01 = c010 * (1.0 - tx) + c110 * tx; 
@@ -806,9 +786,11 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    //let c = c1 * (1.0 - tz) + c0 * tz; 
    let c = c0 * (1.0 - tz) + c1 * tz; 
 
+   //++ if (!isInside(vec3<i32>(p)) || c > 1000.0) {
+   //++     return abs(min_of_cs);
+   //++ }
 
-
-   return c;
+   return c; //abs(c);
 }
 
 fn resampleGradientAndDistance(p: vec3<f32>) -> vec4<f32> {
@@ -818,8 +800,8 @@ fn resampleGradientAndDistance(p: vec3<f32>) -> vec4<f32> {
     var sample0: vec3<f32>;
     var sample1: vec3<f32>;
 
-    let size = 1.5;
-    let step = 1.0 / size;
+    let size = 1.0;
+    let step = 0.2 / size;
 
     sample0.x = fmm_value(p - vec3<f32>(step, 0.0, 0.0), false); 
     sample0.y = fmm_value(p - vec3<f32>(0.0, step, 0.0), false); 
@@ -874,11 +856,10 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
     //fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
-    // (*payload).color = fmm_color((*payload).intersection_point);
-    // final_color = hsv2rgb(rgb2hsv(final_color) - vec3<f32>(2.8, 0.0, 0.0));
+    (*payload).color = fmm_color((*payload).intersection_point);
 
-    let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(sphere_tracer_params.isovalue * 0.01, sphere_tracer_params.isovalue * 0.01, 0.0));
-    (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u); 
+    // let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(sphere_tracer_params.isovalue * 0.01, sphere_tracer_params.isovalue * 0.01, 0.0));
+    // (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u); 
 
     //(*payload).color = fmm_color_nearest((*payload).intersection_point);
     //(*payload).normal = calculate_normal(payload);
@@ -1059,6 +1040,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 	let dist_norm = resampleGradientAndDistance(p);
         distance_to_interface = dist_norm.w - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
         dist = dist + distance_to_interface;
+        //dist = dist + abs(distance_to_interface);
         p = getPoint(dist, ray);
         (*payload).intersection_point = p;
         (*payload).normal = dist_norm.xyz;
