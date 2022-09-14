@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["jaankaup <janne.a.kauppinen@student.jyu.fi>"]
 edition = "2021"
 
+[features]
+gpu_debug = ["jaankaup_core/gpu_debug"]
+
 [dependencies]
 jaankaup_core = { path = "../jaankaup_core" }
 jaankaup_models = { path = "../assets/models" }

@@ -1,11 +1,10 @@
 use std::mem::size_of;
-use crate::fmm_things::{FmmPrefixParams, FmmCellPc, FmmBlock};
+use crate::fmm_things::{FmmPrefixParams, FmmCellPc};
 use crate::common_functions::{udiv_up_safe32, encode_rgba_u32};
 use crate::fmm_things::FmmValueFixer;
 use crate::fmm_things::PointCloudParamsBuffer;
 use std::convert::TryInto;
 use crate::buffer::buffer_from_data;
-use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use crate::render_object::{ComputeObject, create_bind_groups};
@@ -18,14 +17,14 @@ use crate::gpu_timer::GpuTimer;
 /// Tag value for a unknow cell.
 const OTHER: u32  = 0;
 
-/// Tag value for a remedy cell.
-const REMEDY: u32 = 1;
-
-/// Tag value for active cell.
-const ACTIVE: u32 = 2;
-
-/// Tag value for Source cell.
-const SOURCE: u32 = 3;
+// /// Tag value for a remedy cell.
+// const REMEDY: u32 = 1;
+// 
+// /// Tag value for active cell.
+// const ACTIVE: u32 = 2;
+// 
+// /// Tag value for Source cell.
+// const SOURCE: u32 = 3;
 
 /// Tag value for outside cell.
 const OUTSIDE: u32 = 4;
@@ -151,7 +150,8 @@ impl FastIterativeMethod {
     pub fn init(device: &wgpu::Device,
                 global_dimension: [u32; 3],
                 local_dimension: [u32; 3],
-                gpu_debugger: &Option<&GpuDebugger>,
+                gpu_debugger: &Option<GpuDebugger>,
+                // gpu_debugger: &Option<&GpuDebugger>,
                 ) -> Self {
 
         // TODO: assertions for local and global dimension.
@@ -184,8 +184,13 @@ impl FastIterativeMethod {
                     &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("dummy_fim.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/dummy_fim.wgsl"))),
-
+                            if cfg!(not(target_arch = "wasm32")) {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/dummy_fim.wgsl"))
+                            }
+                            else {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/wasm/dummy_fim.wgsl"))
+                            }
+                        ),
                     }),
                     Some("FastIterativeMethod dummy ComputeObject"),
                     &vec![
@@ -287,6 +292,7 @@ impl FastIterativeMethod {
                                                                exclusive_parts_start_index: number_of_fmm_cells as u32,
                                                                exclusive_parts_end_index: number_of_fmm_cells as u32 + 2048,});
 
+        #[cfg(feature = "gpu_debug")]
         let compute_object_bind_groups = create_bind_groups(
                 &device,
                 &compute_object.bind_group_layout_entries,
@@ -301,11 +307,35 @@ impl FastIterativeMethod {
                         &fim_histogram.get_histogram_buffer().as_entire_binding(),
                     ],
                     vec![
-                        &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_element_counter_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_chars_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_arrows_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
+        );
+
+        // TODO: create a shader without gpu_debugger bindings.
+        #[cfg(not(feature = "gpu_debug"))]
+        let compute_object_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_prefix_params.as_entire_binding(),
+                        &fmm_params_buffer.get_buffer().as_entire_binding(),
+                        &active_list.as_entire_binding(),
+                        &fim_data.as_entire_binding(),
+                        &fim_histogram.get_histogram_buffer().as_entire_binding(),
+                    ],
+                    vec![
+                        &fim_data.as_entire_binding(), // TODO: shader without gpu_debug bindings.
+                        &fim_data.as_entire_binding(), // TODO: shader without gpu_debug bindings.
+                        &fim_data.as_entire_binding(), // TODO: shader without gpu_debug bindings.
+                        &fim_data.as_entire_binding(), // TODO: shader without gpu_debug bindings.
+                        &fim_data.as_entire_binding(), // TODO: shader without gpu_debug bindings.
                     ],
                 ]
         );
@@ -316,8 +346,13 @@ impl FastIterativeMethod {
                     &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("pc_to_interface_fmm.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/pc_to_interface_fmm.wgsl"))),
-
+                            if cfg!(not(target_arch = "wasm32")) {
+                                Cow::Borrowed(include_str!("../../assets/shaders/pc_to_interface_fmm.wgsl"))
+                            }
+                            else {
+                                Cow::Borrowed(include_str!("../../assets/shaders/pc_to_interface_fmm_wasm.wgsl"))
+                            }
+                        ),
                     }),
                     Some("Cloud data to fmm Compute object fmm"),
                     &vec![
@@ -407,7 +442,12 @@ impl FastIterativeMethod {
              1, 1, 1, Some("Point data to interface dispatch")
          );
 
-         self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(self.calculate_cell_count(), 1024), 1, 1]);
+         if cfg!(not(target_arch = "wasm32")) {
+             self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(self.calculate_cell_count(), 1024), 1, 1]);
+         }
+         else {
+             self.fmm_value_fixer.dispatch(encoder, [udiv_up_safe32(self.calculate_cell_count(), 256), 1, 1]);
+         }
     }
 
     pub fn fim_iteration(&mut self, encoder: &mut wgpu::CommandEncoder, gpu_timer: &mut Option<GpuTimer>) {
@@ -416,6 +456,7 @@ impl FastIterativeMethod {
         // let number_of_dispatches_64 = udiv_up_safe32(self.calculate_cell_count(), 64);
         // let number_of_dispatches_128 = udiv_up_safe32(self.calculate_cell_count(), 128);
         let number_of_dispatches_256 = udiv_up_safe32(self.calculate_cell_count(), 256);
+        // let number_of_dispatches_1024 = udiv_up_safe32(self.calculate_cell_count(), 256);
         let number_of_dispatches_2048 = udiv_up_safe32(self.calculate_cell_count(), 2048);
         // println!("number_of_dispatches == {}", number_of_dispatches);
         // println!("number_of_dispatches_64 == {}", number_of_dispatches_64);
@@ -484,11 +525,6 @@ impl FastIterativeMethod {
                     &self.fim_data.as_entire_binding(),
                     &pc_data.as_entire_binding(),
                     &self.sample_data.as_entire_binding(),
-                    //&gpu_debugger.get_element_counter_buffer().as_entire_binding(),
-                    // &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
-                    // &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
-                    // &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
-                    // &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
                     ],
                 ]
         );
@@ -522,8 +558,13 @@ impl FastIterativeMethod {
                     &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("create_initial_active_cells.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/create_initial_active_cells.wgsl"))),
-
+                            if cfg!(not(target_arch = "wasm32")) {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/create_initial_active_cells.wgsl"))
+                            }
+                            else {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/wasm/create_initial_active_cells.wgsl"))
+                            }
+                        ),
                     }),
                     Some("Create initial active cells ComputeObject"),
                     &vec![
@@ -558,8 +599,13 @@ impl FastIterativeMethod {
                     &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("update_phase.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/update_phase.wgsl"))),
-
+                            if cfg!(not(target_arch = "wasm32")) {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/update_phase.wgsl"))
+                            }
+                            else {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/wasm/update_phase.wgsl"))
+                            }
+                        ),
                     }),
                     Some("Update phase ComputeObject"),
                     &vec![
@@ -593,8 +639,13 @@ impl FastIterativeMethod {
                     &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("pre_remedy.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/pre_remedy.wgsl"))),
-
+                            if cfg!(not(target_arch = "wasm32")) {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/pre_remedy.wgsl"))
+                            }
+                            else {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/wasm/pre_remedy.wgsl"))
+                            }
+                        ),
                     }),
                     Some("Pre-remedy ComputeObject"),
                     &vec![
@@ -632,8 +683,13 @@ impl FastIterativeMethod {
                     &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                         label: Some("remedy_phase.wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
-                            Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/remedy_phase.wgsl"))),
-
+                            if cfg!(not(target_arch = "wasm32")) {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/remedy_phase.wgsl"))
+                            }
+                            else {
+                                Cow::Borrowed(include_str!("../../assets/shaders/fim_shaders/wasm/remedy_phase.wgsl"))
+                            }
+                        ),
                     }),
                     Some("Remedy phase ComputeObject"),
                     &vec![

@@ -15,6 +15,8 @@ pub struct SphereTracerParams {
     pub render_samplers: u32,
     pub isovalue: f32,
     pub draw_circles: u32,
+    pub color_mode: u32,
+    pub padding: u32,
 }
 
 #[repr(C)]
@@ -48,10 +50,11 @@ impl SphereTracer {
                 render_samplers: bool,
                 isovalue: f32,
                 draw_circles: u32,
+                color_mode: u32,
                 fmm_params: &wgpu::Buffer,
                 fmm_data: &wgpu::Buffer,
                 camera_buffer: &wgpu::Buffer,
-                gpu_debugger: &Option<&GpuDebugger>,
+                gpu_debugger: &Option<GpuDebugger>,
                 ) -> Self {
 
         let st_compute_object =
@@ -114,6 +117,8 @@ impl SphereTracer {
             render_samplers: if render_samplers { 1 } else { 0 },
             isovalue: isovalue,
             draw_circles: draw_circles,
+            color_mode: color_mode,
+            padding: 0,
         };
 
         let sphere_tracer_buffer = buffer_from_data::<SphereTracerParams>(
@@ -137,6 +142,7 @@ impl SphereTracer {
             mapped_at_creation: false,
         });
 
+        #[cfg(feature = "gpu_debug")]
         let st_bind_groups = create_bind_groups(
                 &device,
                 &st_compute_object.bind_group_layout_entries,
@@ -151,11 +157,35 @@ impl SphereTracer {
                         &output_buffer_color.as_entire_binding(),
                     ],
                     vec![
-                        &gpu_debugger.unwrap().get_element_counter_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_chars_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_arrows_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_aabbs_buffer().as_entire_binding(),
-                        &gpu_debugger.unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_element_counter_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_chars_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_arrows_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                        &gpu_debugger.as_ref().unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
+        );
+
+        #[cfg(not(feature = "gpu_debug"))]
+        let st_bind_groups = create_bind_groups(
+                &device,
+                &st_compute_object.bind_group_layout_entries,
+                &st_compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                        &fmm_params.as_entire_binding(),
+                        &sphere_tracer_buffer.as_entire_binding(),
+                        &camera_buffer.as_entire_binding(),
+                        &fmm_data.as_entire_binding(),
+                        // &output_buffer.as_entire_binding(),
+                        &output_buffer_color.as_entire_binding(),
+                    ],
+                    vec![
+                        &output_buffer_color.as_entire_binding(), // TODO: shader without gpu_debugger bindings.
+                        &output_buffer_color.as_entire_binding(), // TODO: shader without gpu_debugger bindings.
+                        &output_buffer_color.as_entire_binding(), // TODO: shader without gpu_debugger bindings.
+                        &output_buffer_color.as_entire_binding(), // TODO: shader without gpu_debugger bindings.
+                        &output_buffer_color.as_entire_binding(), // TODO: shader without gpu_debugger bindings.
                     ],
                 ]
         );

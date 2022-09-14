@@ -91,6 +91,8 @@ struct SphereTracerParams {
     render_samplers: u32,
     isovalue: f32,
     draw_circles: u32,
+    color_mode: u32,
+    padding: u32,
 };
 
 @group(0) @binding(0) var<uniform>            fmm_params: FmmParams;
@@ -773,7 +775,7 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    let c011 = private_neighbors[6].value; 
    let c111 = private_neighbors[7].value; 
 
-   // let min_of_cs = min(min(min(min(min(min(min(c000,c100), c010),c110),c001),c101),c011),c111) + 1.0; 
+   let min_of_cs = min(min(min(min(min(min(min(c000,c100), c010),c110),c001),c101),c011),c111); // + 1.0; 
 
    let c00 = c000 * (1.0 - tx) + c100 * tx; 
    let c01 = c010 * (1.0 - tx) + c110 * tx; 
@@ -786,22 +788,23 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    //let c = c1 * (1.0 - tz) + c0 * tz; 
    let c = c0 * (1.0 - tz) + c1 * tz; 
 
-   //++ if (!isInside(vec3<i32>(p)) || c > 1000.0) {
-   //++     return abs(min_of_cs);
-   //++ }
+   // if (!isInside(vec3<i32>(p)) || c > 1000.0) {
+   if (c > 400.0) {
+       return min_of_cs;
+   }
 
    return c; //abs(c);
 }
 
 fn resampleGradientAndDistance(p: vec3<f32>) -> vec4<f32> {
 
-    var sample = fmm_value(p, false);
+    var samp = fmm_value(p, false);
 
     var sample0: vec3<f32>;
     var sample1: vec3<f32>;
 
-    let size = 1.0;
-    let step = 0.2 / size;
+    let size = 0.5;
+    let step = 0.4 / size;
 
     sample0.x = fmm_value(p - vec3<f32>(step, 0.0, 0.0), false); 
     sample0.y = fmm_value(p - vec3<f32>(0.0, step, 0.0), false); 
@@ -814,8 +817,8 @@ fn resampleGradientAndDistance(p: vec3<f32>) -> vec4<f32> {
     let scaledPosition = p * size - 0.5;
     let fraction = scaledPosition - floor(scaledPosition);
     let correctionPolynomial = (fraction * (fraction - 1.0)) / 2.0;
-    sample += dot((sample0 - sample * 2.0 + sample1), correctionPolynomial);
-    return vec4<f32>(normalize(sample1 - sample0), sample);
+    samp += dot((sample0 - samp * 2.0 + sample1), correctionPolynomial);
+    return vec4<f32>(normalize(sample1 - sample0), samp);
 }
 
 
@@ -1038,12 +1041,15 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         }
         // distance_to_interface = fmm_value(p, false) - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
 	let dist_norm = resampleGradientAndDistance(p);
-        distance_to_interface = dist_norm.w - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
-        dist = dist + distance_to_interface;
-        //dist = dist + abs(distance_to_interface);
-        p = getPoint(dist, ray);
         (*payload).intersection_point = p;
-        (*payload).normal = dist_norm.xyz;
+        //distance_to_interface = abs(dist_norm.w) - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
+        // distance_to_interface = sphere_tracer_params.isovalue - abs(dist_norm.w);  // max(min(0.01 * dist, 0.2), 0.001);
+        //distance_to_interface = dist_norm.w;  // max(min(0.01 * dist, 0.2), 0.001);
+        // dist = dist + distance_to_interface;
+        //dist = dist + abs(distance_to_interface);
+        //+++ p = getPoint(dist, ray);
+        //+++ (*payload).intersection_point = p;
+        //+++ (*payload).normal = dist_norm.xyz;
 
         if (step_counter > 0u &&
 	    sphere_tracer_params.draw_circles == 1u &&
@@ -1070,16 +1076,18 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
         //if (abs(distance_to_interface) < 0.03) {
 	//let delta = abs(distance_to_interface - sphere_tracer_params.isovalue)
-        if (abs(distance_to_interface) < 0.01) { // sphere_tracer_params.isovalue) {
+        //if (abs(dist_norm.w - sphere_tracer_params.isovalue) < 0.01) { // sphere_tracer_params.isovalue) {
+        if (dist_norm.w < 0.01) { // sphere_tracer_params.isovalue) {
 
             (*payload).opacity = dist;
+            (*payload).normal = dist_norm.xyz;
             hit(ray, payload);
             return;
         }
         step_counter = step_counter + 1u;
+	dist = dist + dist_norm.w;
     } // while
 
-    (*payload).intersection_point = p;
 }
 
 // fn box_intersect(aabb_min: vec<f32>, aabb_max: vec<f32>, result: ptr<function, f32>, canStartInBox: bool) -> bool {

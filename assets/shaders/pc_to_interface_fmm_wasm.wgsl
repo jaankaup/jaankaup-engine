@@ -175,7 +175,7 @@ fn index_to_uvec3(index: u32, dim_x: u32, dim_y: u32) -> vec3<u32> {
 }
 
 @compute
-@workgroup_size(1024,1,1)
+@workgroup_size(256,1,1)
 fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         @builtin(local_invocation_index) local_index: u32,
         @builtin(workgroup_id) work_group_id: vec3<u32>,
@@ -198,7 +198,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //           );
     // }
 
-    let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
+    let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 256u);
 
     let min_distance = 0.57;
     //let min_distance = 0.55;
@@ -212,7 +212,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	//}
 	workgroupBarrier();
 
-        let actual_index = i * 1024u + local_index;
+        let actual_index = i * 256u + local_index;
 
         // var nearest_cell: vec3<i32>;
 
@@ -263,34 +263,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		}
             }
             
-            //++ nearest_cell = vec3<i32>(i32(round(p.position.x)),
-            //++                          i32(round(p.position.y)),
-            //++                          i32(round(p.position.z)));
-
-            //++ // Check if cell is inside the computational domain.
-            //++ let inside = isInside(nearest_cell);
-
-            //++ // Calculate the distance between point and nearest cell.
-            //++ let dist = distance(p.position, vec3<f32>(nearest_cell)) - min_distance;
-	    //++ //let sign_of_dist = select(f, t, dist - min_distance < 0.0); 
-
-            //++ // 0.045 => 45000
-            //++ var dist_to_i32 = i32(dist * 1000000.0);
-
-            //++ let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
-            //++ //var up_date = false;
-
-            //++ // If inside update distance.
-            //++ //if (inside && abs(dist) < min_distance) {
-            //++ if (inside) { 
-
-	    //++     // var the_color = decode_color(p.color).xyz;
-
-	    //++     // up_date = select(false, true, the_color.x > 0.05 || the_color.y > 0.05 || the_color.z > 0.05);
-            //++     
-            //++     atomicMin(&fmm_data[memory_index].value, dist_to_i32);
-            //++     // atomicMin(&fmm_data[memory_index].value, dist_to_i32);
-            //++ }
         } // if
 
         workgroupBarrier(); 
@@ -303,90 +275,5 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		}
 	    }
         }
-        // storageBarrier(); 
-
-        // if (actual_index < point_cloud_params.point_count && inside && abs(dist) < min_distance) {
-        //++ if (actual_index < point_cloud_params.point_count && inside) {
-
-        //++     let memory_index = get_cell_mem_location(vec3<u32>(nearest_cell));
-
-        //++     var final_value = atomicLoad(&fmm_data[memory_index].value);
-
-        //++     // Update the color and tag.
-        //++     if (final_value == dist_to_i32) {
-
-        //++         // Add sign.
-        //++         // if (dist < 0.0) { final_value = final_value | (1u << 31u); }
-
-        //++         atomicExchange(&fmm_data[memory_index].color, p.color);
-        //++         fmm_data[memory_index].tag = KNOWN; // SOURCE
-        //++         // atomicExchange(&fmm_data[memory_index].value, final_value);
-
-        //++         //++ output_arrow[atomicAdd(&counter[1], 1u)] =  
-        //++         //++       Arrow (
-        //++         //++           4.0 * vec4<f32>(vec3<f32>(p.position), 0.0),
-        //++         //++           4.0 * vec4<f32>(vec3<f32>(nearest_cell), 0.0),
-        //++         //++           //fmm_data[memory_index].color,
-        //++         //++           p.color,
-        //++         //++           0.05
-        //++         //++ );
-        //++     }
-        //++ }
     }
-    // workgroupBarrier(); 
-
-    // for (var i: u32 = 0u; i < number_of_chunks; i = i + 1u) { 
-
-    //     var p: VVVC;
-    //     let actual_index = i * 1024u + local_index;
-    //     let base_point = vec3<i32>(floor(p.position));
-
-    //     if (actual_index < point_cloud_params.point_count) {
-
-    //         p = point_data[actual_index];
-
-    //         let base_mem = get_cell_mem_location(vec3<u32>(base_point));
-    //         var base_cell= fmm_data[base_mem];
-    //         if (base_cell.tag != KNOWN) { continue; }
-
-    //         // COLORS
-    //         for (var i:u32 = 0u ; i < 64u ; i = i + 1u) {
-
-    //         //for (var i:u32 = 0u ; i < 32u ; i = i + 1u) {
-    //             //let temp_point = vec3<i32>(index_to_uvec3(i, 3u, 3u)) - vec3<i32>(1, 1, 1) + base_point;
-    //             let temp_point = vec3<i32>(index_to_uvec3(i, 4u, 4u)) - vec3<i32>(1, 1, 1) + base_point;
-    //             let dist = distance(vec3<f32>(temp_point), p.position); 
-    //             //if (dist < 1.41421356237 && isInside(temp_point)) {
-    //             if (dist < 2.0 && isInside(temp_point) ) {
-    //             //if (dist < 1.0) {
-    //             //if (dist < 2.0 && isInside(temp_point)) {
-    //                 //let t_w = abs(dist - 1.0);
-
-    //                 //let t_w = pow(abs(dist - 1.41421356237), 2.0);
-    //                 //let t_w = abs(dist - 2.0) / 2.0;
-    //                 //let t_w = abs(dist - 1.0);
-    //                 let mem = get_cell_mem_location(vec3<u32>(temp_point));
-    //                 var fmm_cell= fmm_data[mem];
-    //                 if (fmm_cell.tag != KNOWN) { 
-    //                     atomicStore(&fmm_data[mem].color, p.color);
-    //                     //atomicStore(&fmm_data[mem].color, vec4_to_rgba(decode_color(fmm_cell.color) * 0.8));
-    //                 }
-    //                 // val = val + t_w * decode_color(fmm_cell.color);
-    //                 // weight = weight + t_w;
-
-    //                 // if (private_global_index.x == 0u) {
-    //                 //     output_arrow[atomicAdd(&counter[1], 1u)] =  
-    //                 //           Arrow (
-    //                 //               vec4<f32>(p * 4.0, 0.0),
-    //                 //               vec4<f32>(vec3<f32>(temp_point) * 4.0, 0.0),
-    //                 //               //vec4<f32>(tMins, 0.0),
-    //                 //               //vec4<f32>(tMaxes, 0.0),
-    //                 //               fmm_cell.color,
-    //                 //               0.1
-    //                 //     );
-    //                 // }
-    //             }
-    //         }
-    //     }
-    // }
 }

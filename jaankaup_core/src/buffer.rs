@@ -50,7 +50,7 @@ pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod + std::marker::
     encoder.copy_buffer_to_buffer(buffer, 0, &staging_buffer, 0, copy_size);
     queue.submit(Some(encoder.finish()));
 
-    let mut res: Vec<T>;
+    let res: Vec<T>;
 
     let buffer_slice = staging_buffer.slice(..);
     //++ let (sender, receiver) = futures_intrusive::channel::shared::oneshot_channel();

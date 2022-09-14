@@ -1,7 +1,6 @@
 use std::num::NonZeroU32;
 use jaankaup_core::two_triangles::TwoTriangles;
-use std::mem::size_of;
-use jaankaup_core::fmm_things::FmmBlock;
+// use jaankaup_core::fmm_things::FmmBlock;
 use jaankaup_core::fmm_things::PointCloudParamsBuffer;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -30,7 +29,7 @@ enum CameraMode {
 
 use jaankaup_core::{wgpu, log};
 use jaankaup_core::winit;
-use jaankaup_core::buffer::{buffer_from_data, to_vec};
+use jaankaup_core::buffer::{buffer_from_data};
 use jaankaup_core::model_loader::{TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
 use jaankaup_core::gpu_debugger::GpuDebugger;
@@ -40,8 +39,8 @@ use jaankaup_core::shaders::{RenderVvvvnnnnCamera};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
 use jaankaup_core::render_object::{draw, RenderObject, ComputeObject, create_bind_groups};
 use jaankaup_core::texture::Texture;
-use jaankaup_core::fmm_things::{PointCloud, FmmCellPc};
-use jaankaup_core::fast_marching_method::{FastMarchingMethod, FmmState};
+use jaankaup_core::fmm_things::PointCloud;
+// use jaankaup_core::fast_marching_method::{FastMarchingMethod, FmmState};
 use jaankaup_core::fast_iterative_method::{FastIterativeMethod};
 use jaankaup_core::sphere_tracer::{SphereTracer, SphereTracerParams};
 use bytemuck::{Pod, Zeroable};
@@ -79,18 +78,18 @@ const TOTAL_INDICES: usize = 32*16*32*4*4*4; // FMM_GLOBAL_X * FMM_GLOBAL_Y * FM
 // const FMM_GLOBAL_X: usize = 62;
 // const FMM_GLOBAL_Y: usize = 16;
 // const FMM_GLOBAL_Z: usize = 54;
-// const FMM_GLOBAL_X: usize = 70;
-// const FMM_GLOBAL_Y: usize = 18;
-// const FMM_GLOBAL_Z: usize = 60;
+const FMM_GLOBAL_X: usize = 70;
+const FMM_GLOBAL_Y: usize = 18;
+const FMM_GLOBAL_Z: usize = 60;
 // const FMM_GLOBAL_X: usize = 82;
 // const FMM_GLOBAL_Y: usize = 17;
 // const FMM_GLOBAL_Z: usize = 58;
 // const FMM_GLOBAL_X: usize = 100;
 // const FMM_GLOBAL_Y: usize = 22;
 // const FMM_GLOBAL_Z: usize = 76;
-const FMM_GLOBAL_X: usize = 116;
-const FMM_GLOBAL_Y: usize = 25;
-const FMM_GLOBAL_Z: usize = 89;
+// const FMM_GLOBAL_X: usize = 116;
+// const FMM_GLOBAL_Y: usize = 25;
+// const FMM_GLOBAL_Z: usize = 89;
 
 const FMM_INNER_X: usize = 4;
 const FMM_INNER_Y: usize = 4;
@@ -137,13 +136,31 @@ impl WGPUFeatures for FmmAppFeatures {
 
     fn required_limits() -> wgpu::Limits {
         let mut limits = wgpu::Limits::default();
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
         limits.max_compute_invocations_per_workgroup = 1024;
+        }
+
+        #[cfg(not(target_arch = "wasm32"))] 
+        {
         limits.max_compute_workgroup_size_x = 1024;
+        }
+
         limits.max_storage_buffers_per_shader_stage = 10;
-        limits.max_push_constant_size = 4;
-        limits.max_push_constant_size = 4;
+
+        #[cfg(not(target_arch = "wasm32"))] 
+        {
+        limits.max_push_constant_size = 4; // Now useless.
+        }
+
+        #[cfg(not(target_arch = "wasm32"))] 
+        {
+        limits.max_push_constant_size = 4; // Now useless.
+        }
+
         //limits.max_compute_workgroup_size_x = 65536 * 2;
-        limits.max_storage_buffer_binding_size = 436101120; 
+        //limits.max_storage_buffer_binding_size = 436101120; 
         //limits.max_storage_buffer_binding_size = 256819200; 
         //limits.max_storage_buffer_binding_size = 154275840; 
         // limits.max_compute_workgroups_per_dimension = 65536 * 2;
@@ -157,7 +174,7 @@ struct FmmApp {
     camera: Camera,
     ray_camera: Camera,
     camera_mode: CameraMode,
-    gpu_debugger: GpuDebugger,
+    gpu_debugger: Option<GpuDebugger>,
     gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
     screen: ScreenTexture, 
@@ -167,7 +184,7 @@ struct FmmApp {
     triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     point_cloud: PointCloud,
-    compute_bind_groups_fmm_visualizer: Vec<wgpu::BindGroup>,
+    compute_bind_groups_fmm_visualizer: Option<Vec<wgpu::BindGroup>>,
     compute_object_fmm_visualizer: ComputeObject,
     render_vvvvnnnn: RenderVvvvnnnnCamera,
     render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
@@ -200,16 +217,13 @@ impl Application for FmmApp {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.2);
 
-        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (0.0, 0.0, 0.0), -89.0, 0.0);
+        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 100.0, 400.0), -89.0, 0.0);
         ray_camera.set_rotation_sensitivity(0.4);
         ray_camera.set_movement_sensitivity(0.05);
 
         let camera_mode = CameraMode::RayCamera;
 
         ray_camera.set_focal_distance(1.0, &configuration.queue);
-        // ray_camera.set_restriction_area([0.0, 0.0, 0.0],
-        //                             [(FMM_GLOBAL_X * FMM_INNER_X * 4) as f32, (FMM_GLOBAL_Y * FMM_INNER_Y * 4) as f32, (FMM_GLOBAL_Z * FMM_INNER_Z * 4)  as f32]); 
-        // ray_camera.enable_restriction_area(true);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,
@@ -219,16 +233,13 @@ impl Application for FmmApp {
              update: false,
         };
 
-        print!("Creating Gpu debugger   ");
-        // Gpu debugger.
-        let gpu_debugger = create_gpu_debugger( &configuration.device, &configuration.sc_desc, &mut camera);
-        println!("OK");
+        #[cfg(feature = "gpu_debug")]
+        let gpu_debugger: Option<GpuDebugger> = create_gpu_debugger(&configuration.device, &configuration.sc_desc, &mut camera).into();
 
-        print!("Creating Gpu timer   ");
-        // Gpu timer.
-        //let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer")).unwrap();
+        #[cfg(not(feature = "gpu_debug"))]
+        let gpu_debugger = None;
+
         let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
-        println!("OK");
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
         let keyboard_manager = create_keyboard_manager();
@@ -369,11 +380,15 @@ impl Application for FmmApp {
         //                                    &Some(&gpu_debugger),
         // );
 
+        println!("yhhyyy");
+        // #[cfg(feature = "gpu_debug")]
         let mut fim = FastIterativeMethod::init(&configuration.device,
                                                global_dimension,
                                                local_dimension,
-                                               &Some(&gpu_debugger),
+                                               &gpu_debugger
+                                               //&Some(&gpu_debugger),
         );
+        println!("yhhyyy2");
 
         //++ fmm.add_point_cloud_data(&configuration.device,
         //++                          &point_cloud.get_buffer(),
@@ -449,8 +464,9 @@ impl Application for FmmApp {
             None)
         );
 
+        #[cfg(feature = "gpu_debug")]
         let compute_bind_groups_fmm_visualizer =
-            create_bind_groups(
+            Some(create_bind_groups(
                 &configuration.device,
                 &compute_object_fmm_visualizer.bind_group_layout_entries,
                 &compute_object_fmm_visualizer.bind_group_layouts,
@@ -459,14 +475,17 @@ impl Application for FmmApp {
                          &buffers.get(&"fmm_visualization_params".to_string()).unwrap().as_entire_binding(),
                          &fim.get_fim_data_buffer().as_entire_binding(),
                          //&fmm.get_fmm_data_buffer().as_entire_binding(),
-                         &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
-                         &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                         &gpu_debugger.as_ref().unwrap().get_element_counter_buffer().as_entire_binding(),
+                         &gpu_debugger.as_ref().unwrap().get_output_chars_buffer().as_entire_binding(),
+                         &gpu_debugger.as_ref().unwrap().get_output_arrows_buffer().as_entire_binding(),
+                         &gpu_debugger.as_ref().unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                         &gpu_debugger.as_ref().unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
                     ]
                 ]
-        );
+        ));
+
+        #[cfg(not(feature = "gpu_debug"))]
+        let compute_bind_groups_fmm_visualizer = None;
 
         let mut encoder = configuration.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
@@ -506,6 +525,8 @@ impl Application for FmmApp {
                 render_samplers: 0,
                 isovalue: 0.015,
                 draw_circles: 0,
+                color_mode: 0,
+                padding: 0,
         };
 
         let sphere_tracer = SphereTracer::init(
@@ -516,12 +537,14 @@ impl Application for FmmApp {
                 if sphere_tracer_params.render_samplers == 0 {false} else {true},
                 sphere_tracer_params.isovalue,
                 sphere_tracer_params.draw_circles,
+                0, // TODO: enum
                 //[192, 320],
                 fim.get_fmm_params_buffer(),
                 fim.get_fim_data_buffer(),
                 //fmm.get_fmm_data_buffer(),
                 &ray_camera.get_ray_camera_uniform(&configuration.device),
-                &Some(&gpu_debugger)
+                &gpu_debugger
+                //&Some(&gpu_debugger)
         );
 
 
@@ -553,7 +576,7 @@ impl Application for FmmApp {
             sphere_tracer: sphere_tracer,
             sphere_tracer_renderer: sphere_tracer_renderer,
             sphere_tracer_params: sphere_tracer_params,
-            draw_two_triangles: false,
+            draw_two_triangles: true,
             fim: fim,
          }
     }
@@ -623,8 +646,9 @@ impl Application for FmmApp {
 
         queue.submit(Some(encoder.finish())); 
 
+        #[cfg(feature = "gpu_debug")]
         if !self.draw_two_triangles {
-            self.gpu_debugger.render(
+            self.gpu_debugger.as_mut().unwrap().render(
                       &device,
                       &queue,
                       &view,
@@ -635,10 +659,12 @@ impl Application for FmmApp {
         }
     
         //self.gpu_debugger.reset_element_counters(&queue);
-        self.gpu_debugger.reset_chars(&device, &queue);
-        self.gpu_debugger.reset_arrows(&device, &queue);
-        self.gpu_debugger.reset_aabbs(&device, &queue);
-        self.gpu_debugger.reset_aabb_wires(&device, &queue);
+        #[cfg(feature = "gpu_debug")] {
+        self.gpu_debugger.as_mut().unwrap().reset_chars(&device, &queue);
+        self.gpu_debugger.as_mut().unwrap().reset_arrows(&device, &queue);
+        self.gpu_debugger.as_mut().unwrap().reset_aabbs(&device, &queue);
+        self.gpu_debugger.as_mut().unwrap().reset_aabb_wires(&device, &queue);
+        }
 
         self.screen.prepare_for_rendering();
     }
@@ -651,6 +677,7 @@ impl Application for FmmApp {
         }
 
         // Far.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::Key1, input) {
             let bit = if get_bit(self.app_render_params.visualization_method, 0) == 0 { true } else { false };
             self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 0, bit);
@@ -658,6 +685,7 @@ impl Application for FmmApp {
         }
 
         // Band.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::Key2, input) {
             let bit = if get_bit(self.app_render_params.visualization_method, 1) == 0 { true } else { false };
             self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 1, bit);
@@ -665,6 +693,7 @@ impl Application for FmmApp {
         }
 
         // Known.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::Key3, input) {
             let bit = if get_bit(self.app_render_params.visualization_method, 2) == 0 { true } else { false };
             self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 2, bit);
@@ -676,6 +705,7 @@ impl Application for FmmApp {
         }
         
         // Numbers.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::N, input) {
             let bit = if get_bit(self.app_render_params.visualization_method, 6) == 0 { true } else { false };
             self.app_render_params.visualization_method = set_bit_to(self.app_render_params.visualization_method, 6, bit);
@@ -722,21 +752,25 @@ impl Application for FmmApp {
         }
 
         // Draw spheres.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::Key9, input) {
                 self.sphere_tracer_params.draw_circles = 1;
                 self.sphere_tracer.draw_circles(queue, self.sphere_tracer_params.draw_circles);
         }
         // Hide spheres.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::Key8, input) {
                 self.sphere_tracer_params.draw_circles = 0;
                 self.sphere_tracer.draw_circles(queue, self.sphere_tracer_params.draw_circles);
         }
         // Render samplers.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::Key7, input) {
                 self.sphere_tracer_params.render_samplers = 1;
                 self.sphere_tracer.render_samplers(queue, self.sphere_tracer_params.render_samplers);
         }
         // Hide samplers.
+        #[cfg(feature = "gpu_debug")]
         if self.keyboard_manager.test_key(&Key::Key6, input) {
                 self.sphere_tracer_params.render_samplers = 0;
                 self.sphere_tracer.render_samplers(queue, self.sphere_tracer_params.render_samplers);
@@ -837,9 +871,11 @@ impl Application for FmmApp {
         // println!("disp_x == {}, disp_y == {}", disp_x, disp_y);
 
         // Cell visualizer.
+
+        #[cfg(feature = "gpu_debug")]
         if self.app_render_params.visualization_method != 0 {
             self.compute_object_fmm_visualizer.dispatch(
-                &self.compute_bind_groups_fmm_visualizer,
+                &self.compute_bind_groups_fmm_visualizer.as_ref().unwrap(),
                 &mut encoder,
                 // (FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z) as u32, 1, 1,
                 dispatch_x, 1, 1,
