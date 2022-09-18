@@ -6,6 +6,9 @@ use jaankaup_core::template::{
         BasicLoop,
         Spawner,
 };
+
+#[cfg(target_arch = "wasm32")]
+use jaankaup_core::template::OffscreenCanvasSetup;
 use jaankaup_core::render_object::draw;
 use jaankaup_core::input::*;
 use jaankaup_core::camera::Camera;
@@ -171,6 +174,8 @@ impl Application for BasicApp {
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
+              #[cfg(target_arch = "wasm32")]
+              offscreen_canvas_setup: &OffscreenCanvasSetup,
               spawner: &Spawner) {
 
         self.screen.acquire_screen_texture(
@@ -201,7 +206,12 @@ impl Application for BasicApp {
 
         queue.submit(Some(encoder.finish())); 
 
+
+        #[cfg(not(target_arch = "wasm32"))]
         self.screen.prepare_for_rendering();
+
+        #[cfg(target_arch = "wasm32")]
+        self.screen.prepare_for_rendering(offscreen_canvas_setup);
     }
 
     fn input(&mut self, queue: &wgpu::Queue, input_cache: &InputCache) {

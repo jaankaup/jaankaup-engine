@@ -43,16 +43,15 @@ simple_logger = "1.16.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="191537021e6f7504beee9961c16b3245b72e194b" }
 getrandom = { version = "0.2.7", features = ["js"] }
-# web-sys = "0.3.57"
-# js-sys = "0.3.57"
-# wasm-bindgen = "0.2.80"
-# wasm-bindgen-futures = "0.4.30"
-web-sys = "0.3.58"
-js-sys = "0.3.58"
-wasm-bindgen = "0.2.81"
-wasm-bindgen-futures = "0.4.31"
+web-sys = "0.3.60"
+js-sys = "0.3.60"
+wasm-bindgen = "0.2.83"
+wasm-bindgen-futures = "0.4.33"
+# web-sys = "0.3.58"
+# js-sys = "0.3.58"
+# wasm-bindgen = "0.2.81"
+# wasm-bindgen-futures = "0.4.31"
 wasm-timer = "0.2.5"
 console_error_panic_hook = "0.1.6"
 console_log = "0.1.2"

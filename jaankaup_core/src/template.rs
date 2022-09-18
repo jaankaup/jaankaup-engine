@@ -1,5 +1,13 @@
 use std::future::Future;
 
+#[cfg(target_arch = "wasm32")]
+use web_sys::{ImageBitmapRenderingContext, OffscreenCanvas};
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowExtWebSys;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
+
+
 #[cfg(not(target_arch = "wasm32"))]
 use simple_logger::SimpleLogger;
 
@@ -27,6 +35,8 @@ pub trait Application: Sized + 'static {
               //swap_chain: &mut wgpu::SwapChain,
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
+              #[cfg(target_arch = "wasm32")]
+              offscreen_canvas_setup: &OffscreenCanvasSetup,
               spawner: &Spawner);
 
     /// A function that handles inputs.
@@ -37,6 +47,12 @@ pub trait Application: Sized + 'static {
 
     /// A function for updating the state of the application.
     fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner);
+}
+
+#[cfg(target_arch = "wasm32")]
+pub struct OffscreenCanvasSetup {
+    pub offscreen_canvas: OffscreenCanvas,
+    pub bitmap_renderer: ImageBitmapRenderingContext,
 }
 
 /// A trait for Loops.
@@ -61,6 +77,9 @@ pub struct WGPUConfiguration {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub sc_desc: wgpu::SurfaceConfiguration,
+    #[cfg(target_arch = "wasm32")]
+    pub offscreen_canvas_setup: OffscreenCanvasSetup,
+    //pub offscreen_canvas_setup: Option<OffscreenCanvasSetup>
 }
 
 /// A trait to configure wgpu-rs engine.
@@ -105,7 +124,9 @@ impl Loop for BasicLoop {
         adapter,
         device,
         mut queue,
-        mut sc_desc 
+        mut sc_desc,
+        #[cfg(target_arch = "wasm32")]
+        offscreen_canvas_setup
         //adapter_limits
         }: WGPUConfiguration,) {
 
@@ -127,7 +148,10 @@ impl Loop for BasicLoop {
                 &mut sc_desc,
                 &mut application,
                 &mut input,
-                &spawner);
+                &spawner,
+                #[cfg(target_arch = "wasm32")]
+                &offscreen_canvas_setup
+                );
 
         *control_flow = ControlFlow::Poll;
         //*control_flow = ControlFlow::Wait;
@@ -185,7 +209,11 @@ impl Loop for BasicLoop {
                 }
             }
             Event::RedrawRequested(_) => {
+                #[cfg(not(target_arch = "wasm32"))]
                 application.render(&device, &mut queue /* &mut swap_chain */, &surface, &sc_desc, &spawner);
+
+                #[cfg(target_arch = "wasm32")]
+                application.render(&device, &mut queue /* &mut swap_chain */, &surface, &sc_desc, &offscreen_canvas_setup, &spawner);
             }
             _ => { } // Any other events
         } // match event
@@ -252,6 +280,26 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
 
     log::info!("Initializing the surface...");
 
+    log::info!("Creating offscreen canvas...");
+
+    //let mut offscreen_canvas_setup: Option<OffscreenCanvasSetup> = None;
+
+    #[cfg(target_arch = "wasm32")]
+    let offscreen_canvas = OffscreenCanvas::new(1024, 768).expect("couldn't create OffscreenCanvas");
+
+    #[cfg(target_arch = "wasm32")]
+    let bitmap_renderer = window
+        .canvas()
+        .get_context("bitmaprenderer")
+        .expect("couldn't create ImageBitmapRenderingContext (Result)")
+        .expect("couldn't create ImageBitmapRenderingContext (Option)")
+        .dyn_into::<ImageBitmapRenderingContext>()
+        .expect("couldn't convert into ImageBitmapRenderingContext");
+
+    //offscreen_canvas_setup = Some(OffscreenCanvasSetup {
+    #[cfg(target_arch = "wasm32")]
+    let offscreen_canvas_setup = OffscreenCanvasSetup { offscreen_canvas, bitmap_renderer, };
+
     let backend = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::PRIMARY);
     //let backend = wgpu::Backends::GL;
     
@@ -268,10 +316,26 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     log::info!("power_preference = {:?}", power_preference);
     let instance = wgpu::Instance::new(backend);
     let (size, surface) = unsafe {
+
         let size = window.inner_size();
+
+        #[cfg(not(target_arch = "wasm32"))]
         let surface = instance.create_surface(&window);
+
+        #[cfg(target_arch = "wasm32")]
+        let surface = instance .create_surface_from_offscreen_canvas(&offscreen_canvas_setup.offscreen_canvas);
+        //     if let Some(offscreen_canvas_setup) = &offscreen_canvas_setup {
+        //         log::info!("Creating surface from OffscreenCanvas");
+        //         instance
+        //             .create_surface_from_offscreen_canvas(&offscreen_canvas_setup.offscreen_canvas)
+        //     } else {
+        //         instance.create_surface(&window)
+        //     }
+        // };
+
         (size, surface)
     };
+
     let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, backend, Some(&surface))
         .await
         .expect("No suitable GPU adapters found on the system!");
@@ -350,6 +414,8 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
             device: device,
             queue: queue,
             sc_desc: sc_desc,
+            #[cfg(target_arch = "wasm32")]
+            offscreen_canvas_setup,
     })
 }
 

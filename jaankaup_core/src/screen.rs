@@ -1,5 +1,7 @@
 use std::mem;
 use crate::texture::Texture;
+#[cfg(target_arch = "wasm32")]
+use crate::template::OffscreenCanvasSetup;
 
 /// A struct that owns the current wgpu::SurfaceTexture and the optional depth texture.
 /// TODO: getter_functions for attributes
@@ -60,73 +62,35 @@ impl ScreenTexture {
     /// This must be called so the texture can be actually rendered to the screen. Call this method
     /// after wgpu::Queue::submit.
     //pub fn prepare_for_rendering(&mut self) {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn prepare_for_rendering(&mut self) {
-
         if self.surface_texture.is_none() {
             panic!("ScreenTexture doesn't have a surface_texture. Consider calling the ScreenTexture::acquire_screen_texture before this method.");
         }
 
         mem::take(&mut self.surface_texture).unwrap().present();
     }
-    
-    
-    // pub fn draw(encoder: &mut wgpu::CommandEncoder,
-    //         //frame: &wgpu::SurfaceFrame,
-    //         view: &wgpu::TextureView,
-    //         depth_texture: &jaankaup::Texture,
-    //         bind_groups: &Vec<wgpu::BindGroup>,
-    //         pipeline: &wgpu::RenderPipeline,
-    //         draw_buffer: &wgpu::Buffer,
-    //         range: Range<u32>,
-    //         clear: bool) {
 
-    //     let mut render_pass = encoder.begin_render_pass(
-    //             &wgpu::RenderPassDescriptor {
-    //                 label: Some("two_triangles_rendes_pass_descriptor"),
-    //                 color_attachments: &[
-    //                     wgpu::RenderPassColorAttachment {
-    //                             view: &view,
-    //                             resolve_target: None,
-    //                             ops: wgpu::Operations {
-    //                                 load: match clear {
-    //                                     true => {
-    //                                         wgpu::LoadOp::Clear(wgpu::Color {
-    //                                             r: 0.0,
-    //                                             g: 0.0,
-    //                                             b: 0.0,
-    //                                             a: 1.0,
-    //                                         })
-    //                                     }
-    //                                     false => {
-    //                                         wgpu::LoadOp::Load
-    //                                     }
-    //                                 },
-    //                                 store: true,
-    //                             },
-    //                     }
-    //                 ],
-    //             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-    //                 view: &depth_texture.view,
-    //                 depth_ops: Some(wgpu::Operations {
-    //                         load: match clear { true => wgpu::LoadOp::Clear(1.0), false => wgpu::LoadOp::Load },
-    //                         store: true,
-    //                 }),
-    //                 stencil_ops: None,
-    //                 }),
-    //         });
+    #[cfg(target_arch = "wasm32")]
+    pub fn prepare_for_rendering(&mut self, offscreen_canvas_setup: &OffscreenCanvasSetup) {
 
-    //         render_pass.set_pipeline(&pipeline);
-    //         // Set bind groups.
-    //         for (e, bgs) in bind_groups.iter().enumerate() {
-    //             render_pass.set_bind_group(e as u32, &bgs, &[]);
-    //         }
+        if self.surface_texture.is_none() {
+            panic!("ScreenTexture doesn't have a surface_texture. Consider calling the ScreenTexture::acquire_screen_texture before this method.");
+        }
 
-    //         // Set vertex buffer.
-    //         render_pass.set_vertex_buffer(
-    //             0,
-    //             draw_buffer.slice(..)
-    //         );
+        mem::take(&mut self.surface_texture).unwrap().present();
 
-    //         render_pass.draw(range, 0..1);
-    // }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let image_bitmap = offscreen_canvas_setup
+                .offscreen_canvas
+                .transfer_to_image_bitmap()
+                .expect("couldn't transfer offscreen canvas to image bitmap.");
+            offscreen_canvas_setup
+                .bitmap_renderer
+                .transfer_from_image_bitmap(&image_bitmap);
+
+            log::info!("Transferring OffscreenCanvas to ImageBitmapRenderer");
+        }
+    }
 }
