@@ -775,7 +775,7 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    let c011 = private_neighbors[6].value; 
    let c111 = private_neighbors[7].value; 
 
-   let min_of_cs = min(min(min(min(min(min(min(c000,c100), c010),c110),c001),c101),c011),c111); // + 1.0; 
+   // let min_of_cs = min(min(min(min(min(min(min(c000,c100), c010),c110),c001),c101),c011),c111); // + 1.0; 
 
    let c00 = c000 * (1.0 - tx) + c100 * tx; 
    let c01 = c010 * (1.0 - tx) + c110 * tx; 
@@ -789,9 +789,9 @@ fn fmm_value(p: vec3<f32>, render: bool) -> f32 {
    let c = c0 * (1.0 - tz) + c1 * tz; 
 
    // if (!isInside(vec3<i32>(p)) || c > 1000.0) {
-   if (c > 400.0) {
-       return min_of_cs;
-   }
+   // if (c > 400.0) {
+   //     return min_of_cs;
+   // }
 
    return c; //abs(c);
 }
@@ -1186,7 +1186,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     ray.rMax = 800.0;
 
     var payload: RayPayload;
-    payload.color = rgba_u32(0u, 0u, 0u, 0u);
+    payload.color = rgba_u32(255u, 0u, 0u, 0u);
     payload.visibility = 0.0;
 
     traceRay(&ray, &payload);
@@ -1206,8 +1206,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
         output_aabb[atomicAdd(&counter[2], 1u)] =  
               AABB (
-                  vec4<f32>(focal_point * 4.0 - vec3<f32>(2.2), f32(rgba_u32(255u, 0u, 2550u, 255u))),
-                  vec4<f32>(focal_point * 4.0 + vec3<f32>(2.2), 0.0),
+                  vec4<f32>(focal_point * 4.0 - vec3<f32>(1.2), f32(rgba_u32(255u, 0u, 2550u, 255u))),
+                  vec4<f32>(focal_point * 4.0 + vec3<f32>(1.2), 0.0),
         );
         output_arrow[atomicAdd(&counter[1], 1u)] =  
               Arrow (
@@ -1215,7 +1215,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                   vec4<f32>(focal_point * 4.0 + camera.view * 19.0, 0.0),
                   //vec4<f32>(result.intersection_point, 0.0),
                   rgba_u32(255u, 0u, 2550u, 255u),
-                  1.0
+                  0.5
         );
         // let renderable_element = Char (
         //                 // element_position,
@@ -1258,18 +1258,16 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         // );
     }
     // Rays.
-    //++if (private_local_index.x == 0u && payload.color != rgba_u32(0u, 0u, 0u, 255u)) {
-    //++    output_arrow[atomicAdd(&counter[1], 1u)] =  
-    //++          Arrow (
-    //++              vec4<f32>(ray.origin * 4.0, 0.0),
-    //++              vec4<f32>(payload.intersection_point * 4.0, 0.0),
-    //++              //vec4<f32>(result.intersection_point, 0.0),
-    //++              rgba_u32_argb(payload.color),
-    //++              //rgba_u32(0u, 2550u, 0u, 255u),
-    //++              //payload.color,
-    //++              0.01
-    //++    );
-    //++}
+    // if ((private_local_index.x == 0u || private_local_index.x == 42u) && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
+    if (private_local_index.x == 0u && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
+        output_arrow[atomicAdd(&counter[1], 1u)] =  
+              Arrow (
+                  vec4<f32>(ray.origin * 4.0, 0.0),
+                  vec4<f32>(payload.intersection_point * 4.0, 0.0),
+                  rgba_u32_argb(payload.color),
+                  0.3
+        );
+    }
     // Scene aabb.
     //++ if (global_id.x == 0u) {
     //++     let aabbmin = vec3<f32>(0.0, 0.0, 0.0);

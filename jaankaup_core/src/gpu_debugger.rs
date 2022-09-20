@@ -168,14 +168,23 @@ impl GpuDebugger {
         // This must be given to the shaders that uses GpuDebugger.
         let histogram_element_counter = Histogram::init(&device, &vec![0; 4]);
 
+        // let light = LightBuffer::create(
+        //               &device,
+        //               [100.0, 100.0, 100.0],
+        //               [25, 125, 25],
+        //               [255,255,255],
+        //               55.0,
+        //               0.15,
+        //               0.00013
+        // );
         let light = LightBuffer::create(
                       &device,
-                      [100.0, 100.0, 100.0],
-                      [25, 125, 25],
-                      [255,255,255],
-                      55.0,
+                      [250.0, 250.0, 250.0], // pos
+                      [125, 125, 130],  // spec
+                      [155,155,255], // light 
+                      255.0,
                       0.15,
-                      0.00013
+                      0.0000013
         );
 
         let arrow_aabb_params = ArrowAabbParams {

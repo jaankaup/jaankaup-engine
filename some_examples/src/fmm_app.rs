@@ -223,7 +223,7 @@ impl Application for FmmApp {
 
         let camera_mode = CameraMode::RayCamera;
 
-        ray_camera.set_focal_distance(1.0, &configuration.queue);
+        ray_camera.set_focal_distance(10.0, &configuration.queue);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: false,
@@ -244,15 +244,19 @@ impl Application for FmmApp {
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
         let keyboard_manager = create_keyboard_manager();
 
+        let scene_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32;
+        let scene_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32;
+        let scene_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32;
+
         // Light source for triangle meshes.
         let light = LightBuffer::create(
                       &configuration.device,
-                      [25.0, 55.0, 25.0], // pos
+                      [scene_x * 0.5, scene_y * 1.25, scene_z * 0.5], // pos
                       [25, 25, 130],  // spec
                       [255,200,255], // light 
-                      55.0,
+                      255.0,
                       0.35,
-                      0.000013
+                      0.00013
         );
 
         // Scale_factor for triangle meshes.
@@ -316,9 +320,6 @@ impl Application for FmmApp {
 
 
         // Generate the point cloud.
-        let scene_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32;
-        let scene_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32;
-        let scene_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32;
 
         let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string(), scene_x, scene_y, scene_z);
 
