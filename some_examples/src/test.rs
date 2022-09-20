@@ -210,7 +210,14 @@ impl Application for TestProject {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         // Generate the point cloud.
-        let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
+        // let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string());
+          
+        // Generate the point cloud.
+        let scene_x = (FMM_GLOBAL_X * FMM_INNER_X) as f32;
+        let scene_y = (FMM_GLOBAL_Y * FMM_INNER_Y) as f32;
+        let scene_z = (FMM_GLOBAL_Z * FMM_INNER_Z) as f32;
+        let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string(), scene_x, scene_y, scene_z);
+
         println!("Point cloud generated.");
 
         println!("Generate fmm sample data.");
@@ -227,6 +234,7 @@ impl Application for TestProject {
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None)
             );
+
 
         let pc_min_coord = point_cloud.get_min_coord();
         let pc_max_coord = point_cloud.get_max_coord();
@@ -248,6 +256,7 @@ impl Application for TestProject {
 
         let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
 
+
         println!("pc_scale_factor == {}", pc_scale_factor);
 
         let render_params_point_cloud = RenderParamBuffer::create(
@@ -262,7 +271,7 @@ impl Application for TestProject {
                 point_cloud.get_point_count(),
                 pc_min_coord,
                 pc_max_coord,
-                pc_scale_factor, // scale_factor
+                [pc_scale_factor, pc_scale_factor, pc_scale_factor], // scale_factor
                 point_cloud_draw_iterator,
                 show_numbers,
                 &buffers.get("pc_sample_data").unwrap(),
@@ -302,9 +311,20 @@ impl Application for TestProject {
             None)
         );
 
+        // A dummy buffer to keep fmm_value_fixer happy.
+        buffers.insert(
+                "dummy_fixer".to_string(),
+                buffer_from_data::<u32>(
+                    &configuration.device,
+                    &vec![0 ; 1024],
+                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    None
+        ));
+
         let fmm_value_fixer = FmmValueFixer::init(&configuration.device,
                                                   &buffers.get(&"fmm_visualization_params".to_string()).unwrap(),
-                                                  &buffers.get(&"pc_sample_data".to_string()).unwrap()
+                                                  &buffers.get(&"pc_sample_data".to_string()).unwrap(),
+                                                  &buffers.get(&"dummy_fixer".to_string()).unwrap()
         );
 
         // The fmm scene visualizer.

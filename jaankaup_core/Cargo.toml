@@ -13,8 +13,8 @@ texture_debug = []
 
 [dependencies]
 
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="90eb399d4344a73ed723a9a4ab0249fde7bfa3c7" }
-#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="7d138e2e76c0d9bf1f1e573dbafb041bd533e76a" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="b752c7d248a1668ffd954685259b80902307af94" }
+#wgpu = { git = "https://github.com/gfx-rs/wgpu", rev="90eb399d4344a73ed723a9a4ab0249fde7bfa3c7" }
 
 winit = { version = "0.27" }
 cgmath = "0.18"

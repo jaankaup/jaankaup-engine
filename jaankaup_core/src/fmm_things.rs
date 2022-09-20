@@ -455,8 +455,8 @@ pub struct GridDataPc {
 
 /// A struct that offers some functionality for PointCloud data manipulation.
 pub struct PointCloudHandler {
-    //++ compute_object_point_to_interface: ComputeObject,
-    //++ point_to_interface_bind_groups: Vec<wgpu::BindGroup>,
+    compute_object_point_to_interface: ComputeObject,
+    point_to_interface_bind_groups: Vec<wgpu::BindGroup>,
     _fmm_params_buffer: FmmParamsBuffer, // TODO: from parameter, remove this 
     point_cloud_params_buffer: PointCloudParamsBuffer,
 }
@@ -480,72 +480,73 @@ impl PointCloudHandler {
         let fmm_params_buffer = FmmParamsBuffer::create(&device, global_dimension, local_dimension);
         let point_cloud_params_buffer = PointCloudParamsBuffer::create(&device, point_count, aabb_min, aabb_max, scale_factor, thread_group_number, show_numbers);
         
-        //++ let compute_object =
-        //++         ComputeObject::init(
-        //++             &device,
-        //++             &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        //++                 label: Some("point_cloud_to_interface.wgsl"),
-        //++                 source: wgpu::ShaderSource::Wgsl(
-        //++                     Cow::Borrowed(include_str!("../../assets/shaders/point_cloud_to_interface.wgsl"))),
+        let compute_object =
+                ComputeObject::init(
+                    &device,
+                    &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: Some("point_cloud_to_interface.wgsl"),
+                        source: wgpu::ShaderSource::Wgsl(
+                            Cow::Borrowed(include_str!("../../assets/shaders/pc_to_interface_fmm.wgsl"))),
+                            // Cow::Borrowed(include_str!("../../assets/shaders/point_cloud_to_interface.wgsl"))),
 
-        //++             }),
-        //++             Some("Cloud data to fmm Compute object"),
-        //++             &vec![
-        //++                 vec![
-        //++                     // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
-        //++                     create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
+                    }),
+                    Some("Cloud data to fmm Compute object"),
+                    &vec![
+                        vec![
+                            // @group(0) @binding(0) var<uniform> fmm_params: FmmParams;
+                            create_uniform_bindgroup_layout(0, wgpu::ShaderStages::COMPUTE),
  
-        //++                     // @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
-        //++                     create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
+                            // @group(0) @binding(1) var<uniform> point_cloud_params: PointCloudParams;
+                            create_uniform_bindgroup_layout(1, wgpu::ShaderStages::COMPUTE),
  
-        //++                     // @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
-        //++                     create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(2) var<storage, read_write> fmm_data: array<FmmCellPc>;
+                            create_buffer_bindgroup_layout(2, wgpu::ShaderStages::COMPUTE, false),
  
-        //++                     // @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
-        //++                     create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
+                            create_buffer_bindgroup_layout(3, wgpu::ShaderStages::COMPUTE, false),
  
-        //++                     // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
-        //++                     create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(4) var<storage, read_write> sample_data: array<u32>; // not used
+                            create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
  
-        //++                     // @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
-        //++                     create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            //++ // @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
+                            //++ create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
  
-        //++                     // @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
-        //++                     create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                            //++ // @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
+                            //++ create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
  
-        //++                     // @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
-        //++                     create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+                            //++ // @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
+                            //++ create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
  
-        //++                     // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
-        //++                     create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
-        //++                 ],
-        //++             ],
-        //++             &"main".to_string(),
-        //++             None
-        //++ );
+                            //++ // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            //++ create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+                        ],
+                    ],
+                    &"main".to_string(),
+                    None
+        );
  
-        //++ let point_to_interface_bind_groups = create_bind_groups(
-        //++         &device,
-        //++         &compute_object.bind_group_layout_entries,
-        //++         &compute_object.bind_group_layouts,
-        //++         &vec![
-        //++             vec![
-        //++             &fmm_params_buffer.get_buffer().as_entire_binding(),
-        //++             &point_cloud_params_buffer.get_buffer().as_entire_binding(),
-        //++             &fmm_data.as_entire_binding(),
-        //++             &point_data.as_entire_binding(),
-        //++             &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
-        //++             &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
-        //++             &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
-        //++             &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
-        //++             &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
-        //++             ],
-        //++         ]
-        //++ );
+        let point_to_interface_bind_groups = create_bind_groups(
+                &device,
+                &compute_object.bind_group_layout_entries,
+                &compute_object.bind_group_layouts,
+                &vec![
+                    vec![
+                    &fmm_params_buffer.get_buffer().as_entire_binding(),
+                    &point_cloud_params_buffer.get_buffer().as_entire_binding(),
+                    &fmm_data.as_entire_binding(),
+                    &fmm_data.as_entire_binding(), // This is useless.
+                    // &gpu_debugger.get_element_counter_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_chars_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_arrows_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_aabbs_buffer().as_entire_binding(),
+                    // &gpu_debugger.get_output_aabb_wires_buffer().as_entire_binding(),
+                    ],
+                ]
+        );
  
         Self {
-             //++ compute_object_point_to_interface: compute_object,
-             //++ point_to_interface_bind_groups: point_to_interface_bind_groups,
+             compute_object_point_to_interface: compute_object,
+             point_to_interface_bind_groups: point_to_interface_bind_groups,
              _fmm_params_buffer: fmm_params_buffer,
              point_cloud_params_buffer: point_cloud_params_buffer,
         }
