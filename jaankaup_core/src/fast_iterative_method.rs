@@ -287,10 +287,10 @@ impl FastIterativeMethod {
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 None
         );
-        println!("fmm_prefix_params = {:?}", FmmPrefixParams { data_start_index: 0,
-                                                               data_end_index: (number_of_fmm_cells - 1) as u32,
-                                                               exclusive_parts_start_index: number_of_fmm_cells as u32,
-                                                               exclusive_parts_end_index: number_of_fmm_cells as u32 + 2048,});
+        // println!("fmm_prefix_params = {:?}", FmmPrefixParams { data_start_index: 0,
+        //                                                        data_end_index: (number_of_fmm_cells - 1) as u32,
+        //                                                        exclusive_parts_start_index: number_of_fmm_cells as u32,
+        //                                                        exclusive_parts_end_index: number_of_fmm_cells as u32 + 2048,});
 
         #[cfg(feature = "gpu_debug")]
         let compute_object_bind_groups = create_bind_groups(
@@ -461,8 +461,8 @@ impl FastIterativeMethod {
         // println!("number_of_dispatches == {}", number_of_dispatches);
         // println!("number_of_dispatches_64 == {}", number_of_dispatches_64);
         // println!("number_of_dispatches_128 == {}", number_of_dispatches_128);
-        println!("number_of_dispatches_256 == {}", number_of_dispatches_256);
-        println!("self.calculate_block_count() == {}", self.calculate_block_count());
+        // println!("number_of_dispatches_256 == {}", number_of_dispatches_256);
+        // println!("self.calculate_block_count() == {}", self.calculate_block_count());
         // let number_of_dispatches_prefix = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);
 
         let mut pass = encoder.begin_compute_pass(
@@ -535,9 +535,9 @@ impl FastIterativeMethod {
         self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2] * self.local_dimension[0]  * self.local_dimension[1]  * self.local_dimension[2] 
     }
 
-    fn calculate_block_count(&self) -> u32 {
-        self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]
-    }
+    // fn calculate_block_count(&self) -> u32 {
+    //     self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]
+    // }
 
     pub fn get_fim_data_buffer(&self) -> &wgpu::Buffer {
         &self.fim_data

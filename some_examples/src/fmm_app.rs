@@ -15,11 +15,19 @@ use jaankaup_core::template::{
 };
 use jaankaup_core::common_functions::{
     udiv_up_safe32,
-    create_buffer_bindgroup_layout,
     create_uniform_bindgroup_layout,
+    encode_rgba_u32,
+};
+
+#[cfg(feature = "gpu_debug")]
+use jaankaup_core::common_functions::{
     set_bit_to,
     get_bit,
-    encode_rgba_u32,
+};
+
+#[cfg(feature = "gpu_debug")]
+use jaankaup_core::common_functions::{
+    create_buffer_bindgroup_layout,
 };
 
 #[derive(PartialEq)]
@@ -33,12 +41,15 @@ use jaankaup_core::winit;
 use jaankaup_core::buffer::{buffer_from_data};
 use jaankaup_core::model_loader::{TriangleMesh, create_from_bytes};
 use jaankaup_core::camera::Camera;
+#[cfg(feature = "gpu_debug")]
 use jaankaup_core::gpu_debugger::GpuDebugger;
 use jaankaup_core::gpu_timer::GpuTimer;
 use jaankaup_core::screen::ScreenTexture;
 use jaankaup_core::shaders::{RenderVvvvnnnnCamera};
 use jaankaup_core::render_things::{LightBuffer, RenderParamBuffer};
-use jaankaup_core::render_object::{draw, RenderObject, ComputeObject, create_bind_groups};
+use jaankaup_core::render_object::{draw, RenderObject, create_bind_groups};
+#[cfg(feature = "gpu_debug")]
+use jaankaup_core::render_object::ComputeObject;
 use jaankaup_core::texture::Texture;
 use jaankaup_core::fmm_things::PointCloud;
 // use jaankaup_core::fast_marching_method::{FastMarchingMethod, FmmState};
@@ -175,6 +186,7 @@ struct FmmApp {
     camera: Camera,
     ray_camera: Camera,
     camera_mode: CameraMode,
+    #[cfg(feature = "gpu_debug")]
     gpu_debugger: Option<GpuDebugger>,
     gpu_timer: Option<GpuTimer>,
     keyboard_manager: KeyboardManager,
@@ -185,7 +197,9 @@ struct FmmApp {
     _triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     point_cloud: PointCloud,
+    #[cfg(feature = "gpu_debug")]
     compute_bind_groups_fmm_visualizer: Option<Vec<wgpu::BindGroup>>,
+    #[cfg(feature = "gpu_debug")]
     compute_object_fmm_visualizer: ComputeObject,
     render_vvvvnnnn: RenderVvvvnnnnCamera,
     render_vvvvnnnn_bg: Vec<wgpu::BindGroup>,
@@ -336,14 +350,15 @@ impl Application for FmmApp {
         // let point_cloud_scale_factor_y = pc_max_coord[1] / (FMM_GLOBAL_Y * FMM_INNER_Y) as f32;
         // let point_cloud_scale_factor_z = pc_max_coord[2] / (FMM_GLOBAL_Z * FMM_INNER_Z) as f32;
 
-        println!("point_cloud_scale_factor_x == {}", point_cloud_scale_factor_x);
-        println!("point_cloud_scale_factor_y == {}", point_cloud_scale_factor_y);
-        println!("point_cloud_scale_factor_z == {}", point_cloud_scale_factor_z);
-        println!("point_cloud.get_max_coord() == {:?}", point_cloud.get_max_coord());
+        // println!("point_cloud_scale_factor_x == {}", point_cloud_scale_factor_x);
+        // println!("point_cloud_scale_factor_y == {}", point_cloud_scale_factor_y);
+        // println!("point_cloud_scale_factor_z == {}", point_cloud_scale_factor_z);
+        // println!("point_cloud.get_max_coord() == {:?}", point_cloud.get_max_coord());
 
-        let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
+        // #[cfg(feature = "gpu_debug")]
+        // let pc_scale_factor = point_cloud_scale_factor_x.min(point_cloud_scale_factor_y).min(point_cloud_scale_factor_z);
 
-        println!("pc_scale_factor == {}", pc_scale_factor);
+        // println!("pc_scale_factor == {}", pc_scale_factor);
 
         let pc_params = PointCloudParamsBuffer::create(
             &configuration.device,
@@ -381,15 +396,12 @@ impl Application for FmmApp {
         //                                    &Some(&gpu_debugger),
         // );
 
-        println!("yhhyyy");
         // #[cfg(feature = "gpu_debug")]
         let mut fim = FastIterativeMethod::init(&configuration.device,
                                                global_dimension,
                                                local_dimension,
                                                &gpu_debugger
-                                               //&Some(&gpu_debugger),
         );
-        println!("yhhyyy2");
 
         //++ fmm.add_point_cloud_data(&configuration.device,
         //++                          &point_cloud.get_buffer(),
@@ -400,6 +412,8 @@ impl Application for FmmApp {
 
 
         // The fmm scene visualizer. TODO: fim scene visualizer.
+        
+        #[cfg(feature = "gpu_debug")]
         let compute_object_fmm_visualizer =
                 ComputeObject::init(
                     &configuration.device,
@@ -485,8 +499,8 @@ impl Application for FmmApp {
                 ]
         ));
 
-        #[cfg(not(feature = "gpu_debug"))]
-        let compute_bind_groups_fmm_visualizer = None;
+        // #[cfg(not(feature = "gpu_debug"))]
+        // let compute_bind_groups_fmm_visualizer = None;
 
         let mut encoder = configuration.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
@@ -553,6 +567,7 @@ impl Application for FmmApp {
             camera: camera,
             ray_camera: ray_camera,
             camera_mode: camera_mode,
+            #[cfg(feature = "gpu_debug")]
             gpu_debugger: gpu_debugger,
             gpu_timer: gpu_timer,
             keyboard_manager: keyboard_manager,
@@ -564,7 +579,9 @@ impl Application for FmmApp {
             buffers: buffers,
             //radix radix_sort: radix_sort,
             point_cloud: point_cloud,
+            #[cfg(feature = "gpu_debug")]
             compute_bind_groups_fmm_visualizer: compute_bind_groups_fmm_visualizer,
+            #[cfg(feature = "gpu_debug")]
             compute_object_fmm_visualizer: compute_object_fmm_visualizer,
             render_vvvvnnnn: render_vvvvnnnn,
             render_vvvvnnnn_bg: render_vvvvnnnn_bg,
@@ -587,7 +604,7 @@ impl Application for FmmApp {
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
-              spawner: &Spawner) {
+              _spawner: &Spawner) {
 
         self.screen.acquire_screen_texture(
             &device,
@@ -655,7 +672,7 @@ impl Application for FmmApp {
                       &view,
                       self.screen.depth_texture.as_ref().unwrap(),
                       &mut clear,
-                      spawner
+                      _spawner
             );
         }
     
@@ -819,7 +836,7 @@ impl Application for FmmApp {
     }
 
     #[allow(unused)]
-    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, spawner: &Spawner) {
+    fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, input: &InputCache, _spawner: &Spawner) {
 
         // Step fmm.
         // if self.keyboard_manager.test_key(&Key::B, input) {
@@ -996,6 +1013,7 @@ fn log_adapter_info(adapter: &wgpu::Adapter) {
 }
 
 /// Initialize and create GpuDebugger for this project. TODO: add MAX_... to function parameters.
+#[cfg(feature = "gpu_debug")]
 fn create_gpu_debugger(device: &wgpu::Device,
                        sc_desc: &wgpu::SurfaceConfiguration,
                        camera: &mut Camera) -> GpuDebugger {

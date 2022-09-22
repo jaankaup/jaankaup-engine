@@ -343,7 +343,7 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     #[cfg(not(target_arch = "wasm32"))]
     {
         let adapter_info = adapter.get_info();
-        println!("Using {} ({:?})", adapter_info.name, adapter_info.backend);
+        log::info!("Using {} ({:?})", adapter_info.name, adapter_info.backend);
     }
 
     let optional_features = P::optional_features();
@@ -379,7 +379,7 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     let needed_limits = P::required_limits().using_resolution(adapter.limits());
 
     let trace_dir = std::env::var("WGPU_TRACE");
-    log::info!("trace_dir == {:?}", trace_dir);
+    // log::info!("trace_dir == {:?}", trace_dir);
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
