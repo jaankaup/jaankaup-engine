@@ -395,7 +395,7 @@ impl Application for DebugVisualizator {
               queue: &mut wgpu::Queue,
               surface: &wgpu::Surface,
               sc_desc: &wgpu::SurfaceConfiguration,
-              spawner: &Spawner) {
+              _spawner: &Spawner) {
 
         self.screen.acquire_screen_texture(
             &device,

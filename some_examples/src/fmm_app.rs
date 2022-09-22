@@ -22,6 +22,7 @@ use jaankaup_core::common_functions::{
     encode_rgba_u32,
 };
 
+#[derive(PartialEq)]
 enum CameraMode {
     Camera,
     RayCamera,
@@ -180,8 +181,8 @@ struct FmmApp {
     screen: ScreenTexture, 
     _light: LightBuffer,
     _render_params: RenderParamBuffer,
-    triangle_mesh_renderer: RenderVvvvnnnnCamera,
-    triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
+    _triangle_mesh_renderer: RenderVvvvnnnnCamera,
+    _triangle_mesh_bindgroups: Vec<wgpu::BindGroup>,
     buffers: HashMap<String, wgpu::Buffer>,
     point_cloud: PointCloud,
     compute_bind_groups_fmm_visualizer: Option<Vec<wgpu::BindGroup>>,
@@ -226,7 +227,7 @@ impl Application for FmmApp {
         ray_camera.set_focal_distance(10.0, &configuration.queue);
 
         let app_render_params = AppRenderParams {
-             draw_point_cloud: false,
+             draw_point_cloud: true,
              visualization_method: 0,
              _step: false,
              _show_numbers: false,
@@ -303,7 +304,6 @@ impl Application for FmmApp {
 
         let global_dimension = [FMM_GLOBAL_X as u32, FMM_GLOBAL_Y as u32, FMM_GLOBAL_Z as u32];
         let local_dimension = [FMM_INNER_X as u32, FMM_INNER_Y as u32, FMM_INNER_Z as u32];
-        let total_cell_count = FMM_GLOBAL_X * FMM_GLOBAL_Y * FMM_GLOBAL_Z * FMM_INNER_X * FMM_INNER_Y * FMM_INNER_Z;
         let render_params = RenderParamBuffer::create(
                     &configuration.device,
                     4.0
@@ -559,8 +559,8 @@ impl Application for FmmApp {
             screen: ScreenTexture::init(&configuration.device, &configuration.sc_desc, true),
             _light: light,
             _render_params: render_params,
-            triangle_mesh_renderer: triangle_mesh_renderer,
-            triangle_mesh_bindgroups: triangle_mesh_bindgroups,
+            _triangle_mesh_renderer: triangle_mesh_renderer,
+            _triangle_mesh_bindgroups: triangle_mesh_bindgroups,
             buffers: buffers,
             //radix radix_sort: radix_sort,
             point_cloud: point_cloud,
@@ -673,7 +673,7 @@ impl Application for FmmApp {
     #[allow(unused)]
     fn input(&mut self, queue: &wgpu::Queue, input: &InputCache) {
         match self.camera_mode {
-            CameraMode::Camera => self.camera.update_from_input(&queue, &input),
+            CameraMode::Camera => { self.camera.update_from_input(&queue, &input) },
             CameraMode::RayCamera => self.ray_camera.update_from_input(&queue, &input),
         }
 
@@ -703,6 +703,12 @@ impl Application for FmmApp {
 
         if self.keyboard_manager.test_key(&Key::Key0, input) {
             self.app_render_params.draw_point_cloud = !self.app_render_params.draw_point_cloud;
+            if self.app_render_params.draw_point_cloud {
+                println!("Show point cloud."); 
+            }
+            else {
+                println!("Hide point cloud."); 
+            }
         }
         
         // Numbers.
@@ -715,22 +721,32 @@ impl Application for FmmApp {
         // Focal distance
         if self.keyboard_manager.test_key(&Key::O, input) {
             self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() - 0.01, &queue);
+            println!("Ray camera: focal distance == {:?}.", self.ray_camera.get_focal_distance()); 
         }
         // Focal distance
         if self.keyboard_manager.test_key(&Key::P, input) {
             self.ray_camera.set_focal_distance(self.ray_camera.get_focal_distance() + 0.01, &queue);
+            println!("Ray camera: focal distance == {:?}.", self.ray_camera.get_focal_distance()); 
         }
         // Switch camera mode to ray camera.
         if self.keyboard_manager.test_key(&Key::I, input) {
+            if self.camera_mode != CameraMode::RayCamera { println!("Ray camera selected."); }
             self.camera_mode = CameraMode::RayCamera; 
         }
         // Switch camera mode to camera.
         if self.keyboard_manager.test_key(&Key::U, input) {
+            if self.camera_mode != CameraMode::Camera { println!("Debug camera selected."); }
             self.camera_mode = CameraMode::Camera; 
         }
         // Switch camera mode to camera.
         if self.keyboard_manager.test_key(&Key::Space, input) {
             self.draw_two_triangles = !self.draw_two_triangles; 
+            if self.draw_two_triangles {
+                println!("Sphere tracer mode."); 
+            }
+            else {
+                println!("Debug mode."); 
+            }
         }
 
         let inc_value = 0.02;
@@ -919,7 +935,7 @@ impl Application for FmmApp {
 
         // TODO: something better.
         if !self.gpu_timer.is_none() {
-            self.gpu_timer.as_mut().unwrap().create_timestamp_data(&device, &queue);
+            self.gpu_timer.as_mut().unwrap().create_timestamp_data(&device);
             self.gpu_timer.as_mut().unwrap().print_data();
         }
 

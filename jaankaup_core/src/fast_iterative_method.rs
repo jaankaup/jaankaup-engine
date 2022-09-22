@@ -156,7 +156,7 @@ impl FastIterativeMethod {
 
         // TODO: assertions for local and global dimension.
 
-        let iteration_counter = 0;
+        // let iteration_counter = 0;
         // let fmm_state = FmmState::Reduce;
 
         // Buffer hash_map. DO we need this?
@@ -432,7 +432,7 @@ impl FastIterativeMethod {
     /// Create the initial interface using point cloud data.
     /// TODO: point sampling method.
     #[allow(dead_code)]
-    pub fn initialize_interface_pc(&self, encoder: &mut wgpu::CommandEncoder, pc: &PointCloud) {
+    pub fn initialize_interface_pc(&self, encoder: &mut wgpu::CommandEncoder, _pc: &PointCloud) {
 
         assert!(!self.pc_to_interface_bind_groups.is_none(), "Consider calling add_point_cloud_data before this function."); 
 
@@ -457,13 +457,13 @@ impl FastIterativeMethod {
         // let number_of_dispatches_128 = udiv_up_safe32(self.calculate_cell_count(), 128);
         let number_of_dispatches_256 = udiv_up_safe32(self.calculate_cell_count(), 256);
         // let number_of_dispatches_1024 = udiv_up_safe32(self.calculate_cell_count(), 256);
-        let number_of_dispatches_2048 = udiv_up_safe32(self.calculate_cell_count(), 2048);
+        //let number_of_dispatches_2048 = udiv_up_safe32(self.calculate_cell_count(), 2048);
         // println!("number_of_dispatches == {}", number_of_dispatches);
         // println!("number_of_dispatches_64 == {}", number_of_dispatches_64);
         // println!("number_of_dispatches_128 == {}", number_of_dispatches_128);
         println!("number_of_dispatches_256 == {}", number_of_dispatches_256);
         println!("self.calculate_block_count() == {}", self.calculate_block_count());
-        let number_of_dispatches_prefix = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);
+        // let number_of_dispatches_prefix = udiv_up_safe32((self.global_dimension[0] * self.global_dimension[1] * self.global_dimension[2]) as u32, 1024 * 2);
 
         let mut pass = encoder.begin_compute_pass(
             &wgpu::ComputePassDescriptor { label: Some("Fmm compute pass.")}

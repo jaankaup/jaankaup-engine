@@ -158,8 +158,8 @@ pub struct FastMarchingMethod {
     prefix_sum_aux: ComputeObject,
     reduce: ComputeObject,
     find_neighbors: ComputeObject,
-    fmm_alg_visualizer: ComputeObject, 
-    iteration_counter: u32,
+    _fmm_alg_visualizer: ComputeObject, 
+    _iteration_counter: u32,
 }
 
 impl FastMarchingMethod {
@@ -174,7 +174,7 @@ impl FastMarchingMethod {
 
         // TODO: assertions for local and global dimension.
 
-        let iteration_counter = 0;
+        let _iteration_counter = 0;
         let fmm_state = FmmState::Reduce;
 
         // Buffer hash_map. DO we need this?
@@ -577,16 +577,7 @@ impl FastMarchingMethod {
                                         &fmm_histogram.get_histogram_buffer()
         );
         
-        let fmm_alg_visualizer = Self::create_fmm_alg_visualizer(
-                                        &device,
-                                        &fmm_prefix_params,
-                                        &fmm_params_buffer.get_buffer(),
-                                        &fmm_blocks,
-                                        &prefix_temp_array,
-                                        &temporary_fmm_data,
-                                        &fmm_data,
-                                        &fmm_histogram.get_histogram_buffer()
-        );
+        let fmm_alg_visualizer = Self::create_fmm_alg_visualizer( &device);
 
         Self {
             compute_object: compute_object,
@@ -622,8 +613,8 @@ impl FastMarchingMethod {
             prefix_sum_aux: prefix_sum_aux,
             reduce: reduce,
             find_neighbors: find_neighbors,
-            fmm_alg_visualizer: fmm_alg_visualizer,
-            iteration_counter: iteration_counter,
+            _fmm_alg_visualizer: fmm_alg_visualizer,
+            _iteration_counter: _iteration_counter,
         }
     }
 
@@ -663,7 +654,7 @@ impl FastMarchingMethod {
         let number_of_dispatches_64 = udiv_up_safe32(self.calculate_cell_count(), 64);
         let number_of_dispatches_128 = udiv_up_safe32(self.calculate_cell_count(), 128);
         let number_of_dispatches_256 = udiv_up_safe32(self.calculate_cell_count(), 256);
-        let number_of_dispatches_2048 = udiv_up_safe32(self.calculate_cell_count(), 2048);
+        // let number_of_dispatches_2048 = udiv_up_safe32(self.calculate_cell_count(), 2048);
         println!("number_of_dispatches == {}", number_of_dispatches);
         println!("number_of_dispatches_64 == {}", number_of_dispatches_64);
         println!("number_of_dispatches_128 == {}", number_of_dispatches_128);
@@ -1631,14 +1622,7 @@ impl FastMarchingMethod {
         (compute_object, bind_groups)
     }
 
-    fn create_fmm_alg_visualizer(device: &wgpu::Device,
-                                 prefix_params: &wgpu::Buffer,
-                                 fmm_params: &wgpu::Buffer,
-                                 fmm_blocks: &wgpu::Buffer,
-                                 temp_prefix_sum: &wgpu::Buffer,
-                                 filtered_blocks: &wgpu::Buffer,
-                                 fmm_data: &wgpu::Buffer,
-                                 fmm_counter: &wgpu::Buffer) -> ComputeObject {
+    fn create_fmm_alg_visualizer(device: &wgpu::Device) -> ComputeObject {
 
         let compute_object =
                 ComputeObject::init(

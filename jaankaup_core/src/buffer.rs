@@ -28,6 +28,25 @@ pub fn buffer_from_data<T: Pod>(
         )
 }
 
+pub fn to_vec_explicit<T: Convert2Vec + std::clone::Clone + bytemuck::Pod + std::marker::Send>(
+        device: &wgpu::Device,
+        buffer: &wgpu::Buffer,
+    ) -> Vec<T> {
+
+    let res: Vec<T>;
+
+    let buffer_slice = buffer.slice(..);
+    buffer_slice.map_async(wgpu::MapMode::Read, move |_| ());
+    device.poll(wgpu::Maintain::Wait);
+
+    let data = buffer_slice.get_mapped_range().to_vec();
+    res = Convert2Vec::convert(&data);
+    drop(data);
+    buffer.unmap();
+
+    res
+}
+
 /// Copy the content of the buffer into a vector.
 pub fn to_vec<T: Convert2Vec + std::clone::Clone + bytemuck::Pod + std::marker::Send>(
     device: &wgpu::Device,

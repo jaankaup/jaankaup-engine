@@ -3,7 +3,7 @@ use crate::impl_convert;
 use crate::misc::Convert2Vec;
 use bytemuck::{Pod, Zeroable};
 use std::convert::TryInto;
-use crate::buffer::{to_vec}; 
+use crate::buffer::to_vec_explicit; 
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable,Debug)]
@@ -58,7 +58,8 @@ impl GpuTimer {
                 let query_buffer = device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("Query buffer"),
                     size: (size_of::<TimestampData>() * timestamp_count as usize) as wgpu::BufferAddress,
-                    usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_SRC,
+                    usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                    //usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_SRC,
                     mapped_at_creation: false,
                 });
 
@@ -147,13 +148,10 @@ impl GpuTimer {
     }
 
     /// Store the content of start and end counter parts.
-    pub fn create_timestamp_data(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub fn create_timestamp_data(&mut self, device: &wgpu::Device) {
         self.data = 
-            to_vec::<TimestampData>(&device,
-                                &queue,
-                                &self.query_buffer,
-                                0 as wgpu::BufferAddress,
-                                (size_of::<TimestampData>() * self.max_number_of_time_stamps as usize) as wgpu::BufferAddress
+            to_vec_explicit::<TimestampData>(&device,
+                                &self.query_buffer
         );
     }
 

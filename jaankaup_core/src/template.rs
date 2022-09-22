@@ -395,11 +395,10 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
     let sc_desc = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: surface.get_supported_formats(&adapter)[0],
-        //format: surface.get_preferred_format(&adapter).unwrap(),
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::Fifo,
-        //present_mode: wgpu::PresentMode::Mailbox,
+        alpha_mode: surface.get_supported_alpha_modes(&adapter)[0],
     };
 
     surface.configure(&device, &sc_desc);

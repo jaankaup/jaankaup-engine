@@ -455,8 +455,8 @@ pub struct GridDataPc {
 
 /// A struct that offers some functionality for PointCloud data manipulation.
 pub struct PointCloudHandler {
-    compute_object_point_to_interface: ComputeObject,
-    point_to_interface_bind_groups: Vec<wgpu::BindGroup>,
+    _compute_object_point_to_interface: ComputeObject,
+    _point_to_interface_bind_groups: Vec<wgpu::BindGroup>,
     _fmm_params_buffer: FmmParamsBuffer, // TODO: from parameter, remove this 
     point_cloud_params_buffer: PointCloudParamsBuffer,
 }
@@ -473,8 +473,8 @@ impl PointCloudHandler {
                 thread_group_number: u32,
                 show_numbers: bool,
                 fmm_data: &wgpu::Buffer,
-                point_data: &wgpu::Buffer,
-                gpu_debugger: &GpuDebugger) -> Self {
+                _point_data: &wgpu::Buffer,
+                _gpu_debugger: &GpuDebugger) -> Self {
 
         // From parameter.
         let fmm_params_buffer = FmmParamsBuffer::create(&device, global_dimension, local_dimension);
@@ -545,8 +545,8 @@ impl PointCloudHandler {
         );
  
         Self {
-             compute_object_point_to_interface: compute_object,
-             point_to_interface_bind_groups: point_to_interface_bind_groups,
+             _compute_object_point_to_interface: compute_object,
+             _point_to_interface_bind_groups: point_to_interface_bind_groups,
              _fmm_params_buffer: fmm_params_buffer,
              point_cloud_params_buffer: point_cloud_params_buffer,
         }
