@@ -220,7 +220,7 @@ impl Application for DebugVisualizator {
                 RenderObject::init(
                     &configuration.device,
                     &configuration.sc_desc,
-                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("renderer_v4n4_debug_visualizator_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/renderer_v4n4_debug_visualizator.wgsl"))),
@@ -322,7 +322,7 @@ impl Application for DebugVisualizator {
         let compute_object =
                 ComputeObject::init(
                     &configuration.device,
-                    &configuration.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    &configuration.device.create_shader_module(&wgpu::ShaderModuleDescriptor {
                         label: Some("curves_wgsl"),
                         source: wgpu::ShaderSource::Wgsl(
                             Cow::Borrowed(include_str!("../../assets/shaders/curves.wgsl"))),
