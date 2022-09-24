@@ -167,7 +167,7 @@ impl FastIterativeMethod {
 
         let cell_count = global_dimension[0] * global_dimension[1] * global_dimension[2] * local_dimension[0]  * local_dimension[1]  * local_dimension[2];
 
-        print!("Creating sample_data buffer.");
+        //print!("Creating sample_data buffer.");
         // Prefix temp array.
         let sample_data = buffer_from_data::<f32>(
                 &device,
@@ -175,7 +175,7 @@ impl FastIterativeMethod {
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
         );
-        println!("OK");
+        //println!("OK");
 
         // Create fim shader template. Only for binding resources.
         let compute_object =
@@ -245,25 +245,25 @@ impl FastIterativeMethod {
         fim_data[number_of_fmm_cells] = FmmCellPc { tag: OUTSIDE, value: 100000.0, color: the_color, };
                                                 
         // Fast marching method cell data.
-        print!("Creating fim_data buffer.  ");
+        //print!("Creating fim_data buffer.  ");
         let fim_data = buffer_from_data::<FmmCellPc>(
                 &device,
                 &fim_data,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
         );
-        println!("OK");
+        //println!("OK");
 
-        print!("Creating active list buffer.  ");
+        //print!("Creating active list buffer.  ");
         let active_list = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Fim active list buffer"),
             size: (number_of_fmm_cells * size_of::<FmmCellPc>()) as u64 * 2,
             usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        println!("OK");
+        //println!("OK");
 
-        print!("Creating prefix_temp_array.  ");
+        //print!("Creating prefix_temp_array.  ");
         // TODO: remove. Only fmm_value_fixer uses this binding. Remove this binding from
         // fmm_value_fixer.
         let prefix_temp_array = buffer_from_data::<u32>(
@@ -273,7 +273,7 @@ impl FastIterativeMethod {
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 None
         );
-        println!("OK");
+        // println!("OK");
 
         // Prefix sum params.
         let fmm_prefix_params = buffer_from_data::<FmmPrefixParams>(

@@ -158,7 +158,7 @@ impl GpuDebugger {
                 scale_factor: f32,
                 ) -> Self {
 
-        println!("max_number_of_vertices == {}", max_number_of_vertices);
+        //println!("max_number_of_vertices == {}", max_number_of_vertices);
         // println!("max_number_of_aabbs == {}", max_number_of_aabbs);
 
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
@@ -199,7 +199,6 @@ impl GpuDebugger {
         ////                 BUFFERS                    ////
         ////////////////////////////////////////////////////
 
-        print!("Creating gpu debugger buffers    ");
         buffers.insert(
             "indirect_draw_buffer".to_string(),
                 buffer_from_data::<DrawIndirect>(
@@ -318,7 +317,7 @@ impl GpuDebugger {
             None)
         );
 
-        println!("OK");
+        // println!("OK");
 
         let render_object_vvvvnnnn =
                 RenderObject::init(

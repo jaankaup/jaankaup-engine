@@ -1,3 +1,4 @@
+use std::env;
 use std::num::NonZeroU32;
 use jaankaup_core::two_triangles::TwoTriangles;
 // use jaankaup_core::fmm_things::FmmBlock;
@@ -223,6 +224,12 @@ impl Application for FmmApp {
         // Log adapter info.
         // log_adapter_info(&configuration.adapter);
 
+        let args: Vec<String> = env::args().collect();
+        if args.len() < 2 { panic!("You must pass the point cloud data file as argument!"); }
+        else {
+            log::info!("The point cloud data file: {:?}", &args[1]); 
+        }
+
         let once = true;
         // Buffer hash_map.
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
@@ -335,7 +342,11 @@ impl Application for FmmApp {
 
         // Generate the point cloud.
 
+        #[cfg(target_arch = "wasm32")]
         let point_cloud = PointCloud::init(&configuration.device, &"../../cloud_data.asc".to_string(), scene_x, scene_y, scene_z);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let point_cloud = PointCloud::init(&configuration.device, &args[1], scene_x, scene_y, scene_z);
 
         let pc_max_coord = point_cloud.get_max_coord();
 

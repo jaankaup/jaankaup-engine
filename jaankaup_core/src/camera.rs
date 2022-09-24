@@ -128,7 +128,7 @@ impl Camera {
         // The ray camera uniform buffer doesn't exist. Create ray camera buffer.
         if self.ray_camera_buffer.is_none() {
 
-            println!("Creating ray camera uniform.");
+            // println!("Creating ray camera uniform.");
             // Create ray camera uniform data.
             let ray_camera_uniform = RayCameraUniform {
                 pos: [self.pos.x, self.pos.y, self.pos.z],

@@ -54,6 +54,9 @@ pub fn read_pc_data(file: &String, scene_x: f32, scene_y: f32, scene_z: f32) -> 
             }
         }
     }
+    else {
+       panic!("File not found '{:?}", file); 
+    }
 
     for i in 0..result.len() {
         result2.push(VVVC {
@@ -63,7 +66,7 @@ pub fn read_pc_data(file: &String, scene_x: f32, scene_y: f32, scene_z: f32) -> 
             color: result[i].color,
         });
     }
-    // println!("{:?}", aabb);
+
     aabb.max = aabb.max - aabb.min;  
     aabb.min.x = 0.0;
     aabb.min.y = 0.0;
