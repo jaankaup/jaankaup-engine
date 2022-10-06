@@ -331,12 +331,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "copyless"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2df960f5d869b2dd8532793fde43eb5427cceb126c929747a26823ab0eeb536"
-
-[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1121,8 +1115,8 @@ dependencies = [
 
 [[package]]
 name = "naga"
-version = "0.9.0"
-source = "git+https://github.com/gfx-rs/naga?rev=b209d911#b209d911681c4ef563f7d9048623667743e6248f"
+version = "0.10.0"
+source = "git+https://github.com/gfx-rs/naga?rev=c52d9102#c52d91023d43092323615fcc746162e478033f26"
 dependencies = [
  "bit-set",
  "bitflags",
@@ -2171,14 +2165,14 @@ dependencies = [
 
 [[package]]
 name = "wgpu"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd#2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd"
+version = "0.14.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=261069d04fc1263d8e587c18936b9db90b077abb#261069d04fc1263d8e587c18936b9db90b077abb"
 dependencies = [
  "arrayvec 0.7.2",
  "js-sys",
  "log",
  "naga",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "raw-window-handle 0.5.0",
  "smallvec",
  "static_assertions",
@@ -2192,19 +2186,18 @@ dependencies = [
 
 [[package]]
 name = "wgpu-core"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd#2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd"
+version = "0.14.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=261069d04fc1263d8e587c18936b9db90b077abb#261069d04fc1263d8e587c18936b9db90b077abb"
 dependencies = [
  "arrayvec 0.7.2",
  "bit-vec",
  "bitflags",
  "cfg_aliases",
  "codespan-reporting",
- "copyless",
  "fxhash",
  "log",
  "naga",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "profiling",
  "raw-window-handle 0.5.0",
  "smallvec",
@@ -2216,8 +2209,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-hal"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd#2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd"
+version = "0.14.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=261069d04fc1263d8e587c18936b9db90b077abb#261069d04fc1263d8e587c18936b9db90b077abb"
 dependencies = [
  "android_system_properties",
  "arrayvec 0.7.2",
@@ -2239,7 +2232,7 @@ dependencies = [
  "metal",
  "naga",
  "objc",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "profiling",
  "range-alloc",
  "raw-window-handle 0.5.0",
@@ -2254,8 +2247,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-types"
-version = "0.13.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd#2c1d7a8a5c6564daf7c50e1a6bf0e75b019733cd"
+version = "0.14.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=261069d04fc1263d8e587c18936b9db90b077abb#261069d04fc1263d8e587c18936b9db90b077abb"
 dependencies = [
  "bitflags",
 ]
