@@ -200,7 +200,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
 
-    let min_distance = 0.57;
+    let min_distance = 0.65;
+    //let min_distance = 0.57;
     //let min_distance = 0.55;
     //let min_distance = 0.70710678;
     //let min_distance = 0.5;

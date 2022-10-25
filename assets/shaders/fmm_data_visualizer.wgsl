@@ -334,7 +334,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let color_far = rgba_u32(255u, 255u, 255u, 255u);
     let color_band = rgba_u32(255u, 0u, 0u, 255u);
-    let color_band_new = rgba_u32(255u, 255u, 50u, 255u);
+    let color_band_new = rgba_u32(255u, 0u, 0u, 255u);
+    // let color_band_new = rgba_u32(255u, 255u, 50u, 255u);
     let color_known = rgba_u32(0u, 255u, 0u, 255u);
     let color_text = rgba_u32(255u, 255u, 255u, 255u);
     let color_known_new = rgba_u32(123u, 123u, 50u, 255u);
@@ -370,7 +371,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         }
     }
 
-    if ((fmm_visualization_params.visualization_method & 2u) != 0u && (cell.tag == BAND || cell.tag == BAND_NEW) ) {
+    // if ((fmm_visualization_params.visualization_method & 2u) != 0u && (cell.tag == BAND || cell.tag == BAND_NEW) ) {
+    //if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND ) {
+    if ((fmm_visualization_params.visualization_method & 2u) != 0u && cell.tag == BAND_NEW) {
+
         visualize_cell(position, col);
 
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
@@ -382,10 +386,10 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     if ((fmm_visualization_params.visualization_method & 4u) != 0u && cell.tag == KNOWN) {
                            
         // visualize_cell(position, cell.color);
-	if (cell.color ==  rgba_u32(0u, 0u, 0u, 255u)) { return; }  
-        //visualize_cell(position, cell.color);
+	// if (cell.value > 100000.0) { visualize_cell(position, color_known_new); }  
+        // visualize_cell(position, cell.color);
+	// else { visualize_cell(position, col); }
         visualize_cell(position, col);
-        //visualize_cell(position, col);
 
         if ((fmm_visualization_params.visualization_method & 64u) != 0u) {
 

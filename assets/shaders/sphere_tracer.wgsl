@@ -331,21 +331,22 @@ fn screen_to_index(v: vec2<u32>) -> u32 {
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
     let light_pos = vec3<f32>(
-                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) * 0.5,
-                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) * 2.0,
-                        f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) * 0.5 +
+                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) * 1.5,
+                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) * 1.5,
+                        f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) * 1.5 +
 			vec3<f32>(0.0, f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y), 0.0);
+    //let light_pos = vec3<f32>(-480.0, 250.0, -300.0);
+    //let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (400.0, 100.0, 150.0), -167.0, -21.0);
 
-
-    // let light_pos = vec3<f32>(150.0,70.0,150.0);
+    //let light_pos = vec3<f32>(150.0,70.0,150.0);
     //let light_pos = camera.pos; // vec3<f32>(150.0,70.0,150.0);
-    let lightColor = vec3<f32>(1.0,1.0,1.0);
-    let lightPower = 10000.0;
+    let lightColor = vec3<f32>(0.6,0.6,0.6);
+    let lightPower = 330000.0;
     
     // Material properties
     let materialDiffuseColor = decode_color((*payload).color).xyz; //vec3<f32>(1.0, 0.0, 0.0);
-    let materialAmbientColor = vec3<f32>(0.4,0.4,0.4) * materialDiffuseColor;
-    let materialSpecularColor = vec3<f32>(0.8,0.8,0.8);
+    let materialAmbientColor = vec3<f32>(0.6,0.6,0.6) * materialDiffuseColor;
+    let materialSpecularColor = vec3<f32>(1.0,1.0,1.0);
     
     // Distance to the light
     let distance = length(light_pos - (*payload).intersection_point);
@@ -857,13 +858,28 @@ fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
 /// Function tha is called on ray hit. TODO: separate gradien calculation to another function.
 fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
+    //++ raymarch  if ((*payload).opacity < 0.01) {
+    //++ raymarch      (*payload).color = rgba_u32(55u, 55u, 200u, 255u); 
+    //++ raymarch  }
+    //++ raymarch  else {
+    //++ raymarch      let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>((*payload).opacity * 0.006, 0.0 , 0.0 )); // (*payload).opacity * 0.005));
+    //++ raymarch      (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u); 
+    //++ raymarch  }
+
     //fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
+
     (*payload).color = fmm_color((*payload).intersection_point);
 
-    // let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(sphere_tracer_params.isovalue * 0.01, sphere_tracer_params.isovalue * 0.01, 0.0));
-    // (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u); 
+    //++ let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(sphere_tracer_params.isovalue * 0.01, sphere_tracer_params.isovalue * 0.01, 0.0));
+    //++ (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u); 
 
+//++     (*payload).color = rgba_u32(255u - u32((*payload).opacity * 3.0),
+//++                                 0u,
+//++ 				u32((*payload).opacity * 3.0),
+//++ 				255u);
+    //++ let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>((*payload).opacity * 0.005, 0.0 , 0.0)); // (*payload).opacity * 0.005));
+    //++ (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u); 
     //(*payload).color = fmm_color_nearest((*payload).intersection_point);
     //(*payload).normal = calculate_normal(payload);
     (*payload).visibility = 1.0;
@@ -1019,7 +1035,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     var p: vec3<f32>;
     var distance_to_interface: f32;
 
-    while (dist < (*ray).rMax && step_counter < 800u) {
+    while (dist < (*ray).rMax && step_counter < 1400000u) {
         p = getPoint(dist, ray);
 
         if (fmm_is_outside_value(p)) {
@@ -1043,13 +1059,17 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 	let dist_norm = resampleGradientAndDistance(p);
         (*payload).intersection_point = p;
         //distance_to_interface = abs(dist_norm.w) - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
-        // distance_to_interface = sphere_tracer_params.isovalue - abs(dist_norm.w);  // max(min(0.01 * dist, 0.2), 0.001);
-        //distance_to_interface = dist_norm.w;  // max(min(0.01 * dist, 0.2), 0.001);
-        // dist = dist + distance_to_interface;
-        //dist = dist + abs(distance_to_interface);
-        //+++ p = getPoint(dist, ray);
-        //+++ (*payload).intersection_point = p;
-        //+++ (*payload).normal = dist_norm.xyz;
+        //distance_to_interface = dist_norm.w - sphere_tracer_params.isovalue; // max(min(0.01 * dist, 0.2), 0.001);
+        //distance_to_interface = sphere_tracer_params.isovalue - abs(dist_norm.w);  // max(min(0.01 * dist, 0.2), 0.001);
+        //++ distance_to_interface = dist_norm.w - sphere_tracer_params.isovalue;  // max(min(0.01 * dist, 0.2), 0.001);
+        // distance_to_interface = dist_norm.w;  // max(min(0.01 * dist, 0.2), 0.001);
+
+
+        //++ dist = dist + 0.001; // distance_to_interface;
+
+        //p = getPoint(dist, ray);
+        //(*payload).intersection_point = p;
+        //(*payload).normal = dist_norm.xyz;
 
         if (step_counter > 0u &&
 	    sphere_tracer_params.draw_circles == 1u &&
@@ -1060,34 +1080,77 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         }
 
         // Render step points.
-        //++ if ( private_local_index.x == 0u) {
-        //++ output_aabb[atomicAdd(&counter[2], 1u)] =  
-        //++       AABB (
-        //++           vec4<f32>(4.0 * p.x - 0.4,
-        //++                     4.0 * p.y - 0.4,
-        //++                     4.0 * p.z - 0.4,
-        //++                     bitcast<f32>(rgba_u32(min(255u, step_counter), 0u, min(255u, 255u - step_counter), 255u))),
-        //++           vec4<f32>(4.0 * p.x + 0.4,
-        //++                     4.0 * p.y + 0.4,
-        //++                     4.0 * p.z + 0.4,
-        //++                     0.0),
-        //++ );
-        //++ }
+        if ( private_local_index.x == 0u) {
+        output_aabb[atomicAdd(&counter[2], 1u)] =  
+              AABB (
+                  vec4<f32>(4.0 * p.x - 0.4,
+                            4.0 * p.y - 0.4,
+                            4.0 * p.z - 0.4,
+                            bitcast<f32>(rgba_u32(min(255u, step_counter), 0u, min(255u, 255u - step_counter), 255u))),
+                  vec4<f32>(4.0 * p.x + 0.4,
+                            4.0 * p.y + 0.4,
+                            4.0 * p.z + 0.4,
+                            0.0),
+        );
+        }
 
         //if (abs(distance_to_interface) < 0.03) {
 	//let delta = abs(distance_to_interface - sphere_tracer_params.isovalue)
-        //if (abs(dist_norm.w - sphere_tracer_params.isovalue) < 0.01) { // sphere_tracer_params.isovalue) {
-        if (dist_norm.w < 0.01) { // sphere_tracer_params.isovalue) {
+        //if (dist_norm.w < 0.01) { // sphere_tracer_params.isovalue) {
 
-            (*payload).opacity = dist;
-            (*payload).normal = dist_norm.xyz;
-            hit(ray, payload);
+        //++ ray march let min_x = 2.0;
+        //++ ray march let min_y = 2.0;
+        //++ ray march let min_z = 2.0;
+        //++ ray march let max_x = 300.0;
+        //++ ray march let max_y = 86.0;
+        //++ ray march let max_z = 76.0 * 4.0 - 2.0;
+	//++ ray march let offsetc = 4;
+	//++ ray march //let offsetc = 2;
+	//++ ray march // var condx = false; // dist_norm.w < 0.01 && dist_norm.w > 0.0;
+	//++ ray march var condx = dist_norm.w < 0.01 && dist_norm.w > 0.0;
+
+	//++ ray march for (var i: i32 = 1 ; i < 15 ; i = i + 1) {
+	//++ ray march //for (var i: i32 = 15 ; i > 0 ; i = i - 1) {
+	//++ ray march     if (condx) { break; }
+	//++ ray march     let off = f32(offsetc * i); 
+	//++ ray march     condx = (dist_norm.w < off) && (dist_norm.w > (off - 0.01));  
+	//++ ray march }
+
+	//++ ray march // let conds_back = (p.x < min_x) ||
+        //++ ray march //                  (p.y < min_y) ||
+        //++ ray march //                  (p.z < min_z);
+	//++ ray march 
+	//++ ray march let conds = (p.x > min_x) &&
+        //++ ray march             (p.y > min_y) &&
+	//++ ray march             (p.z > min_z) &&
+	//++ ray march 	    (p.x < max_x) &&
+        //++ ray march             (p.y < max_y) &&
+	//++ ray march 	    (p.z < max_z) &&
+	//++ ray march 	    condx;
+
+        //++ ray march // if (conds_back) {
+        //++ ray march //     (*payload).opacity = dist_norm.w;
+        //++ ray march //     (*payload).normal = dist_norm.xyz;
+        //++ ray march //     hit_back(ray, payload);
+	//++ ray march //     return;
+	//++ ray march // }
+	//++ ray march if (conds) {
+        //++ ray march     (*payload).opacity = dist_norm.w;
+        //++ ray march     (*payload).normal = dist_norm.xyz;
+        //++ ray march     hit(ray, payload);
+        //++ ray march     return;
+	//++ ray march }
+	if (dist_norm.w < 0.01) {
+
+	    (*payload).opacity = dist;
+	    (*payload).normal = dist_norm.xyz;
+	    hit(ray, payload);
             return;
         }
+
         step_counter = step_counter + 1u;
 	dist = dist + dist_norm.w;
     } // while
-
 }
 
 // fn box_intersect(aabb_min: vec<f32>, aabb_max: vec<f32>, result: ptr<function, f32>, canStartInBox: bool) -> bool {
@@ -1182,11 +1245,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     //ray.origin = point_on_plane + camera.pos.xyz * 0.25;
     ray.origin = point_on_plane + camera.pos.xyz;
     ray.direction = normalize(point_on_plane + d*camera.view.xyz);
-    ray.rMin = 0.0;
-    ray.rMax = 800.0;
+    ray.rMin = 100.0;
+    ray.rMax = 300.0;
 
     var payload: RayPayload;
-    payload.color = rgba_u32(255u, 0u, 0u, 0u);
+    payload.color = rgba_u32(255u, 255u, 255u, 255u);
+    //payload.color = rgba_u32(255u, 0u, 0u, 0u);
     payload.visibility = 0.0;
 
     traceRay(&ray, &payload);

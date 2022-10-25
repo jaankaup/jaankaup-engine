@@ -251,5 +251,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     fim_data[global_id.x].tag = REMEDY;
 		    active_list[atomicAdd(&fim_counter[2], 1u)] = TempData(global_id.x, fim_data[global_id.x].value);
 	        }
+		else {
+                    fim_data[global_id.x].tag = SOURCE;
+		}
 	}
 }

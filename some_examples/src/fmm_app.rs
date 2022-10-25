@@ -175,6 +175,7 @@ impl WGPUFeatures for FmmAppFeatures {
         //limits.max_compute_workgroup_size_x = 65536 * 2;
         //limits.max_storage_buffer_binding_size = 436101120; 
         //limits.max_storage_buffer_binding_size = 256819200; 
+        limits.max_storage_buffer_binding_size = 396441600; 
         //limits.max_storage_buffer_binding_size = 154275840; 
         // limits.max_compute_workgroups_per_dimension = 65536 * 2;
         // println!("limits.max_storage_buffer_binding_size == {}", limits.max_storage_buffer_binding_size);
@@ -235,17 +236,18 @@ impl Application for FmmApp {
         let mut buffers: HashMap<String, wgpu::Buffer> = HashMap::new();
 
         // Camera.
-        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 130.0, 480.0), -89.0, 0.0);
+        let mut camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 130.0, 480.0), -89.0, -4.0);
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.2);
 
         let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 100.0, 400.0), -89.0, 0.0);
+        //++let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (440.0, 110.0, 165.0), -171.0, -23.0);
         ray_camera.set_rotation_sensitivity(0.4);
         ray_camera.set_movement_sensitivity(0.05);
 
         let camera_mode = CameraMode::RayCamera;
 
-        ray_camera.set_focal_distance(10.0, &configuration.queue);
+        ray_camera.set_focal_distance(1.0, &configuration.queue);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: true,
@@ -273,13 +275,22 @@ impl Application for FmmApp {
         // Light source for triangle meshes.
         let light = LightBuffer::create(
                       &configuration.device,
-                      [scene_x * 0.5, scene_y * 1.25, scene_z * 0.5], // pos
+                      [scene_x * 0.5, scene_y * 1.75, scene_z * 0.5], // pos
                       [25, 25, 130],  // spec
                       [255,200,255], // light 
                       255.0,
                       0.35,
                       0.00013
         );
+        // let light = LightBuffer::create(
+        //               &configuration.device,
+        //               [0.0, 87.0* 1.25, -50.0], // pos
+        //               [25, 25, 130],  // spec
+        //               [255,200,255], // light 
+        //               255.0,
+        //               0.35,
+        //               0.000013
+        // );
 
         // Scale_factor for triangle meshes.
         let render_params = RenderParamBuffer::create(
@@ -931,7 +942,9 @@ impl Application for FmmApp {
         }
 
         // self.gpu_timer.resolve_timestamps(&mut encoder);
-        self.sphere_tracer.dispatch(&mut encoder);
+        //if self.once {
+            self.sphere_tracer.dispatch(&mut encoder);
+        //}
 
         encoder.copy_buffer_to_texture(
             wgpu::ImageCopyBuffer {

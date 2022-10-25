@@ -310,61 +310,78 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                         // fim_cell.value = updated_value;
 	                //!!! fim_data[t].value = updated_value;
                         active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = TempData(t.memory_location, updated_value);
+			active_list[swap_index].value = updated_value;
+			// atomicStore(&fim_data[t.memory_location].tag, ACTIVE);
 		    }
 
 		    else {
 
-                        if (!(private_neighbors[0].tag == SOURCE || private_neighbors[0].tag == ACTIVE || private_neighbors[0].tag == OUTSIDE)) {
-		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, ACTIVE);
-	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
-				    TempData(neighbor_mem_locations[0], private_neighbors[0].value);
-	                    }
-		        }
-                        if (!(private_neighbors[1].tag == SOURCE || private_neighbors[1].tag == ACTIVE || private_neighbors[1].tag == OUTSIDE)) {
-		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, ACTIVE);
-	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
-				    TempData(neighbor_mem_locations[1], private_neighbors[1].value);
-	                    }
-		        }
-                        if (!(private_neighbors[2].tag == SOURCE || private_neighbors[2].tag == ACTIVE || private_neighbors[2].tag == OUTSIDE)) {
-		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, ACTIVE);
-	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
-				    TempData(neighbor_mem_locations[2], private_neighbors[2].value);
-	                    }
-		        }
-                        if (!(private_neighbors[3].tag == SOURCE || private_neighbors[3].tag == ACTIVE || private_neighbors[3].tag == OUTSIDE)) {
-		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, ACTIVE);
-	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
-				    TempData(neighbor_mem_locations[3], private_neighbors[3].value);
-	                    }
-		        }
-                        if (!(private_neighbors[4].tag == SOURCE || private_neighbors[4].tag == ACTIVE || private_neighbors[4].tag == OUTSIDE)) {
-		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, ACTIVE);
-	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
-				    TempData(neighbor_mem_locations[4], private_neighbors[4].value);
-	                    }
-		        }
-                        if (!(private_neighbors[5].tag == SOURCE || private_neighbors[5].tag == ACTIVE || private_neighbors[5].tag == OUTSIDE)) {
-		            var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, ACTIVE);
-	                    if (old_tag != ACTIVE) {
-                                active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
-				    TempData(neighbor_mem_locations[5], private_neighbors[5].value);
-	                    }
+                        // WHY ???!!!
+			if (updated_value < 100000.0) {
+
+			    atomicStore(&fim_data[t.memory_location].tag, SOURCE);
+			    // if (updated_value > 99999.0) { 
+			    //    fim_data[t.memory_location].value = 100066.0;
+			    // }
+			    // fim_data[t.memory_location].value = updated_value;
+
+                            if (private_neighbors[0].tag == OTHER) {
+                            //if (!(private_neighbors[0].tag == SOURCE || private_neighbors[0].tag == ACTIVE || private_neighbors[0].tag == OUTSIDE)) {
+		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[0]].tag, ACTIVE);
+	                        if (old_tag == OTHER) {
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
+			    	    TempData(neighbor_mem_locations[0], private_neighbors[0].value);
+	                        }
+		            }
+                            if (private_neighbors[1].tag == OTHER) {
+                            //if (!(private_neighbors[1].tag == SOURCE || private_neighbors[1].tag == ACTIVE || private_neighbors[1].tag == OUTSIDE)) {
+		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[1]].tag, ACTIVE);
+	                        if (old_tag == OTHER) {
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
+			    	    TempData(neighbor_mem_locations[1], private_neighbors[1].value);
+	                        }
+		            }
+                            if (private_neighbors[2].tag == OTHER) {
+                            // if (!(private_neighbors[2].tag == SOURCE || private_neighbors[2].tag == ACTIVE || private_neighbors[2].tag == OUTSIDE)) {
+		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, ACTIVE);
+	                        if (old_tag == OTHER) {
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+			    	    TempData(neighbor_mem_locations[2], private_neighbors[2].value);
+	                        }
+		            }
+                            if (private_neighbors[3].tag == OTHER) {
+                            // if (!(private_neighbors[3].tag == SOURCE || private_neighbors[3].tag == ACTIVE || private_neighbors[3].tag == OUTSIDE)) {
+		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, ACTIVE);
+	                        if (old_tag == OTHER) {
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+			    	    TempData(neighbor_mem_locations[3], private_neighbors[3].value);
+	                        }
+		            }
+                            if (private_neighbors[4].tag == OTHER) {
+                            // if (!(private_neighbors[4].tag == SOURCE || private_neighbors[4].tag == ACTIVE || private_neighbors[4].tag == OUTSIDE)) {
+		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, ACTIVE);
+	                        if (old_tag == OTHER) {
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+			    	    TempData(neighbor_mem_locations[4], private_neighbors[4].value);
+	                        }
+		            }
+                            if (private_neighbors[5].tag == OTHER) {
+                            // if (!(private_neighbors[5].tag == SOURCE || private_neighbors[5].tag == ACTIVE || private_neighbors[5].tag == OUTSIDE)) {
+		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, ACTIVE);
+	                        if (old_tag == OTHER) {
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+			    	    TempData(neighbor_mem_locations[5], private_neighbors[5].value);
+	                        }
+		            }
+	                }
+			else {
+                            active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = TempData(t.memory_location, t.value);
 		        }
 		    }
 	        }
             } // for
 	    workgroupBarrier();
 
-            if (local_index == 0u) {
-                items_to_process = atomicExchange(&wg_mem_offset, 0u);
-            }
-	    workgroupBarrier();
 
             // buffer_swap_id = (buffer_swap_id + 1u) & 1u;
             chunks = udiv_up_safe32(items_to_process, 1024u);
@@ -455,5 +472,11 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
             //+++ }
             //+++atomicStore(&fim_counter[0], buffer_swap_id);
             buffer_swap_id = (buffer_swap_id + 1u) & 1u;
+
+	    workgroupBarrier();
+            if (local_index == 0u) {
+                items_to_process = atomicExchange(&wg_mem_offset, 0u);
+            }
+	    workgroupBarrier();
         } // while
 }
