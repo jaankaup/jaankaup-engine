@@ -867,7 +867,7 @@ fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         (*payload).color = rgba_u32(55u, 55u, 200u, 255u);
     }
     else {
-        let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>((*payload).opacity * 0.009 - 0.2, 0.0 , 0.0 )); // (*payload).opacity * 0.005));
+        let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>((*payload).opacity * 0.014 - 0.4, 0.0 , 0.0 )); // (*payload).opacity * 0.005));
         (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
     }
 
@@ -1109,7 +1109,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         let max_x = 300.0;
         let max_y = 86.0;
         let max_z = 76.0 * 4.0 - 2.0;
-	let offsetc = 0.3;
+	let offsetc = 0.1;
 	//let offsetc = 2;
 	// var condx = false; // dist_norm.w < 0.01 && dist_norm.w > 0.0;
 	var condx = dist_norm.w < 0.01 && dist_norm.w > 0.0;
