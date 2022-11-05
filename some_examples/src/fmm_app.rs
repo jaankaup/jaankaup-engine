@@ -255,11 +255,11 @@ impl Application for FmmApp {
                         cube_min[1] + cube_dim[1] * 0.5,
                         cube_min[2] + cube_dim[2] * 0.5];
 
-        println!("GRADU coord == ({:?},{:?},{:?})", center[0], center[1], cube_max[2]);
 
         //let corner_lookat = [cube_min[0], (cube_min[1] + cube_dim[1]) * 0.75, cube_min[2] + cube_dim[2]]; 
         //let corner_lookat = [cube_min[0] + cube_dim[0], (cube_min[1] + cube_dim[1]) * 0.75, cube_min[2] + cube_dim[2]]; 
         let corner_lookat = [center[0], center[1], cube_min[2] + cube_dim[2]]; 
+
 
         let mut ray_camera = Camera::new(configuration.size.width as f32,
                                          configuration.size.height as f32,
@@ -267,6 +267,7 @@ impl Application for FmmApp {
                                           corner_lookat[1],
                                           corner_lookat[2]),
                                          -49.0, -18.0);
+
         //let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (185.0 + movement[0], 76.0 + movement[1], 315.0 + movement[2]), -49.0, -18.0);
         //let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 120.0, 500.0), -89.0, -20.0);
         //++let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (440.0, 110.0, 165.0), -171.0, -23.0);
@@ -275,11 +276,24 @@ impl Application for FmmApp {
         ray_camera.set_lookat([center[0],
                                center[1],
                                center[2]], &configuration.queue);
-        ray_camera.move_forward(-50.0, &configuration.queue);
+        // ray_camera.set_lookat([center[0],
+        //                        center[1],
+        //                        center[2]], &configuration.queue);
+
+        //ray_camera.move_forward(-1.0, &configuration.queue);
+
+        println!("GRADU coord == ({:?},{:?},{:?})",
+                  // camera.get_view()[0] * 1.0 + camera.get_position()[0],
+                  // camera.get_view()[1] * 1.0 + camera.get_position()[1],
+                  // camera.get_view()[2] * 1.0 + camera.get_position()[2]
+                  ray_camera.get_position()[0],
+                  ray_camera.get_position()[1],
+                  ray_camera.get_position()[2]
+        );
 
         let camera_mode = CameraMode::RayCamera;
 
-        ray_camera.set_focal_distance(1.0, &configuration.queue);
+        ray_camera.set_focal_distance(10.0, &configuration.queue);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: true,

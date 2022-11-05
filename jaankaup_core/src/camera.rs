@@ -97,6 +97,10 @@ impl Camera {
         [self.view.x, self.view.y, self.view.z]
     }
 
+    pub fn get_position(&self) -> [f32; 3] {
+        [self.pos.x, self.pos.y, self.pos.z]
+    }
+
     pub fn move_forward(&mut self, amount: f32, queue: &wgpu::Queue) {
         self.pos = self.pos + self.view * amount;
         self.update_camera(&queue);
@@ -384,8 +388,5 @@ impl Camera {
         view
     }
 
-    pub fn get_position(&self) -> [f32; 3] {
-        [self.pos.x, self.pos.y, self.pos.z]
-    }
 }
 

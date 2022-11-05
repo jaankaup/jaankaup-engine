@@ -180,7 +180,7 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
     );
 }
 
-fn solve_quadratic() -> f32 {
+fn solve_quadratic(speed: f32) -> f32 {
 
     var phis: array<f32, 6> = array<f32, 6>(
                                   private_neighbors[0].value,
@@ -220,14 +220,15 @@ fn solve_quadratic() -> f32 {
     var result: f32 = 777.0;
 
     // The speed information.
-    let speed = 1.0;
-    let fpow2_inv = 1.0; // / (speed * speed);
+    // let speed = 1.0;
+    let fpow2_inv = 1.0 / (speed * speed);
+    //let fpow2_inv = (speed * speed);
 
     if (abs(p[0] - p[2]) < 1.0) {
         var phi_sum = p[0] + p[1] + p[2];
         var phi_sum2 = pow(p[0], 2.0) + pow(p[1], 2.0) + pow(p[2], 2.0);
         var phi_sum_pow2 = pow(phi_sum, 2.0);
-        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum2 - 1.0 * fpow2_inv)));
+        result = 1.0/6.0 * (2.0 * phi_sum + sqrt(4.0 * phi_sum_pow2 - 12.0 * (phi_sum2 - fpow2_inv)));
     }
 
     else if (abs(p[0] - p[1]) < 1.0) {
@@ -236,7 +237,7 @@ fn solve_quadratic() -> f32 {
     }
 
     else {
-        result = p[0] + 1.0 * fpow2_inv;
+        result = p[0] + fpow2_inv;
     }
 
     return result;
@@ -298,8 +299,15 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                     private_neighbors[4] = fim_data[neighbor_mem_locations[4]];
                     private_neighbors[5] = fim_data[neighbor_mem_locations[5]];
 
+//                    let sp = select(1.0, 2.0, this_coord.x >= 140u && this_coord.x <= 150u &&
+//	                                       this_coord.y >= 45u && this_coord.y <= 55u &&
+//	                		       this_coord.z >= 225u && this_coord.z <= 235u);
+                    let sp = select(1.0, 4.0, this_coord.x == 145u &&
+		                              this_coord.y == 50u &&
+					      this_coord.z == 230u);
+
                     // Calculate eikonal value.
-                    updated_value = solve_quadratic();
+                    updated_value = solve_quadratic(sp);
 		}
 
 		// Value changed. Add neihborhood to remedy.

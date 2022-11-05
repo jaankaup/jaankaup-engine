@@ -1205,6 +1205,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 		       sphere_tracer_params.inner_dim.y,
 		       sphere_tracer_params.outer_dim.x
     );
+    // let screen_width = 4096.0;
+    // let screen_height = 2048.0;
     let screen_width = f32(sphere_tracer_params.inner_dim.x * sphere_tracer_params.outer_dim.x);
     let screen_height = f32(sphere_tracer_params.inner_dim.y * sphere_tracer_params.outer_dim.y);
 
@@ -1221,41 +1223,12 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 
     let point_on_plane = alpha * u + beta * v;
 
-    // Print camera sceen 3d.
-    // if (global_id.x == 0u) {
-    //     let screen_coord_a = vec2<f32>(index_to_screen(0u,
-    //                                    sphere_tracer_params.inner_dim.x,
-    //         			       sphere_tracer_params.inner_dim.y,
-    //         			       sphere_tracer_params.outer_dim.x));
-    //     let screen_coord_b = vec2<f32>(index_to_screen(total_cell_count() - 1u,
-    //                                    sphere_tracer_params.inner_dim.x,
-    //         			       sphere_tracer_params.inner_dim.y,
-    //         			       sphere_tracer_params.outer_dim.x));
-
-    //     let alpha_a = 2.0 * (f32(screen_coord_a.x) + 0.5) / screen_width - 1.0;
-    //     let beta_a  = 1.0 - 2.0 * (f32(screen_coord_a.y) + 0.5) / screen_height;
-    //     let alpha_b = 2.0 * (f32(screen_coord_b.x) + 0.5) / screen_width - 1.0;
-    //     let beta_b  = 1.0 - 2.0 * (f32(screen_coord_b.y) + 0.5) / screen_height;
-    //     let point_on_plane_a = alpha_a * u + beta_a * v + camera.pos.xyz;
-    //     let point_on_plane_b = alpha_b * u + beta_b * v + camera.pos.xyz;
-
-    //     output_arrow[atomicAdd(&counter[1], 1u)] =
-    //           Arrow (
-    //               vec4<f32>(point_on_plane_a * 4.0, 0.0),
-    //               vec4<f32>(point_on_plane_b * 4.0, 0.0),
-    //               //vec4<f32>(tMins, 0.0),
-    //               //vec4<f32>(tMaxes, 0.0),
-    //               rgba_u32(155u, 0u, 1550u, 255u),
-    //               0.1
-    //     );
-    // }
-
     var ray: Ray;
     //ray.origin = point_on_plane + camera.pos.xyz * 0.25;
     ray.origin = point_on_plane + camera.pos.xyz;
     ray.direction = normalize(point_on_plane + d*camera.view.xyz);
-    ray.rMin = 70.0;
-    ray.rMax = 70.1;
+    ray.rMin = 0.0;
+    ray.rMax = 0.0;
 
     var payload: RayPayload;
     payload.color = rgba_u32(255u, 255u, 255u, 255u);
