@@ -372,20 +372,20 @@ impl FastIterativeMethod {
                             // @group(0) @binding(4) var<storage, read_write> sample_data: array<SamplerCell>;
                             create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
  
-                            // // @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
-                            // create_buffer_bindgroup_layout(4, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(5) var<storage,read_write> counter: array<atomic<u32>>;
+                            create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
  
-                            // // @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
-                            // create_buffer_bindgroup_layout(5, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(6) var<storage,read_write> output_char: array<Char>;
+                            create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
  
-                            // // @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
-                            // create_buffer_bindgroup_layout(6, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(7) var<storage,read_write> output_arrow: array<Arrow>;
+                            create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
  
-                            // // @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
-                            // create_buffer_bindgroup_layout(7, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(8) var<storage,read_write> output_aabb: array<AABB>;
+                            create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
  
-                            // // @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
-                            // create_buffer_bindgroup_layout(8, wgpu::ShaderStages::COMPUTE, false),
+                            // @group(0) @binding(9) var<storage,read_write> output_aabb_wire: array<AABB>;
+                            create_buffer_bindgroup_layout(9, wgpu::ShaderStages::COMPUTE, false),
                         ],
                     ],
                     &"main".to_string(),
@@ -512,7 +512,8 @@ impl FastIterativeMethod {
     pub fn add_point_cloud_data(&mut self,
                                 device: &wgpu::Device,
                                 pc_data: &wgpu::Buffer,
-                                point_cloud_params_buffer: &PointCloudParamsBuffer) {
+                                point_cloud_params_buffer: &PointCloudParamsBuffer,
+                                gpu_debugger: &Option<GpuDebugger>) {
 
         let pc_to_interface_bind_groups = create_bind_groups(
                 &device,
@@ -525,6 +526,11 @@ impl FastIterativeMethod {
                     &self.fim_data.as_entire_binding(),
                     &pc_data.as_entire_binding(),
                     &self.sample_data.as_entire_binding(),
+                    &gpu_debugger.as_ref().unwrap().get_element_counter_buffer().as_entire_binding(),
+                    &gpu_debugger.as_ref().unwrap().get_output_chars_buffer().as_entire_binding(),
+                    &gpu_debugger.as_ref().unwrap().get_output_arrows_buffer().as_entire_binding(),
+                    &gpu_debugger.as_ref().unwrap().get_output_aabbs_buffer().as_entire_binding(),
+                    &gpu_debugger.as_ref().unwrap().get_output_aabb_wires_buffer().as_entire_binding(),
                     ],
                 ]
         );

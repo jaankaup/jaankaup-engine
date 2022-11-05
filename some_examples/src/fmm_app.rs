@@ -240,10 +240,42 @@ impl Application for FmmApp {
         camera.set_rotation_sensitivity(0.4);
         camera.set_movement_sensitivity(0.2);
 
-        let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 100.0, 400.0), -89.0, 0.0);
+        let swap_camera_x = -1.0;
+        let swap_camera_z = -1.0;
+
+        //let cube_dim = [100.0, 50.0, 100.0];
+        let cube_dim = [50.0, 20.0, 50.0];
+        let cube_min = [120.0, 40.0, 180.0];
+        // let cube_min = [220.0, 40.0, 280.0];
+        let cube_max = [cube_min[0] + cube_dim[0],
+                        cube_dim[1] + cube_min[1],
+                        cube_dim[2] + cube_min[2]];
+
+        let center   = [cube_min[0] + cube_dim[0] * 0.5,
+                        cube_min[1] + cube_dim[1] * 0.5,
+                        cube_min[2] + cube_dim[2] * 0.5];
+
+        println!("GRADU coord == ({:?},{:?},{:?})", center[0], center[1], cube_max[2]);
+
+        //let corner_lookat = [cube_min[0], (cube_min[1] + cube_dim[1]) * 0.75, cube_min[2] + cube_dim[2]]; 
+        //let corner_lookat = [cube_min[0] + cube_dim[0], (cube_min[1] + cube_dim[1]) * 0.75, cube_min[2] + cube_dim[2]]; 
+        let corner_lookat = [center[0], center[1], cube_min[2] + cube_dim[2]]; 
+
+        let mut ray_camera = Camera::new(configuration.size.width as f32,
+                                         configuration.size.height as f32,
+                                         (corner_lookat[0],
+                                          corner_lookat[1],
+                                          corner_lookat[2]),
+                                         -49.0, -18.0);
+        //let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (185.0 + movement[0], 76.0 + movement[1], 315.0 + movement[2]), -49.0, -18.0);
+        //let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 120.0, 500.0), -89.0, -20.0);
         //++let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (440.0, 110.0, 165.0), -171.0, -23.0);
         ray_camera.set_rotation_sensitivity(0.4);
         ray_camera.set_movement_sensitivity(0.05);
+        ray_camera.set_lookat([center[0],
+                               center[1],
+                               center[2]], &configuration.queue);
+        ray_camera.move_forward(-50.0, &configuration.queue);
 
         let camera_mode = CameraMode::RayCamera;
 
@@ -263,7 +295,7 @@ impl Application for FmmApp {
         #[cfg(not(feature = "gpu_debug"))]
         let gpu_debugger = None;
 
-        let gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
+        let mut gpu_timer = GpuTimer::init(&configuration.device, &configuration.queue, 8, Some("gpu timer"));
 
         // Keyboard manager. Keep tract of keys which has been pressed, and for how long time.
         let keyboard_manager = create_keyboard_manager();
@@ -430,7 +462,8 @@ impl Application for FmmApp {
         //++                          &pc_params);
         fim.add_point_cloud_data(&configuration.device,
                                  &point_cloud.get_buffer(),
-                                 &pc_params);
+                                 &pc_params,
+                                 &gpu_debugger);
 
 
         // The fmm scene visualizer. TODO: fim scene visualizer.
@@ -583,6 +616,13 @@ impl Application for FmmApp {
                 &gpu_debugger
                 //&Some(&gpu_debugger)
         );
+
+        let mut encoder = configuration.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm encoder.") });
+
+        fim.fim_iteration(&mut encoder, &mut gpu_timer);
+        sphere_tracer.dispatch(&mut encoder); // SPHERE TRACER DISPATCH
+
+        configuration.queue.submit(Some(encoder.finish())); 
 
 
         Self {
@@ -881,7 +921,8 @@ impl Application for FmmApp {
         // Fast marching method.
         if self.once {
             // self.fmm.fmm_iteration(&mut encoder, &mut self.gpu_timer);
-            self.fim.fim_iteration(&mut encoder, &mut self.gpu_timer);
+            // self.fim.fim_iteration(&mut encoder, &mut self.gpu_timer);
+            // self.sphere_tracer.dispatch(&mut encoder); // SPHERE TRACER DISPATCH
             // let mut pass = self.fmm.create_compute_pass_fmm(&mut encoder);
 
             // self.gpu_timer.start_pass(&mut pass);
@@ -943,7 +984,7 @@ impl Application for FmmApp {
 
         // self.gpu_timer.resolve_timestamps(&mut encoder);
         //if self.once {
-            self.sphere_tracer.dispatch(&mut encoder);
+        //   self.sphere_tracer.dispatch(&mut encoder); // SPHERE TRACER DISPATCH
         //}
 
         encoder.copy_buffer_to_texture(

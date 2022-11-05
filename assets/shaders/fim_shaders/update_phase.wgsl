@@ -46,24 +46,24 @@ var<private> private_neighbors:     array<FimCellPc, 6>;
 
 fn udiv_up_safe32(x: u32, y: u32) -> u32 {
     let tmp = (x + y - 1u) / y;
-    return select(tmp, 0u, y == 0u); 
+    return select(tmp, 0u, y == 0u);
 }
 
 fn total_cell_count() -> u32 {
 
-    return fmm_params.global_dimension.x * 
-           fmm_params.global_dimension.y * 
-           fmm_params.global_dimension.z * 
-           fmm_params.local_dimension.x * 
-           fmm_params.local_dimension.y * 
-           fmm_params.local_dimension.z; 
+    return fmm_params.global_dimension.x *
+           fmm_params.global_dimension.y *
+           fmm_params.global_dimension.z *
+           fmm_params.local_dimension.x *
+           fmm_params.local_dimension.y *
+           fmm_params.local_dimension.z;
 };
 
-/// A function that checks if a given coordinate is within the global computational domain. 
+/// A function that checks if a given coordinate is within the global computational domain.
 fn isInside(coord: vec3<i32>) -> bool {
     return (coord.x >= 0 && coord.x < i32(fmm_params.local_dimension.x * fmm_params.global_dimension.x)) &&
            (coord.y >= 0 && coord.y < i32(fmm_params.local_dimension.y * fmm_params.global_dimension.y)) &&
-           (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z)); 
+           (coord.z >= 0 && coord.z < i32(fmm_params.local_dimension.z * fmm_params.global_dimension.z));
 }
 
 fn encode3Dmorton32(x: u32, y: u32, z: u32) -> u32 {
@@ -128,7 +128,7 @@ fn get_cell_index(global_index: u32) -> vec3<u32> {
 
     let cell_position = block_position + local_position;
 
-    return cell_position; 
+    return cell_position;
 }
 
 /// Get memory index from given cell coordinate.
@@ -176,7 +176,7 @@ fn load_neighbors_6(coord: vec3<u32>) -> array<u32, 6> {
         select(tcc ,i2, isInside(neighbors[2])),
         select(tcc ,i3, isInside(neighbors[3])),
         select(tcc ,i4, isInside(neighbors[4])),
-        select(tcc ,i5, isInside(neighbors[5])) 
+        select(tcc ,i5, isInside(neighbors[5]))
     );
 }
 
@@ -188,7 +188,7 @@ fn solve_quadratic() -> f32 {
                                   private_neighbors[2].value,
                                   private_neighbors[3].value,
                                   private_neighbors[4].value,
-                                  private_neighbors[5].value 
+                                  private_neighbors[5].value
     );
     // var phis: array<f32, 6> = array<f32, 6>(
     //                               //private_neighbors[0].value,
@@ -196,13 +196,13 @@ fn solve_quadratic() -> f32 {
     //                               //private_neighbors[2].value,
     //                               //private_neighbors[3].value,
     //                               //private_neighbors[4].value,
-    //                               //private_neighbors[5].value 
+    //                               //private_neighbors[5].value
     //                               select(0.0, private_neighbors[0].value, private_neighbors[0].tag == SOURCE),
     //                               select(0.0, private_neighbors[1].value, private_neighbors[1].tag == SOURCE),
     //                               select(0.0, private_neighbors[2].value, private_neighbors[2].tag == SOURCE),
     //                               select(0.0, private_neighbors[3].value, private_neighbors[3].tag == SOURCE),
     //                               select(0.0, private_neighbors[4].value, private_neighbors[4].tag == SOURCE),
-    //                               select(0.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE) 
+    //                               select(0.0, private_neighbors[5].value, private_neighbors[5].tag == SOURCE)
     // );
 
 
@@ -238,7 +238,7 @@ fn solve_quadratic() -> f32 {
     else if (abs(p[0] - p[1]) < 1.0) {
         result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
     }
- 
+
     else {
         result = p[0] + 1.0;
     }
@@ -275,7 +275,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 	        var actual_index = local_index + i * 1024u; // + buffer_swap_id * buffer_offset;
 	        var swap_index = actual_index + buffer_swap_id * buffer_offset;
 
-		var t: TempData; 
+		var t: TempData;
 		var fim_cell: FimCellPc;
 		var this_coord: vec3<u32>;
 		var updated_value: f32;
@@ -320,7 +320,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
 			if (updated_value < 100000.0) {
 
 			    atomicStore(&fim_data[t.memory_location].tag, SOURCE);
-			    // if (updated_value > 99999.0) { 
+			    // if (updated_value > 99999.0) {
 			    //    fim_data[t.memory_location].value = 100066.0;
 			    // }
 			    // fim_data[t.memory_location].value = updated_value;
@@ -345,7 +345,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                             // if (!(private_neighbors[2].tag == SOURCE || private_neighbors[2].tag == ACTIVE || private_neighbors[2].tag == OUTSIDE)) {
 		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[2]].tag, ACTIVE);
 	                        if (old_tag == OTHER) {
-                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
 			    	    TempData(neighbor_mem_locations[2], private_neighbors[2].value);
 	                        }
 		            }
@@ -353,7 +353,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                             // if (!(private_neighbors[3].tag == SOURCE || private_neighbors[3].tag == ACTIVE || private_neighbors[3].tag == OUTSIDE)) {
 		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[3]].tag, ACTIVE);
 	                        if (old_tag == OTHER) {
-                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
 			    	    TempData(neighbor_mem_locations[3], private_neighbors[3].value);
 	                        }
 		            }
@@ -361,7 +361,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                             // if (!(private_neighbors[4].tag == SOURCE || private_neighbors[4].tag == ACTIVE || private_neighbors[4].tag == OUTSIDE)) {
 		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[4]].tag, ACTIVE);
 	                        if (old_tag == OTHER) {
-                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
 			    	    TempData(neighbor_mem_locations[4], private_neighbors[4].value);
 	                        }
 		            }
@@ -369,7 +369,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                             // if (!(private_neighbors[5].tag == SOURCE || private_neighbors[5].tag == ACTIVE || private_neighbors[5].tag == OUTSIDE)) {
 		                var old_tag = atomicExchange(&fim_data[neighbor_mem_locations[5]].tag, ACTIVE);
 	                        if (old_tag == OTHER) {
-                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] = 
+                                    active_list[atomicAdd(&wg_mem_offset, 1u) + next_buffer_swap * buffer_offset] =
 			    	    TempData(neighbor_mem_locations[5], private_neighbors[5].value);
 	                        }
 		            }

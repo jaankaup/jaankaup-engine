@@ -93,6 +93,25 @@ impl Camera {
         self.focal_distance
     }
 
+    pub fn get_view(&self) -> [f32 ; 3] {
+        [self.view.x, self.view.y, self.view.z]
+    }
+
+    pub fn move_forward(&mut self, amount: f32, queue: &wgpu::Queue) {
+        self.pos = self.pos + self.view * amount;
+        self.update_camera(&queue);
+        self.update_ray_camera(&queue);
+    }
+    pub fn set_lookat(&mut self, at: [f32; 3], queue: &wgpu::Queue) {
+        self.view = Vector3::new(
+            at[0] - self.pos.x, // - at[0],
+            at[1] - self.pos.y, // - at[1],
+            at[2] - self.pos.z, // - at[2],
+        ).normalize_to(1.0);
+        self.update_camera(&queue);
+        self.update_ray_camera(&queue);
+    }
+
     /// Get a reference to camera uniform buffer. Creates the buffer is it doens't already exist.
     pub fn get_camera_uniform(&mut self, device: &wgpu::Device) -> &wgpu::Buffer {
 

@@ -39,6 +39,28 @@ struct FmmCellPc {
 //     col: f32,
 // };
 
+struct AABB {
+    min: vec4<f32>, 
+    max: vec4<f32>, 
+};
+
+struct Char {
+    start_pos: vec3<f32>,
+    font_size: f32,
+    value: vec4<f32>,
+    vec_dim_count: u32,
+    color: u32,
+    decimal_count: u32,
+    auxiliary_data: u32,
+};
+
+struct Arrow {
+    start_pos: vec4<f32>,
+    end_pos:   vec4<f32>,
+    color: u32,
+    size:  f32,
+};
+
 struct TempData {
     memory_index: u32,
     dist: i32,
@@ -51,15 +73,15 @@ struct TempData {
 @group(0) @binding(3) var<storage, read_write> point_data: array<VVVC>;
 @group(0) @binding(4) var<storage, read_write> sample_data: array<u32>; // not used
 
-var<workgroup> temp_workgroup_data: array<TempData, 8192>; 
-var<workgroup> temp_workgroup_data_counter: atomic<u32>; 
+// var<workgroup> temp_workgroup_data: array<TempData, 8192>; 
+// var<workgroup> temp_workgroup_data_counter: atomic<u32>; 
 
 // Debug. Disabled.
-// @group(0) @binding(4) var<storage,read_write> counter: array<atomic<u32>>;
-// @group(0) @binding(5) var<storage,read_write> output_char: array<Char>;
-// @group(0) @binding(6) var<storage,read_write> output_arrow: array<Arrow>;
-// @group(0) @binding(7) var<storage,read_write> output_aabb: array<AABB>;
-// @group(0) @binding(8) var<storage,read_write> output_aabb_wire: array<AABB>;
+@group(0) @binding(5) var<storage,read_write> counter: array<atomic<u32>>;
+@group(0) @binding(6) var<storage,read_write> output_char: array<Char>;
+@group(0) @binding(7) var<storage,read_write> output_arrow: array<Arrow>;
+@group(0) @binding(8) var<storage,read_write> output_aabb: array<AABB>;
+@group(0) @binding(9) var<storage,read_write> output_aabb_wire: array<AABB>;
 
 // fn my_modf(f: f32) -> ModF {
 //     let iptr = trunc(f);
@@ -201,6 +223,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     let number_of_chunks = udiv_up_safe32(point_cloud_params.point_count, 1024u);
 
     let min_distance = 0.65;
+    //let min_distance = 1.0;
     //let min_distance = 0.57;
     //let min_distance = 0.55;
     //let min_distance = 0.70710678;
@@ -257,6 +280,20 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                 if (inside) { 
 	            // var ind = atomicAdd(&temp_workgroup_data_counter, 1u);
                     let dist = distance(p.position, vec3<f32>(neighbors[i])) - min_distance;
+
+                //++ let col = select(rgba_u32(255u, 0u, 0u, 255u), rgba_u32(0u, 0u, 2550u, 255u), dist < 0.0);  
+                //++ // Draw distance arrow.
+		//++ if (actual_index < 1024u && actual_index >= 0u) {
+                //++     output_arrow[atomicAdd(&counter[1], 1u)] =  
+                //++           Arrow (
+                //++               vec4<f32>(vec3<f32>(neighbors[i]) * 4.0, 0.0),
+                //++               vec4<f32>((vec3<f32>(neighbors[i]) + normalize(vec3<f32>(neighbors[i]) - p.position) * dist) * 4.0, 0.0),
+                //++               //vec4<f32>(tMins, 0.0),
+                //++               //vec4<f32>(tMaxes, 0.0),
+                //++               col,
+                //++               0.04
+                //++     );
+	        //++ }
                     var dist_to_i32 = i32(dist * 1000000.0);
                     local_temp_datas[local_temp_data_count] = TempData(mem_locations[i], dist_to_i32, p.color);
                     atomicMin(&fmm_data[mem_locations[i]].value, dist_to_i32);
