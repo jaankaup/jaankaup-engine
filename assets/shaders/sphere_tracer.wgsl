@@ -330,11 +330,20 @@ fn screen_to_index(v: vec2<u32>) -> u32 {
 
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    let light_pos = vec3<f32>(
-                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) * 2.5,
-                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) * 1.5,
-                        f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) * 1.5 +
-			vec3<f32>(0.0, f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y), 0.0);
+    let light_pos = vec3<f32>(125.0, 20.0,-130.0);
+    //let light_pos = vec3<f32>(225.0, 30.0,-130.0);
+    //let light_pos = vec3<f32>(225.0, 30.0,30.0);
+    //let light_pos = vec3<f32>(225.0, 30.0,130.0);
+//    let light_pos = vec3<f32>(
+//                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) * 2.0,
+//                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) * 1.0,
+//                        f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) * 0.5 +
+//			vec3<f32>(0.0, f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y), 0.0);
+//    let light_pos = vec3<f32>(
+//                        f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) * 3.5,
+//                        f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) * 1.5,
+//                        f32(fmm_params.global_dimension.z * fmm_params.local_dimension.z)) * 1.5 +
+//			vec3<f32>(0.0, f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y), 0.0);
 //++     let light_pos = vec3<f32>(
 //++                         f32(fmm_params.global_dimension.x * fmm_params.local_dimension.x) * 1.5,
 //++                         f32(fmm_params.global_dimension.y * fmm_params.local_dimension.y) * 1.5,
@@ -345,12 +354,12 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
     //let light_pos = vec3<f32>(150.0,70.0,150.0);
     //let light_pos = camera.pos; // vec3<f32>(150.0,70.0,150.0);
-    let lightColor = vec3<f32>(0.6,0.6,0.6);
-    let lightPower = 330000.0;
+    let lightColor = vec3<f32>(1.0,1.0,1.0);
+    let lightPower = 129000.0;
 
     // Material properties
     let materialDiffuseColor = decode_color((*payload).color).xyz; //vec3<f32>(1.0, 0.0, 0.0);
-    let materialAmbientColor = vec3<f32>(0.6,0.6,0.6) * materialDiffuseColor;
+    let materialAmbientColor = vec3<f32>(0.1,0.1,0.1) * materialDiffuseColor;
     let materialSpecularColor = vec3<f32>(1.0,1.0,1.0);
 
     // Distance to the light
@@ -368,7 +377,7 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
     let r = reflect(-l,n);
     let cosAlpha = clamp( dot( e,r ), 0.0,1.0);
 
-    let gamma = 1.1;
+    let gamma = 1.0;
 
     // let c = pow(c0 * (1.0 - tz) + c1 * tz, vec4<f32>(1.0 / gamma));
 
@@ -1109,17 +1118,17 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         let max_x = 300.0;
         let max_y = 86.0;
         let max_z = 76.0 * 4.0 - 2.0;
-	let offsetc = 0.1;
+	let offsetc = 0.07;
 	//let offsetc = 2;
 	// var condx = false; // dist_norm.w < 0.01 && dist_norm.w > 0.0;
 	var condx = dist_norm.w < 0.01 && dist_norm.w > 0.0;
 	var the_value = 0.0;
 
-	for (var i: i32 = 1 ; i < 512 ; i = i + 1) {
+	for (var i: i32 = 128 ; i < 632 ; i = i + 1) {
 	//for (var i: i32 = 15 ; i > 0 ; i = i - 1) {
 	    if (condx) { break; }
 	    let off = offsetc * f32(i);
-	    condx = (dist_norm.w < off) && (dist_norm.w > (off - 0.01));
+	    condx = (dist_norm.w < off) && (dist_norm.w > (off - 0.03));
 	    the_value = off;
 	}
 
@@ -1228,7 +1237,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     ray.origin = point_on_plane + camera.pos.xyz;
     ray.direction = normalize(point_on_plane + d*camera.view.xyz);
     ray.rMin = 0.0;
-    ray.rMax = 0.0;
+    ray.rMax = 5.0;
 
     var payload: RayPayload;
     payload.color = rgba_u32(255u, 255u, 255u, 255u);
