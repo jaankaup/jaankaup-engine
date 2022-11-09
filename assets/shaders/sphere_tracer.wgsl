@@ -330,7 +330,12 @@ fn screen_to_index(v: vec2<u32>) -> u32 {
 
 fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    let light_pos = vec3<f32>(125.0, 20.0,-130.0);
+    //let light_pos = vec3<f32>(145.0, 50.0,230.0);
+
+    //-- let light_pos = vec3<f32>(445.0, 150.0,30.0);
+
+    let light_pos = vec3<f32>(445.0, 250.0,-30.0);
+
     //let light_pos = vec3<f32>(225.0, 30.0,-130.0);
     //let light_pos = vec3<f32>(225.0, 30.0,30.0);
     //let light_pos = vec3<f32>(225.0, 30.0,130.0);
@@ -354,12 +359,13 @@ fn diffuse(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
     //let light_pos = vec3<f32>(150.0,70.0,150.0);
     //let light_pos = camera.pos; // vec3<f32>(150.0,70.0,150.0);
-    let lightColor = vec3<f32>(1.0,1.0,1.0);
-    let lightPower = 129000.0;
+    let lightColor = vec3<f32>(0.4,0.4,0.4);
+    //let lightPower = 163000.0;
+    let lightPower = 213000.0;
 
     // Material properties
     let materialDiffuseColor = decode_color((*payload).color).xyz; //vec3<f32>(1.0, 0.0, 0.0);
-    let materialAmbientColor = vec3<f32>(0.1,0.1,0.1) * materialDiffuseColor;
+    let materialAmbientColor = vec3<f32>(0.3,0.3,0.3) * materialDiffuseColor;
     let materialSpecularColor = vec3<f32>(1.0,1.0,1.0);
 
     // Distance to the light
@@ -868,17 +874,27 @@ fn calculate_normal(payload: ptr<function, RayPayload>) -> vec3<f32> {
     //grad.z = z_minus - z;
     return normalize(grad);
 }
+fn hit_back(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
+        //let col = hsv2rgb(rgb2hsv(vec3<f32>(0.9, 0.0, 0.0)) + vec3<f32>(((*payload).opacity - 33.6) * 0.08 , 0.0 , 0.0 )); // (*payload).opacity * 0.005));
+        //(*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
+        //(*payload).color = rgba_u32_tex(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
+
+        // (*payload).color = rgba_u32(0u,200u,0u, 255u);
+        // (*payload).visibility = 1.0;
+        diffuse(ray, payload);
+}
 
 /// Function tha is called on ray hit. TODO: separate gradien calculation to another function.
 fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    if ((*payload).opacity < 0.01) {
-        (*payload).color = rgba_u32(55u, 55u, 200u, 255u);
-    }
-    else {
-        let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>((*payload).opacity * 0.014 - 0.4, 0.0 , 0.0 )); // (*payload).opacity * 0.005));
+    //if ((*payload).opacity < 0.01) {
+    //    (*payload).color = rgba_u32(55u, 55u, 200u, 255u);
+    //}
+    //else {
+        let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(((*payload).opacity - 33.6) * 0.08 , 0.0 , 0.0 )); // (*payload).opacity * 0.005));
         (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
-    }
+        //(*payload).color = rgba_u32_tex(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
+    //}
 
     //fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
@@ -1112,33 +1128,47 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 	//let delta = abs(distance_to_interface - sphere_tracer_params.isovalue)
         //if (dist_norm.w < 0.01) { // sphere_tracer_params.isovalue) {
 
-        let min_x = 2.0;
-        let min_y = 2.0;
-        let min_z = 2.0;
-        let max_x = 300.0;
-        let max_y = 86.0;
-        let max_z = 76.0 * 4.0 - 2.0;
-	let offsetc = 0.07;
+
+        // let min_x = 2.0;
+        // let min_y = 2.0;
+        // let min_z = 2.0;
+        // let max_x = 300.0;
+        // let max_y = 86.0;
+        // let max_z = 76.0 * 4.0 - 2.0;
+        //++ let min_x = 145.0;
+        //++ let min_y = 50.0;
+        //++ let min_z = 230.0;
+        let min_x = 125.0;
+        let min_y = 25.0;
+        let min_z = 150.0;
+        let max_x = 220.0;
+        let max_y = 72.0;
+        let max_z = 270.0;
 	//let offsetc = 2;
 	// var condx = false; // dist_norm.w < 0.01 && dist_norm.w > 0.0;
-	var condx = dist_norm.w < 0.01 && dist_norm.w > 0.0;
 	var the_value = 0.0;
 
-	for (var i: i32 = 128 ; i < 632 ; i = i + 1) {
-	//for (var i: i32 = 15 ; i > 0 ; i = i - 1) {
-	    if (condx) { break; }
-	    let off = offsetc * f32(i);
-	    condx = (dist_norm.w < off) && (dist_norm.w > (off - 0.03));
-	    the_value = off;
-	}
+	let offsetc = 0.035;
+	var condx = false;
 
-	// let conds_back = (p.x < min_x) ||
-        //                  (p.y < min_y) ||
-        //                  (p.z < min_z);
+        let j = dist_norm.w / 0.015;
+        let f = floor(j);
+	let ero = abs(j-f);
+
+	if (ero < 0.4 && dist_norm.w > 29.7 && dist_norm.w < 36.4) {
+           condx = true;
+	}
+	// for (var i: i32 = 850 ; i < 1040 ; i = i + 1) {
+	//     if (condx) { break; }
+	//     let off = offsetc * f32(i);
+	//     condx = (dist_norm.w < off) && (dist_norm.w > (off - 0.010));
+	//     the_value = off;
+	// }
+
 	
-	let conds = (p.x > min_x) &&
-                    (p.y > min_y) &&
-	            (p.z > min_z) &&
+	let conds = (p.x >= min_x) &&
+                    (p.y >= min_y) &&
+	            (p.z >= min_z) &&
 		    (p.x < max_x) &&
                     (p.y < max_y) &&
 		    (p.z < max_z) &&
@@ -1151,12 +1181,29 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 	//     return;
 	// }
 	//if (conds) {
-	if (condx) {
-            (*payload).opacity = the_value;
+	if (distance(p, vec3<f32>(145.0, 50.0, 230.0)) < 0.05) {
+        // if (abs(p.x - 145.0) < 0.05 &&
+        //     abs(p.y - 50.0)  < 0.05 &&
+        //     abs(p.z - 230.0) < 0.05) {
+
+                (*payload).color = rgba_u32_tex(10u, 10u, 10u, 255u);
+                hit_back(ray, payload);
+		return;
+	}
+
+	
+	if (conds) {
+            (*payload).opacity = dist_norm.w;
             (*payload).normal = dist_norm.xyz;
             hit(ray, payload);
             return;
 	}
+	// else {
+        //     // (*payload).opacity = dist_norm.w;
+        //     // (*payload).normal = dist_norm.xyz;
+        //     // hit(ray, payload);
+	//     continue;
+	// }
 	// if (dist_norm.w < 0.01) {
 
 	//     (*payload).opacity = dist;
@@ -1166,6 +1213,7 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
         // }
 
         step_counter = step_counter + 1u;
+	//dist = dist + 0.001;
 	dist = dist + 0.0005;
 	//dist = dist + dist_norm.w;
     } // while
@@ -1237,7 +1285,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     ray.origin = point_on_plane + camera.pos.xyz;
     ray.direction = normalize(point_on_plane + d*camera.view.xyz);
     ray.rMin = 0.0;
-    ray.rMax = 5.0;
+    ray.rMax = 50.0;
 
     var payload: RayPayload;
     payload.color = rgba_u32(255u, 255u, 255u, 255u);

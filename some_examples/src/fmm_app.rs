@@ -293,7 +293,7 @@ impl Application for FmmApp {
 
         let camera_mode = CameraMode::RayCamera;
 
-        ray_camera.set_focal_distance(10.0, &configuration.queue);
+        ray_camera.set_focal_distance(1.0, &configuration.queue);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: true,
