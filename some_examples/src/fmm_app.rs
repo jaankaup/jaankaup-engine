@@ -634,7 +634,7 @@ impl Application for FmmApp {
         let mut encoder = configuration.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Fmm encoder.") });
 
         fim.fim_iteration(&mut encoder, &mut gpu_timer);
-        sphere_tracer.dispatch(&mut encoder); // SPHERE TRACER DISPATCH
+        //sphere_tracer.dispatch(&mut encoder); // SPHERE TRACER DISPATCH
 
         configuration.queue.submit(Some(encoder.finish())); 
 
@@ -998,7 +998,7 @@ impl Application for FmmApp {
 
         // self.gpu_timer.resolve_timestamps(&mut encoder);
         //if self.once {
-        //   self.sphere_tracer.dispatch(&mut encoder); // SPHERE TRACER DISPATCH
+        self.sphere_tracer.dispatch(&mut encoder); // SPHERE TRACER DISPATCH
         //}
 
         encoder.copy_buffer_to_texture(

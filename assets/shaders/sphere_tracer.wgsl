@@ -887,19 +887,13 @@ fn hit_back(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 /// Function tha is called on ray hit. TODO: separate gradien calculation to another function.
 fn hit(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 
-    //if ((*payload).opacity < 0.01) {
-    //    (*payload).color = rgba_u32(55u, 55u, 200u, 255u);
-    //}
-    //else {
-        let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(((*payload).opacity - 33.6) * 0.08 , 0.0 , 0.0 )); // (*payload).opacity * 0.005));
-        (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
-        //(*payload).color = rgba_u32_tex(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
-    //}
+    //raymarch    let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(((*payload).opacity - 33.6) * 0.08 , 0.0 , 0.0 )); // (*payload).opacity * 0.005));
+    //raymarch    (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
 
     //fmm_value((*payload).intersection_point, true);
     //(*payload).color = fmm_color_6((*payload).intersection_point);
 
-    //++ (*payload).color = fmm_color((*payload).intersection_point);
+    (*payload).color = fmm_color((*payload).intersection_point);
 
     //++ let col = hsv2rgb(rgb2hsv(vec3<f32>(1.0, 0.0, 0.0)) + vec3<f32>(sphere_tracer_params.isovalue * 0.01, sphere_tracer_params.isovalue * 0.01, 0.0));
     //++ (*payload).color = rgba_u32(u32(col.x * 255.0), u32(col.y * 255.0), u32(col.z * 255.0), 255u);
@@ -1109,113 +1103,84 @@ fn traceRay(ray: ptr<function, Ray>, payload: ptr<function, RayPayload>) {
 	        render_circle(p, distance_to_interface, dist);
         }
 
-        // Render step points.
-        if ( private_local_index.x == 0u) {
-        output_aabb[atomicAdd(&counter[2], 1u)] =
-              AABB (
-                  vec4<f32>(4.0 * p.x - 0.4,
-                            4.0 * p.y - 0.4,
-                            4.0 * p.z - 0.4,
-                            bitcast<f32>(rgba_u32(min(255u, step_counter), 0u, min(255u, 255u - step_counter), 255u))),
-                  vec4<f32>(4.0 * p.x + 0.4,
-                            4.0 * p.y + 0.4,
-                            4.0 * p.z + 0.4,
-                            0.0),
-        );
-        }
+        // RENDER STEP POINTS.
+        // if ( private_local_index.x == 0u) {
+        // output_aabb[atomicAdd(&counter[2], 1u)] =
+        //       AABB (
+        //           vec4<f32>(4.0 * p.x - 0.4,
+        //                     4.0 * p.y - 0.4,
+        //                     4.0 * p.z - 0.4,
+        //                     bitcast<f32>(rgba_u32(min(255u, step_counter), 0u, min(255u, 255u - step_counter), 255u))),
+        //           vec4<f32>(4.0 * p.x + 0.4,
+        //                     4.0 * p.y + 0.4,
+        //                     4.0 * p.z + 0.4,
+        //                     0.0),
+        // );
+        // }
 
         //if (abs(distance_to_interface) < 0.03) {
 	//let delta = abs(distance_to_interface - sphere_tracer_params.isovalue)
         //if (dist_norm.w < 0.01) { // sphere_tracer_params.isovalue) {
 
 
-        // let min_x = 2.0;
-        // let min_y = 2.0;
-        // let min_z = 2.0;
-        // let max_x = 300.0;
-        // let max_y = 86.0;
-        // let max_z = 76.0 * 4.0 - 2.0;
-        //++ let min_x = 145.0;
-        //++ let min_y = 50.0;
-        //++ let min_z = 230.0;
-        let min_x = 125.0;
-        let min_y = 25.0;
-        let min_z = 150.0;
-        let max_x = 220.0;
-        let max_y = 72.0;
-        let max_z = 270.0;
-	//let offsetc = 2;
-	// var condx = false; // dist_norm.w < 0.01 && dist_norm.w > 0.0;
-	var the_value = 0.0;
+        //++ raymatch let min_x = 125.0;
+        //++ raymatch let min_y = 25.0;
+        //++ raymatch let min_z = 150.0;
+        //++ raymatch let max_x = 220.0;
+        //++ raymatch let max_y = 72.0;
+        //++ raymatch let max_z = 270.0;
+	//++ raymatch var the_value = 0.0;
 
-	let offsetc = 0.035;
-	var condx = false;
+	//++ raymatch let offsetc = 0.035;
+	//++ raymatch var condx = false;
 
-        let j = dist_norm.w / 0.015;
-        let f = floor(j);
-	let ero = abs(j-f);
+        //++ raymatch let j = dist_norm.w / 0.015;
+        //++ raymatch let f = floor(j);
+	//++ raymatch let ero = abs(j-f);
 
-	if (ero < 0.4 && dist_norm.w > 29.7 && dist_norm.w < 36.4) {
-           condx = true;
-	}
-	// for (var i: i32 = 850 ; i < 1040 ; i = i + 1) {
-	//     if (condx) { break; }
-	//     let off = offsetc * f32(i);
-	//     condx = (dist_norm.w < off) && (dist_norm.w > (off - 0.010));
-	//     the_value = off;
-	// }
+	//++ raymatch if (ero < 0.4 && dist_norm.w > 29.7 && dist_norm.w < 36.4) {
+        //++ raymatch    condx = true;
+	//++ raymatch }
+	//++ raymatch 
+	//++ raymatch let conds = (p.x >= min_x) &&
+        //++ raymatch             (p.y >= min_y) &&
+	//++ raymatch             (p.z >= min_z) &&
+	//++ raymatch 	    (p.x < max_x) &&
+        //++ raymatch             (p.y < max_y) &&
+	//++ raymatch 	    (p.z < max_z) &&
+	//++ raymatch 	    condx;
 
-	
-	let conds = (p.x >= min_x) &&
-                    (p.y >= min_y) &&
-	            (p.z >= min_z) &&
-		    (p.x < max_x) &&
-                    (p.y < max_y) &&
-		    (p.z < max_z) &&
-		    condx;
+	//++ raymatch if (distance(p, vec3<f32>(145.0, 50.0, 230.0)) < 0.05) {
 
-        // if (conds_back) {
-        //     (*payload).opacity = dist_norm.w;
-        //     (*payload).normal = dist_norm.xyz;
-        //     hit_back(ray, payload);
-	//     return;
-	// }
-	//if (conds) {
-	if (distance(p, vec3<f32>(145.0, 50.0, 230.0)) < 0.05) {
-        // if (abs(p.x - 145.0) < 0.05 &&
-        //     abs(p.y - 50.0)  < 0.05 &&
-        //     abs(p.z - 230.0) < 0.05) {
+        //++ raymatch         (*payload).color = rgba_u32_tex(10u, 10u, 10u, 255u);
+        //++ raymatch         hit_back(ray, payload);
+	//++ raymatch 	return;
+	//++ raymatch }
 
-                (*payload).color = rgba_u32_tex(10u, 10u, 10u, 255u);
-                hit_back(ray, payload);
-		return;
-	}
-
-	
-	if (conds) {
-            (*payload).opacity = dist_norm.w;
-            (*payload).normal = dist_norm.xyz;
-            hit(ray, payload);
-            return;
-	}
+	//++ raymatch 
+	//++ raymatch if (conds) {
+        //++ raymatch     (*payload).opacity = dist_norm.w;
+        //++ raymatch     (*payload).normal = dist_norm.xyz;
+        //++ raymatch     hit(ray, payload);
+        //++ raymatch     return;
+	//++ raymatch }
 	// else {
         //     // (*payload).opacity = dist_norm.w;
         //     // (*payload).normal = dist_norm.xyz;
         //     // hit(ray, payload);
 	//     continue;
 	// }
-	// if (dist_norm.w < 0.01) {
+	if (dist_norm.w < 0.01) {
 
-	//     (*payload).opacity = dist;
-	//     (*payload).normal = dist_norm.xyz;
-	//     hit(ray, payload);
-        //     return;
-        // }
+	    (*payload).opacity = dist;
+	    (*payload).normal = dist_norm.xyz;
+	    hit(ray, payload);
+            return;
+        }
 
         step_counter = step_counter + 1u;
-	//dist = dist + 0.001;
-	dist = dist + 0.0005;
-	//dist = dist + dist_norm.w;
+	//raymarch dist = dist + 0.0005;
+	dist = dist + dist_norm.w;
     } // while
 }
 
@@ -1288,8 +1253,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     ray.rMax = 50.0;
 
     var payload: RayPayload;
-    payload.color = rgba_u32(255u, 255u, 255u, 255u);
-    //payload.color = rgba_u32(255u, 0u, 0u, 0u);
+    // payload.color = rgba_u32(255u, 255u, 255u, 255u);
+    payload.color = rgba_u32(255u, 0u, 0u, 0u);
     payload.visibility = 0.0;
 
     traceRay(&ray, &payload);
@@ -1360,7 +1325,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
         //           0.1
         // );
     }
-    // Rays.
+    // RAYS.
     // if ((private_local_index.x == 0u || private_local_index.x == 42u) && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
     if (private_local_index.x == 0u && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
         output_arrow[atomicAdd(&counter[1], 1u)] =
@@ -1371,6 +1336,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                   0.3
         );
     }
+
     // Scene aabb.
     //++ if (global_id.x == 0u) {
     //++     let aabbmin = vec3<f32>(0.0, 0.0, 0.0);
