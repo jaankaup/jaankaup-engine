@@ -60,7 +60,7 @@ use bytemuck::{Pod, Zeroable};
 
 /// Max number of arrows for gpu debugger.
 #[allow(dead_code)]
-const MAX_NUMBER_OF_ARROWS:     usize = 262144 * 8;
+const MAX_NUMBER_OF_ARROWS:     usize = 262144 * 16;
 
 /// Max number of aabbs for gpu debugger.
 #[allow(dead_code)]

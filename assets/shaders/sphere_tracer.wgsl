@@ -1327,13 +1327,13 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
     // RAYS.
     // if ((private_local_index.x == 0u || private_local_index.x == 42u) && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
-    if (private_local_index.x == 0u && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
+    if (private_local_index.x == 32u && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
         output_arrow[atomicAdd(&counter[1], 1u)] =
               Arrow (
                   vec4<f32>(ray.origin * 4.0, 0.0),
                   vec4<f32>(payload.intersection_point * 4.0, 0.0),
                   rgba_u32_argb(payload.color),
-                  0.3
+                  0.1
         );
     }
 
