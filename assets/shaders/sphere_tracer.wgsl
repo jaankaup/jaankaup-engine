@@ -1301,7 +1301,7 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
                   vec4<f32>(ray.origin * 4.0, 0.0),
                   vec4<f32>(payload.intersection_point * 4.0, 0.0),
                   //vec4<f32>(result.intersection_point, 0.0),
-                  rgba_u32(255u, 1550u, 250u, 255u),
+                  rgba_u32(255u, 155u, 250u, 255u),
                   //rgba_u32_argb(payload.color),
                   0.2
         );
