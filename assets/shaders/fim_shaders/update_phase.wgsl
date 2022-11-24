@@ -233,11 +233,11 @@ fn solve_quadratic(speed: f32) -> f32 {
 
     else if (abs(p[0] - p[1]) < 1.0) {
         //result = 0.5 * (p[0] + p[1] + sqrt(2.0 * 1.0 - pow((p[0] - p[1]), 2.0)));
-        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * fpow2_inv - (p[0] - p[1]) * (p[0] - p[1])));
+        result = 0.5 * (p[0] + p[1] + sqrt(2.0 * fpow2_inv - ((p[0] - p[1]) * (p[0] - p[1]))));
     }
 
     else {
-        result = p[0] + fpow2_inv;
+        result = p[0] + (1.0 / speed);
     }
 
     return result;

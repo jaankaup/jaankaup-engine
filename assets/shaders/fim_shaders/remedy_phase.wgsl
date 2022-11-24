@@ -237,7 +237,7 @@ fn solve_quadratic(speed: f32) -> f32 {
     }
 
     else {
-        result = p[0] + fpow2_inv;
+        result = p[0] + (1.0 / speed);
     }
 
     return result;

@@ -314,11 +314,6 @@ fn index_to_screen(index: u32, dim_x: u32, dim_y: u32, global_dim_x:u32) -> vec2
 
         // Global coordinate.
 	return vec2<u32>(outer_coord[0] * dim_x + x, outer_coord[1] * dim_y + y);
-
-        // let gx = outer_coord[0] * dim_x + x;
-        // let gy = outer_coord[1] * dim_y + y;
-
-        // [gx, gy]
 }
 
 fn screen_to_index(v: vec2<u32>) -> u32 {
@@ -1216,11 +1211,6 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     private_local_index = local_id;
     step_counter = 0u;
 
-    let screen_coord = vec2<f32>(index_to_screen(global_id.x,
-                                       sphere_tracer_params.inner_dim.x,
-				       sphere_tracer_params.inner_dim.y,
-				       sphere_tracer_params.outer_dim.x));
-
     let screen_coord = index_to_screen(
                        global_id.x,
 		       sphere_tracer_params.inner_dim.x,
@@ -1327,7 +1317,8 @@ fn main(@builtin(local_invocation_id)    local_id: vec3<u32>,
     }
     // RAYS.
     // if ((private_local_index.x == 0u || private_local_index.x == 42u) && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
-    if (private_local_index.x == 32u && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
+    // if ((workgroup_id.x == 0u && local_index == 7u) || (workgroup_id.x == 0u && local_index == 0u) && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
+    if ((local_index == 0u || local_index == 3u || local_index == 6u) && payload.color != rgba_u32(255u, 0u, 0u, 0u)) {
         output_arrow[atomicAdd(&counter[1], 1u)] =
               Arrow (
                   vec4<f32>(ray.origin * 4.0, 0.0),

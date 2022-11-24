@@ -261,12 +261,18 @@ impl Application for FmmApp {
         let corner_lookat = [center[0], center[1], cube_min[2] + cube_dim[2]]; 
 
 
-        let mut ray_camera = Camera::new(configuration.size.width as f32,
-                                         configuration.size.height as f32,
+        let mut ray_camera = Camera::new(1024.0,
+                                         1536.0,
                                          (corner_lookat[0],
                                           corner_lookat[1],
                                           corner_lookat[2]),
                                          -49.0, -18.0);
+        //let mut ray_camera = Camera::new(configuration.size.width as f32,
+        //                                 configuration.size.height as f32,
+        //                                 (corner_lookat[0],
+        //                                  corner_lookat[1],
+        //                                  corner_lookat[2]),
+        //                                 -49.0, -18.0);
 
         //let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (185.0 + movement[0], 76.0 + movement[1], 315.0 + movement[2]), -49.0, -18.0);
         //let mut ray_camera = Camera::new(configuration.size.width as f32, configuration.size.height as f32, (180.0, 120.0, 500.0), -89.0, -20.0);
@@ -293,7 +299,7 @@ impl Application for FmmApp {
 
         let camera_mode = CameraMode::RayCamera;
 
-        ray_camera.set_focal_distance(1.0, &configuration.queue);
+        ray_camera.set_focal_distance(6.0, &configuration.queue);
 
         let app_render_params = AppRenderParams {
              draw_point_cloud: true,
