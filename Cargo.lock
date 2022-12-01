@@ -1331,7 +1331,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
 dependencies = [
  "lock_api",
- "parking_lot_core 0.9.4",
+ "parking_lot_core 0.9.5",
 ]
 
 [[package]]
@@ -1350,9 +1350,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dc9e0dc2adc1c69d09143aff38d3d30c5c3f0df0dad82e6d25547af174ebec0"
+checksum = "7ff9f3fef3968a3ec5945535ed654cb38ff72d7495a25619e2247fb15a2ed9ba"
 dependencies = [
  "cfg-if",
  "libc",
@@ -1606,15 +1606,15 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.147"
+version = "1.0.148"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d193d69bae983fc11a79df82342761dfbf28a99fc8d203dca4c3c1b590948965"
+checksum = "e53f64bb4ba0191d6d0676e1b141ca55047d83b74f5607e6d8eb88126c52c2dc"
 
 [[package]]
 name = "serde_derive"
-version = "1.0.147"
+version = "1.0.148"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f1d362ca8fc9c3e3a7484440752472d68a6caa98f1ab81d99b5dfe517cec852"
+checksum = "a55492425aa53521babf6137309e7d34c20bbfbbfcfe2c7f3a047fd1f6b92c0c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1745,9 +1745,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "1.0.103"
+version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a864042229133ada95abf3b54fdc62ef5ccabe9515b64717bcb9a1919e59445d"
+checksum = "4ae548ec36cf198c0ef7710d3c230987c2d6d7bd98ad6edc0274462724c585ce"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2208,7 +2208,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "0.14.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=82e9dcf8f777db6e1b30731c7b3288cae2b4c64d#82e9dcf8f777db6e1b30731c7b3288cae2b4c64d"
+source = "git+https://github.com/gfx-rs/wgpu?rev=2209463a54321d8e8812ef3588f0cdcc65a6b3a5#2209463a54321d8e8812ef3588f0cdcc65a6b3a5"
 dependencies = [
  "arrayvec 0.7.2",
  "js-sys",
@@ -2229,7 +2229,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "0.14.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=82e9dcf8f777db6e1b30731c7b3288cae2b4c64d#82e9dcf8f777db6e1b30731c7b3288cae2b4c64d"
+source = "git+https://github.com/gfx-rs/wgpu?rev=2209463a54321d8e8812ef3588f0cdcc65a6b3a5#2209463a54321d8e8812ef3588f0cdcc65a6b3a5"
 dependencies = [
  "arrayvec 0.7.2",
  "bit-vec",
@@ -2252,7 +2252,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "0.14.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=82e9dcf8f777db6e1b30731c7b3288cae2b4c64d#82e9dcf8f777db6e1b30731c7b3288cae2b4c64d"
+source = "git+https://github.com/gfx-rs/wgpu?rev=2209463a54321d8e8812ef3588f0cdcc65a6b3a5#2209463a54321d8e8812ef3588f0cdcc65a6b3a5"
 dependencies = [
  "android_system_properties",
  "arrayvec 0.7.2",
@@ -2290,7 +2290,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "0.14.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=82e9dcf8f777db6e1b30731c7b3288cae2b4c64d#82e9dcf8f777db6e1b30731c7b3288cae2b4c64d"
+source = "git+https://github.com/gfx-rs/wgpu?rev=2209463a54321d8e8812ef3588f0cdcc65a6b3a5#2209463a54321d8e8812ef3588f0cdcc65a6b3a5"
 dependencies = [
  "bitflags",
 ]

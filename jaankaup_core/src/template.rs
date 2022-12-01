@@ -320,10 +320,10 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
         let size = window.inner_size();
 
         #[cfg(not(target_arch = "wasm32"))]
-        let surface = instance.create_surface(&window);
+        let surface = instance.create_surface(&window).unwrap();
 
         #[cfg(target_arch = "wasm32")]
-        let surface = instance .create_surface_from_offscreen_canvas(&offscreen_canvas_setup.offscreen_canvas);
+        let surface = instance.create_surface_from_offscreen_canvas(&offscreen_canvas_setup.offscreen_canvas).unwrap();
         //     if let Some(offscreen_canvas_setup) = &offscreen_canvas_setup {
         //         log::info!("Creating surface from OffscreenCanvas");
         //         instance
@@ -394,11 +394,11 @@ pub async fn setup<P: WGPUFeatures>(title: &str) -> Result<WGPUConfiguration, &'
       
     let sc_desc = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: surface.get_supported_formats(&adapter)[0],
+        format: surface.get_capabilities(&adapter).formats[0],
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::Fifo,
-        alpha_mode: surface.get_supported_alpha_modes(&adapter)[0],
+        alpha_mode: surface.get_capabilities(&adapter).alpha_modes[0],
     };
 
     surface.configure(&device, &sc_desc);
